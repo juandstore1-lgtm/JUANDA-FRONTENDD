@@ -1,0 +1,140 @@
+@import url('https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&display=swap');
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@layer utilities {
+  .hide-scrollbar {
+    /* IE and Edge */
+    -ms-overflow-style: none;
+    /* Firefox */
+    scrollbar-width: none;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .animate-marquee {
+    display: flex;
+    width: max-content;
+    animation: marquee 25s linear infinite;
+  }
+  .animate-marquee-reverse {
+    display: flex;
+    width: max-content;
+    animation: marquee-reverse 25s linear infinite;
+  }
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes marquee-reverse {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0%); }
+}
+
+@keyframes quake {
+  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  10% { transform: translate(-10px, 8px) scale(1.05) rotate(-1.5deg); filter: contrast(180%) brightness(150%); }
+  20% { transform: translate(9px, -7px) scale(0.98) rotate(1.5deg); }
+  30% { transform: translate(-8px, -5px) scale(1.03) rotate(-1deg); }
+  40% { transform: translate(7px, 6px) scale(0.99) rotate(1deg); }
+  50% { transform: translate(-5px, 3px) scale(1.04) rotate(-0.5deg); filter: contrast(200%) brightness(180%); }
+  60% { transform: translate(4px, -3px) scale(1.01) rotate(0.5deg); }
+  70% { transform: translate(-3px, 2px) scale(1) rotate(0deg); }
+  80% { transform: translate(2px, -1px) scale(1) rotate(0deg); }
+  100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+}
+
+.animate-quake {
+  animation: quake 0.45s ease-in-out infinite;
+}
+
+@keyframes shockwave {
+  0% { transform: scale(0.6); opacity: 1; border-width: 4px; }
+  100% { transform: scale(2.5); opacity: 0; border-width: 1px; }
+}
+
+.animate-shockwave {
+  animation: shockwave 1.2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* ─── Premium Luxury Dark Background ─────────────────────────────────────────
+   Centro muy sutil #111111 → #0A0A0A → #000000 en bordes.
+   Sin círculo visible. Sin gris evidente. Sin glow blanco.
+   Profundidad cinematográfica, no color plano.
+──────────────────────────────────────────────────────────────────────────── */
+body {
+  background-color: #000000;
+  background-image:
+    radial-gradient(
+      ellipse 160% 120% at 50% 40%,
+      #111111 0%,
+      #0a0a0a 28%,
+      #050505 55%,
+      #000000 80%
+    );
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  color: #e8e8e8;
+  min-height: 100vh;
+}
+
+/* Ensure pages don't override the global background */
+#root {
+  min-height: 100vh;
+  background: transparent;
+}
+
+/* Premium text hierarchy for dark luxury aesthetic */
+.luxury-text-primary   { color: #f0f0f0; }
+.luxury-text-secondary { color: #999999; }
+.luxury-text-muted     { color: #555555; }
+.luxury-text-accent    { color: #cc0000; }
+
+/* Subtle separator lines */
+.luxury-border { border-color: rgba(255,255,255,0.06); }
+
+/* ─── Metallic Silver Chrome Gradient — titles & accents ──────────────────────
+   Matches the chrome finish of the JDQSTORE logo.
+   Apply to any element via: className="text-chrome"
+──────────────────────────────────────────────────────────────── */
+.text-chrome {
+  background: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    #cfcfcf 12%,
+    #ffffff 25%,
+    #777777 40%,
+    #eeeeee 52%,
+    #8a8a8a 68%,
+    #f7f7f7 82%,
+    #555555 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Hover variant — slightly brighter for interactive nav elements */
+.hover\:text-chrome:hover {
+  background: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    #e8e8e8 20%,
+    #ffffff 38%,
+    #aaaaaa 55%,
+    #ffffff 72%,
+    #cccccc 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
