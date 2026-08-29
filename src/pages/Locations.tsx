@@ -4,6 +4,7 @@ import { StoreService } from "../services/api";
 import { Store } from "../types";
 import AnimatedSection from "../components/AnimatedSection";
 import { MapPin, Clock, ExternalLink } from "lucide-react";
+import sedesImg from "@/assets/sedes.png";
 
 export default function Locations() {
   const [stores, setStores] = useState<Store[]>([]);
@@ -40,7 +41,7 @@ export default function Locations() {
                 {/* Photo */}
                 <div className="aspect-[4/3] overflow-hidden bg-black/40 relative">
                   <img
-                    src={store.image || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'}
+                    src={store.image || sedesImg}
                     alt={store.name}
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 grayscale-[20%]"
                   />
