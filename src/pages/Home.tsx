@@ -17,6 +17,7 @@ export default function Home() {
   const [slides, setSlides] = useState<HeroSlide[]>([]);
   const [mysteryBoxSetting, setMysteryBoxSetting] = useState<MysteryBoxSetting | null>(null);
 
+  
   // Interactive Collections State
   const [categoryCollections, setCategoryCollections] = useState<HomeCategoryCollection[]>([]);
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
