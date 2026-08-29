@@ -1,5 +1,5 @@
 import React from "react";
-import logoImg from "C:/Users/JUBOLANO/.gemini/antigravity/brain/709624aa-3b69-4d76-b2fd-3ca8c16fdea4/.user_uploaded/media_1786159830515.png";
+const logoImg = "/logo.png";
 
 export default function Logo({ className = "h-12" }: { className?: string }) {
   return (

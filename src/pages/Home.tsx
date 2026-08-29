@@ -7,8 +7,8 @@ import { ArrowRight, ChevronLeft, ChevronRight, Package, MapPin, Clock, ShieldCh
 import AnimatedSection from "../components/AnimatedSection";
 import ProductCard from "../components/ProductCard";
 import { formatPrice } from "../utils/format";
-import locationBannerImg from "C:/Users/JUBOLANO/Downloads/ChatGPT Image 8 ago 2026, 01_40_05.png";
-import mysteryBoxImg from "C:/Users/JUBOLANO/.gemini/antigravity/brain/709624aa-3b69-4d76-b2fd-3ca8c16fdea4/mystery_box_streetwear_1786170102977.jpg";
+const locationBannerImg = "https://images.unsplash.com/photo-1555529771-835f59fc5efe?auto=format&fit=crop&w=1200&q=80";
+const mysteryBoxImg = "https://images.unsplash.com/photo-1616423641402-f8b46571550c?auto=format&fit=crop&w=1200&q=80";
 
 export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
