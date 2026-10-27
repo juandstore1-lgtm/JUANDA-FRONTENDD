@@ -138,7 +138,7 @@ export default function Navbar() {
         }`}>
           <div className="max-w-7xl mx-auto px-6 md:px-10 h-20 flex items-center justify-between relative z-50">
             <Link to="/" className="text-white dark:text-white py-1">
-              <Logo className="h-11 md:h-12" />
+              <Logo className="h-30 md:h-30" />
             </Link>
             
             {/* Desktop Nav */}

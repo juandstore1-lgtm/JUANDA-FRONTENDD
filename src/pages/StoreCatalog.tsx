@@ -521,7 +521,7 @@ export default function StoreCatalog() {
         {/* Main Content Area */}
         <div className="w-full lg:w-[calc(100%-260px-3rem)] order-2 lg:order-2 flex-1">
           {/* Banners Section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+          <div className="hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
              <div className="relative bg-[#111] rounded-xl border border-white/10 p-6 flex flex-col justify-center overflow-hidden min-h-[140px] group cursor-pointer hover:border-white/30 transition-colors">
                 <div className="relative z-10">
                   <h3 className="text-lg font-black uppercase tracking-widest flex items-center gap-2 text-white">🔥 MÁS VENDIDOS</h3>
@@ -565,45 +565,45 @@ export default function StoreCatalog() {
 
           <div className="flex-1">
             {/* Grid Toolbar */}
-            <div className="flex items-center justify-between bg-[#111] border border-white/5 p-3 rounded-sm mb-6">
-            <span className="text-sm text-white/50">
-              Mostrando <strong className="text-white font-medium">{(currentPage - 1) * ITEMS_PER_PAGE + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredProducts.length)}</strong> de {filteredProducts.length} productos
-            </span>
-            
-            <div className="flex items-center gap-6">
-              <div className="relative">
-                <select 
-                  className="bg-transparent text-sm text-white/70 appearance-none pr-6 cursor-pointer focus:outline-none"
-                  value={activeStoreId || ""}
-                  onChange={(e) => setActiveStoreId(e.target.value || null)}
-                >
-                  <option value="" className="bg-[#111] text-white">Todas las sedes</option>
-                  {allStores.map(store => (
-                    <option key={store.id} value={store.id} className="bg-[#111] text-white">{store.name}</option>
-                  ))}
-                </select>
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <svg className="w-3 h-3 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#111] border border-white/5 p-3 rounded-lg mb-6">
+              <span className="text-xs sm:text-sm text-white/50">
+                Mostrando <strong className="text-white font-medium">{(currentPage - 1) * ITEMS_PER_PAGE + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredProducts.length)}</strong> de {filteredProducts.length} productos
+              </span>
+              
+              <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 flex-wrap">
+                <div className="relative">
+                  <select 
+                    className="bg-transparent text-xs sm:text-sm text-white/70 appearance-none pr-6 cursor-pointer focus:outline-none"
+                    value={activeStoreId || ""}
+                    onChange={(e) => setActiveStoreId(e.target.value || null)}
+                  >
+                    <option value="" className="bg-[#111] text-white">Todas las sedes</option>
+                    {allStores.map(store => (
+                      <option key={store.id} value={store.id} className="bg-[#111] text-white">{store.name}</option>
+                    ))}
+                  </select>
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <svg className="w-3 h-3 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                  </div>
                 </div>
-              </div>
-              <div className="w-px h-4 bg-white/10"></div>
-              <div className="flex items-center gap-3 text-white/40">
-                <span className="text-xs uppercase tracking-widest">Ver:</span>
-                <button className="text-white hover:text-white transition-colors"><Grid className="w-4 h-4" /></button>
-                <button className="hover:text-white transition-colors"><List className="w-4 h-4" /></button>
-              </div>
-              <div className="w-px h-4 bg-white/10"></div>
-              <div className="relative">
-                <select className="bg-transparent text-sm text-white/70 appearance-none pr-6 cursor-pointer focus:outline-none">
-                  <option className="bg-[#111] text-white">12 por página</option>
-                  <option className="bg-[#111] text-white">24 por página</option>
-                </select>
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <svg className="w-3 h-3 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                <div className="hidden sm:block w-px h-4 bg-white/10"></div>
+                <div className="hidden sm:flex items-center gap-3 text-white/40">
+                  <span className="text-xs uppercase tracking-widest">Ver:</span>
+                  <button className="text-white hover:text-white transition-colors"><Grid className="w-4 h-4" /></button>
+                  <button className="hover:text-white transition-colors"><List className="w-4 h-4" /></button>
+                </div>
+                <div className="hidden sm:block w-px h-4 bg-white/10"></div>
+                <div className="hidden sm:block relative">
+                  <select className="bg-transparent text-xs sm:text-sm text-white/70 appearance-none pr-6 cursor-pointer focus:outline-none">
+                    <option className="bg-[#111] text-white">12 por página</option>
+                    <option className="bg-[#111] text-white">24 por página</option>
+                  </select>
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <svg className="w-3 h-3 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
           <div className="lg:hidden flex justify-end mb-8">
             <span className="text-sm text-white/40">{filteredProducts.length} Productos</span>

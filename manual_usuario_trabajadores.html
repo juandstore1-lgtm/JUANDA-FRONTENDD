@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manual de Usuario - Trabajadores (STORE_ADMIN) | JDQSTORE</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
+    
+    @page {
+      size: A4;
+      margin: 18mm 15mm 20mm 15mm;
+    }
+    
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      color: #1a1a1a;
+      background-color: #f8fafc;
+      margin: 0;
+      padding: 0;
+      line-height: 1.6;
+      font-size: 13px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 40px 50px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+    }
+
+    /* Print Controls Bar */
+    .no-print-bar {
+      position: sticky;
+      top: 0;
+      background: #000000;
+      color: #ffffff;
+      padding: 14px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      z-index: 1000;
+      border-bottom: 2px solid #dc2626;
+    }
+
+    .btn-print {
+      background: #dc2626;
+      color: #ffffff;
+      border: none;
+      padding: 10px 20px;
+      font-weight: 800;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+
+    .btn-print:hover {
+      background: #b91c1c;
+    }
+
+    /* Cover Header */
+    .header {
+      border-bottom: 3px solid #000000;
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .header h1 {
+      font-size: 26px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: -0.5px;
+      margin: 0;
+      color: #000000;
+    }
+
+    .header-badge {
+      background: #000000;
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 6px 12px;
+      letter-spacing: 1.5px;
+      border-radius: 4px;
+    }
+
+    /* Alerts */
+    .alert {
+      padding: 16px 20px;
+      border-left: 4px solid #dc2626;
+      background: #fef2f2;
+      border-radius: 0 8px 8px 0;
+      margin: 20px 0;
+    }
+
+    .alert-title {
+      font-weight: 800;
+      text-transform: uppercase;
+      font-size: 11px;
+      color: #991b1b;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+
+    .alert-body {
+      color: #7f1d1d;
+      font-size: 12px;
+    }
+
+    .tip-box {
+      padding: 16px 20px;
+      border-left: 4px solid #059669;
+      background: #ecfdf5;
+      border-radius: 0 8px 8px 0;
+      margin: 20px 0;
+    }
+
+    .tip-title {
+      font-weight: 800;
+      text-transform: uppercase;
+      font-size: 11px;
+      color: #065f46;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+
+    /* Sections & Titles */
+    h2 {
+      font-size: 17px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: -0.3px;
+      color: #000000;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 8px;
+      margin-top: 32px;
+    }
+
+    h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-top: 20px;
+    }
+
+    ul, ol {
+      padding-left: 20px;
+      margin: 10px 0;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    /* Code & Badges */
+    code {
+      background: #f1f5f9;
+      color: #0f172a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 12px;
+    }
+
+    th {
+      background: #0f172a;
+      color: #ffffff;
+      text-align: left;
+      padding: 10px 14px;
+      font-weight: 800;
+      text-transform: uppercase;
+      font-size: 10px;
+      letter-spacing: 1px;
+    }
+
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    tr:nth-child(even) {
+      background: #f8fafc;
+    }
+
+    /* Footer */
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 10px;
+      color: #94a3b8;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    @media print {
+      .no-print-bar { display: none !important; }
+      body { background: #ffffff; }
+      .container { box-shadow: none; padding: 0; }
+      .page-break { page-break-before: always; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Printable Header Controls -->
+  <div class="no-print-bar">
+    <div>
+      <strong style="font-size:14px; letter-spacing:1px; text-transform:uppercase;">📖 Manual de Usuario - Trabajadores (STORE_ADMIN)</strong>
+      <span style="opacity: 0.6; margin-left: 10px; font-size: 11px;">JDQSTORE System Manual</span>
+    </div>
+    <button class="btn-print" onclick="window.print()">🖨️ Guardar o Imprimir en PDF</button>
+  </div>
+
+  <div class="container">
+    
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>JDQSTORE</h1>
+        <div style="font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:1px; mt-1">Manual Operativo de Sede para Trabajadores</div>
+      </div>
+      <div class="header-badge">STORE_ADMIN</div>
+    </div>
+
+    <!-- Alert Box -->
+    <div class="alert">
+      <div class="alert-title">⚠️ Alcance del Perfil ( STORE_ADMIN )</div>
+      <div class="alert-body">
+        Este documento contempla exclusivamente las funciones de <strong>Gestión de Productos, Categorías y Dashboard de Sede</strong> asignadas al equipo operativo. Las funciones de Administración Global (gestión de sedes, creación de usuarios, rifas, concursos y banner principal) están reservadas al Administrador Global y quedan excluidas de este manual.
+      </div>
+    </div>
+
+    <!-- Section 1 -->
+    <h2>1. Acceso al Sistema de Administración</h2>
+    <p>Para ingresar al panel de administración de tu sede:</p>
+    <ol>
+      <li>Ingresa a la URL del administrador (ej. <code>/admin/login</code>).</li>
+      <li>Escribe tu <strong>Correo Electrónico corporativo</strong> y tu <strong>Contraseña asignada</strong>.</li>
+      <li>Haz clic en el botón <strong>INICIAR SESIÓN</strong>. El sistema verificará tu rol y te dará acceso al panel de tu sede.</li>
+    </ol>
+
+    <div class="tip-box">
+      <div class="tip-title">💡 Consejo de Seguridad</div>
+      <div>Recuerda cerrar sesión al finalizar tu turno de trabajo haciendo clic en <strong>Cerrar Sesión</strong> en la parte inferior de la barra lateral.</div>
+    </div>
+
+    <!-- Section 2 -->
+    <h2>2. Menú de Navegación (Sidebar)</h2>
+    <p>En el menú izquierdo tendrás acceso a las siguientes herramientas:</p>
+    <ul>
+      <li>📊 <strong>Dashboard:</strong> Vista general con el indicador del Total de Productos registrados.</li>
+      <li>📦 <strong>Productos:</strong> Módulo principal para consultar, filtrar, agregar, editar o agotar productos.</li>
+      <li>🏷️ <strong>Categorías:</strong> Módulo para organizar las prendas en categorías (Camisetas, Hoodies, Pantalones, etc.).</li>
+      <li>🚪 <strong>Cerrar Sesión:</strong> Opción segura para salir del sistema al finalizar el trabajo.</li>
+    </ul>
+
+    <!-- Section 3 -->
+    <div class="page-break"></div>
+    <h2>3. Módulo de Productos (Gestión de Inventario)</h2>
+    <p>Ubicación: <code>/admin/products</code></p>
+
+    <h3>3.1. Búsqueda y Filtros</h3>
+    <ul>
+      <li><strong>Filtro por Sede:</strong> Los productos están organizados en paneles desplegables por cada sede a la que perteneces.</li>
+      <li><strong>Buscador en Tiempo Real:</strong> Escribe el nombre de cualquier prenda en la casilla <em>"Buscar producto..."</em>.</li>
+      <li><strong>Filtro por Categoría y Estado:</strong> Puedes filtrar simultáneamente por categoría y por disponibilidad (<em>Disponible / Agotado</em>).</li>
+      <li><strong>Previsualizar Imagen:</strong> Haz clic en la miniatura de la prenda para ver la foto en tamaño completo.</li>
+    </ul>
+
+    <h3>3.2. Paso a Paso: Crear un Producto</h3>
+    <ol>
+      <li>Haz clic en el botón superior <strong>+ Nuevo Producto</strong>.</li>
+      <li>Completa el formulario:
+        <ul>
+          <li><strong>Nombre:</strong> Nombre comercial completo del producto.</li>
+          <li><strong>Descripción:</strong> Detalles de la tela, diseño y horma.</li>
+          <li><strong>Precio ($):</strong> Precio de venta en pesos colombianos (COP).</li>
+          <li><strong>Precio Anterior ($):</strong> Llenar solo si el producto cuenta con descuento.</li>
+          <li><strong>Categoría:</strong> Selecciona la categoría registrada en tu sede.</li>
+          <li><strong>Tallas:</strong> Marca las tallas disponibles (S, M, L, XL, XXL).</li>
+          <li><strong>Colores:</strong> Escribe los colores disponibles separados por comas.</li>
+          <li><strong>Imágenes:</strong> Carga una o varias imágenes claras de la prenda.</li>
+          <li><strong>Estado:</strong> Selecciona <code>AVAILABLE</code> (Disponible) o <code>OUT_OF_STOCK</code> (Agotado).</li>
+          <li><strong>Sedes:</strong> Marca la casilla correspondiente a tu sede.</li>
+        </ul>
+      </li>
+      <li>Haz clic en <strong>Guardar Producto</strong>.</li>
+    </ol>
+
+    <h3>3.3. Cambiar Estado a Agotado</h3>
+    <p>Cuando una prenda se quede sin stock físico en la tienda:</p>
+    <ul>
+      <li>Busca el producto y haz clic en el ícono de <strong>Lápiz (Editar)</strong>.</li>
+      <li>Cambia el estado a <strong>Agotado (OUT_OF_STOCK)</strong>.</li>
+      <li>El producto seguirá apareciendo en el catálogo web con el distintivo de <strong>AGOTADO</strong>, evitando ventas de prendas no disponibles.</li>
+    </ul>
+
+    <!-- Section 4 -->
+    <h2>4. Módulo de Categorías</h2>
+    <p>Ubicación: <code>/admin/categories</code></p>
+    <p>Permite mantener organizado el catálogo de tu sede por familias de producto:</p>
+    <ul>
+      <li><strong>Crear Categoría:</strong> Haz clic en <strong>+ Nueva Categoría</strong>, asigna un nombre (ej. <em>Chaquetas</em>) and selecciona tu sede.</li>
+      <li><strong>Editar Categoría:</strong> Modifica el nombre o actualiza la imagen de la sección.</li>
+      <li><strong>Eliminar Categoría:</strong> Remueve categorías en desuso (asegúrate de que no tengan productos activos asignados).</li>
+    </ul>
+
+    <!-- Section 5 -->
+    <h2>5. Guía de Solución de Problemas Frecuentes</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Situación / Problema</th>
+          <th>Causa Probable</th>
+          <th>Acción Correctiva</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>No veo el módulo de Usuarios o Rifas</strong></td>
+          <td>Son funciones exclusivas del Administrador Global.</td>
+          <td>Comportamiento normal de acuerdo a tu rol <code>STORE_ADMIN</code>.</td>
+        </tr>
+        <tr>
+          <td><strong>No aparece la categoría al crear un producto</strong></td>
+          <td>La categoría aún no ha sido registrada para tu sede.</td>
+          <td>Ingresa al menú <strong>Categorías</strong>, créala para tu sede y vuelve a guardar el producto.</td>
+        </tr>
+        <tr>
+          <td><strong>El producto no aparece en la tienda virtual</strong></td>
+          <td>Estado en "Agotado" o desmarcada la sede.</td>
+          <td>Edita el producto y confirma que la sede esté activa y el estado sea <code>Disponible</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="footer">
+      JDQSTORE • Manual Operativo de Usuario para Trabajadores • Sistema v2.0
+    </div>
+
+  </div>
+
+</body>
+</html>

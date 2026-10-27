@@ -185,16 +185,10 @@ export default function Home() {
       </div>
 
       {/* LAS MEJORES COLECCIONES (Administrables desde el Panel Admin) */}
-      <section className="py-20 w-full bg-black text-white border-b border-white/10">
+      <section className="py-8 md:py-20 w-full bg-black text-white border-b border-white/10">
         <div className="w-[80%] mx-auto text-center">
           <AnimatedSection>
-            {/* Header Title */}
-            <span className="text-[11px] font-bold tracking-[0.4em] uppercase text-white/50 block mb-1">
-              LAS MEJORES
-            </span>
-            <h2 className="text-4xl md:text-6xl font-black uppercase tracking-tight mb-10 text-chrome italic">
-              COLECCIONES
-            </h2>
+
 
             {/* Main Interactive Showcase Card Container */}
             {categoryCollections.length > 0 && (
@@ -298,7 +292,7 @@ export default function Home() {
 
       {/* Mystery Box Banner Section */}
       {mysteryBoxSetting?.active && (
-        <section className="py-20 bg-[#080808] border-b border-white/10 text-white relative overflow-hidden">
+        <section className="py-8 md:py-20 bg-[#080808] border-b border-white/10 text-white relative overflow-hidden">
           <div className="w-[80%] mx-auto">
             <AnimatedSection>
               <div className="relative bg-[#111111] border border-white/10 rounded-2xl overflow-hidden shadow-2xl flex flex-col md:flex-row min-h-[420px]">
@@ -385,7 +379,7 @@ export default function Home() {
 
 
       {/* Physical Stores Location Map Banner Card */}
-      <section className="py-20 bg-black text-white border-b border-white/10">
+      <section className="py-8 md:py-20 bg-black text-white border-b border-white/10">
         <div className="w-[80%] mx-auto">
           <AnimatedSection>
             <div className="relative bg-[#050505] border border-white/10 rounded-2xl overflow-hidden shadow-2xl flex flex-col md:flex-row min-h-[420px]">
@@ -453,13 +447,11 @@ export default function Home() {
       </section>
 
       {/* FAQ Section */}
-      <section className="py-20 w-full bg-black text-white border-b border-white/10">
+      <section className="py-8 md:py-20 w-full bg-black text-white border-b border-white/10">
         <div className="w-[80%] mx-auto">
           <AnimatedSection>
             {/* Header Title */}
-            <span className="text-[11px] font-bold tracking-[0.4em] uppercase text-white/50 block mb-1 text-center">
-              RESOLVEMOS TUS DUDAS
-            </span>
+
             <h2 className="text-4xl md:text-6xl font-black uppercase tracking-tight mb-16 text-chrome italic text-center">
               PREGUNTAS FRECUENTES
             </h2>
@@ -467,20 +459,28 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {[
                 {
-                  q: "¿Hacen envíos a toda Colombia?",
-                  a: "Sí, realizamos envíos seguros a nivel nacional. El tiempo estimado de entrega varía según tu ciudad, generalmente tomando de 2 a 5 días hábiles."
+                  q: "¿DÓNDE ESTÁN UBICADOS?",
+                  a: "Estamos ubicados en Cali, Colombia, con cuatro sedes para que puedas visitarnos y conocer nuestros productos."
                 },
                 {
-                  q: "¿Puedo cambiar una prenda?",
-                  a: "Claro que sí. Tienes garantía y opción de cambio por talla, siempre y cuando la prenda mantenga sus etiquetas y condiciones originales."
+                  q: "¿CÓMO PUEDO CONSULTAR EL CATÁLOGO?",
+                  a: "Ingresa a la opción Catálogo en nuestro menú, selecciona cualquiera de nuestras cuatro sedes y descubre las referencias disponibles. Puedes realizar tu compra desde nuestra página web y ser redirigido a WhatsApp para recibir una atención más personalizada."
                 },
                 {
-                  q: "¿Qué métodos de pago aceptan?",
-                  a: "Aceptamos pagos rápidos y seguros a través de transferencia (Bancolombia, Nequi, Daviplata), tarjetas y efectivo en nuestras tiendas físicas."
+                  q: "¿HACEN ENVÍOS A TODO COLOMBIA?",
+                  a: "¡Sí! Realizamos envíos a nivel nacional. El tiempo estimado de entrega varía según tu ciudad de destino y generalmente es de 2 a 5 días hábiles."
                 },
                 {
-                  q: "¿Venden al por mayor?",
-                  a: "Sí. Contamos con una Línea Mayorista para distribuidores. Puedes solicitar acceso desde el menú principal para obtener precios preferenciales."
+                  q: "¿QUÉ MÉTODOS DE PAGO ACEPTAN?",
+                  a: "Aceptamos pagos rápidos y seguros mediante transferencias por código QR y tarjetas débito o crédito. Próximamente incorporaremos nuevas alternativas de financiación, como Sistecrédito o Addi."
+                },
+                {
+                  q: "¿PUEDO CAMBIAR UNA PRENDA?",
+                  a: "¡Claro que sí! Contamos con opciones de cambio por talla, de acuerdo con nuestras políticas y las condiciones aplicables. La prenda debe conservar sus etiquetas y estar en el estado en que fue entregada. Para conocer el procedimiento, comunícate con nuestro equipo por WhatsApp."
+                },
+                {
+                  q: "¿VENDEN AL POR MAYOR?",
+                  a: "¡Sí! Contamos con una línea mayorista ideal para distribuidores y emprendedores. Escríbenos por WhatsApp y uno de nuestros asesores te brindará toda la información."
                 }
               ].map((faq, idx) => (
                 <div key={idx} className="bg-[#050505] border border-white/10 p-8 rounded-2xl hover:border-white/30 transition-colors">

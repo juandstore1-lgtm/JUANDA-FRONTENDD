@@ -66,7 +66,7 @@ function InitialLoader({ onComplete }: { onComplete: () => void; key?: string })
         transition={{ duration: 1.1, ease: "easeInOut", delay: 0.1 }}
         className="relative z-2 flex items-center justify-center pointer-events-none"
       >
-        <Logo className="h-52 md:h-72" />
+        <Logo className="h-130 md:h-130" />
       </motion.div>
 
       {/* Z-3: "Saltar" (Skip) Pill Button on Bottom Right */}
