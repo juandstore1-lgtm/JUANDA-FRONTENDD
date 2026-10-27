@@ -461,38 +461,7 @@ export default function ProductDetail() {
         </div>
       </div>
 
-      {/* Trust Banner Below */}
-      <div className="w-full max-w-[1400px] mx-auto px-6 md:px-12 mb-20">
-         <div className="border border-white/10 rounded-xl p-8 bg-[#111] grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="flex items-center justify-center gap-4 text-center md:text-left">
-               <div className="w-12 h-12 border border-white/20 rounded-full flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
-               </div>
-               <div>
-                  <h4 className="font-bold text-sm tracking-wider">ENVÍOS 24/48H</h4>
-                  <p className="text-xs text-white/50">A todo Colombia</p>
-               </div>
-            </div>
-            <div className="flex items-center justify-center gap-4 text-center md:text-left">
-               <div className="w-12 h-12 border border-white/20 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Shield className="w-5 h-5" />
-               </div>
-               <div>
-                  <h4 className="font-bold text-sm tracking-wider">PAGO CONTRA ENTREGA</h4>
-                  <p className="text-xs text-white/50">Paga al recibir tu pedido</p>
-               </div>
-            </div>
-            <div className="flex items-center justify-center gap-4 text-center md:text-left">
-               <div className="w-12 h-12 border border-white/20 rounded-full flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 12h4l2-2 4 4 4-4 4 4 2-2h2"></path></svg>
-               </div>
-               <div>
-                  <h4 className="font-bold text-sm tracking-wider">CAMBIOS FÁCILES</h4>
-                  <p className="text-xs text-white/50">Tienes hasta 7 días</p>
-               </div>
-            </div>
-         </div>
-      </div>
+
       {/* Quick Add Modal */}
       <AnimatePresence>
         {quickAddProduct && (

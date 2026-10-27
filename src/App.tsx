@@ -13,6 +13,7 @@ import ProductDetail from "./pages/ProductDetail";
 
 import Wholesale from "./pages/Wholesale";
 import Locations from "./pages/Locations";
+import Schedules from "./pages/Schedules";
 
 import MysteryBox from "./pages/MysteryBox";
 import Contest from "./pages/Contest";
@@ -105,6 +106,7 @@ function MainApp() {
 
                 <Route path="/mayorista" element={<Wholesale />} />
                 <Route path="/ubicaciones" element={<Locations />} />
+                <Route path="/horarios" element={<Schedules />} />
 
                 <Route path="/caja-misteriosa" element={<MysteryBox />} />
                 <Route path="/concursos" element={<Contest />} />

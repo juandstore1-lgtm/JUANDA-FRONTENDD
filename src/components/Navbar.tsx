@@ -124,6 +124,7 @@ export default function Navbar() {
 
     { name: "Mayorista", path: "/mayorista" },
     { name: "Ubicaciones", path: "/ubicaciones" },
+    { name: "Horarios", path: "/horarios" },
 
   ];
 
@@ -143,16 +144,23 @@ export default function Navbar() {
             
             {/* Desktop Nav */}
             <div className="hidden md:flex items-center space-x-6">
-              {navLinks.map((link) => (
-                <Link 
-                  key={link.name} 
-                  to={link.path}
-                  className="group relative text-[10px] font-bold uppercase tracking-widest text-white/70 transition-colors hover:text-chrome"
-                >
-                  {link.name}
-                  <span className="absolute -bottom-1 left-0 w-0 h-[1px] bg-white/40 transition-all duration-300 group-hover:w-full"></span>
-                </Link>
-              ))}
+              {navLinks.map((link) => {
+                const isActive = location.pathname === link.path;
+                return (
+                  <Link 
+                    key={link.name} 
+                    to={link.path}
+                    className={`group relative text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                      isActive ? "text-white" : "text-white/70 hover:text-chrome"
+                    }`}
+                  >
+                    {link.name}
+                    <span className={`absolute -bottom-1 left-0 h-[1px] bg-white transition-all duration-300 ${
+                      isActive ? "w-full" : "w-0 bg-white/40 group-hover:w-full"
+                    }`}></span>
+                  </Link>
+                );
+              })}
             </div>
 
             <div className="flex items-center space-x-6">
