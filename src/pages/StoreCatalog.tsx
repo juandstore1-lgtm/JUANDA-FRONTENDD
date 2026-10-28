@@ -408,65 +408,130 @@ export default function StoreCatalog() {
           </div>
         </aside>
 
-        {/* Sidebar Filters - Mobile */}
+        {/* Sidebar Filters - Mobile Drawer */}
         <aside className={`
-          fixed inset-0 z-50 bg-white dark:bg-[#0a0a0a] p-6 md:p-12 transform transition-transform duration-300 lg:hidden overflow-y-auto
+          fixed inset-0 z-[70] bg-[#0a0a0a] flex flex-col transform transition-transform duration-300 lg:hidden
           ${isFilterOpen ? "translate-x-0" : "-translate-x-full"}
         `}>
-          <div className="flex justify-between items-center mb-12">
-            <h2 className="text-xl font-black uppercase tracking-tighter">Filtros</h2>
-            <button onClick={() => setIsFilterOpen(false)}>
-              <X className="w-6 h-6" />
+          {/* Header */}
+          <div className="sticky top-0 bg-[#0a0a0a] border-b border-white/10 px-6 py-4 flex justify-between items-center z-10 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <SlidersHorizontal className="w-4 h-4 text-white/70" />
+              <h2 className="text-base font-black uppercase tracking-wider text-white">Filtros</h2>
+              <span className="text-xs text-white/40 font-bold ml-1">
+                ({filteredProducts.length} productos)
+              </span>
+            </div>
+            <button 
+              onClick={() => setIsFilterOpen(false)}
+              className="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/15 transition-colors cursor-pointer"
+              aria-label="Cerrar filtros"
+            >
+              <X className="w-5 h-5" />
             </button>
           </div>
 
-          <div className="space-y-12">
+          {/* Scrollable Filters Content */}
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
+            {/* Sede Selector */}
+            {allStores.length > 0 && (
+              <div>
+                <h3 className="font-bold uppercase tracking-widest text-xs mb-3 text-white">SEDE</h3>
+                <div className="relative">
+                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none" />
+                  <select 
+                    className="w-full bg-[#111] border border-white/10 text-white text-[13px] pl-10 pr-4 py-3 appearance-none focus:outline-none focus:border-white/30 transition-colors cursor-pointer rounded-sm"
+                    value={activeStoreId || ""}
+                    onChange={(e) => {
+                      setActiveStoreId(e.target.value);
+                      setIsFilterOpen(false);
+                    }}
+                  >
+                    <option value="" disabled className="bg-[#111] text-white">Selecciona tu sede</option>
+                    {allStores.map(s => (
+                      <option key={s.id} value={s.id} className="bg-[#111] text-white">{s.name}</option>
+                    ))}
+                  </select>
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <svg className="w-4 h-4 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Sort */}
             <div>
-              <h3 className="font-bold uppercase tracking-widest text-sm mb-4">Ordenar Por</h3>
-              <div className="space-y-3">
+              <h3 className="font-bold uppercase tracking-widest text-xs mb-3 text-white">ORDENAR POR</h3>
+              <div className="space-y-2">
                 {[
+                  { value: null, label: "Más recientes" },
                   { value: "price_asc", label: "Precio: Menor a Mayor" },
                   { value: "price_desc", label: "Precio: Mayor a Menor" },
                 ].map(option => (
-                  <label key={option.value} className="flex items-center space-x-3 cursor-pointer group">
-                    <div className="w-4 h-4 border border-black dark:border-white flex items-center justify-center">
-                      {sortBy === option.value && <div className="w-2 h-2 bg-black dark:bg-white" />}
+                  <button 
+                    key={String(option.value)}
+                    type="button"
+                    onClick={() => {
+                      setSortBy(option.value as any);
+                      setIsFilterOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between p-3 rounded-lg border text-left transition-colors cursor-pointer ${
+                      sortBy === option.value
+                        ? "bg-white/10 border-white text-white font-bold"
+                        : "bg-[#111] border-white/5 text-white/60 hover:text-white hover:border-white/20"
+                    }`}
+                  >
+                    <span className="text-xs uppercase tracking-wide">{option.label}</span>
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${sortBy === option.value ? "border-white bg-white" : "border-white/30"}`}>
+                      {sortBy === option.value && <div className="w-1.5 h-1.5 rounded-full bg-black" />}
                     </div>
-                    <input 
-                      type="radio" 
-                      className="hidden" 
-                      checked={sortBy === option.value}
-                      onChange={() => setSortBy(option.value as any)}
-                    />
-                    <span className="text-sm text-black/60 dark:text-white/40 group-hover:text-black dark:group-hover:text-white transition-colors">{option.label}</span>
-                  </label>
+                  </button>
                 ))}
               </div>
             </div>
 
             {/* Categories */}
             <div>
-              <h3 className="font-bold uppercase tracking-widest text-sm mb-4">Categoría</h3>
-              <div className="space-y-3">
+              <h3 className="font-bold uppercase tracking-widest text-xs mb-3 text-white">CATEGORÍA</h3>
+              <div className="space-y-1.5">
                 <button 
-                  onClick={() => setSelectedCategory(null)}
-                  className={`block text-left text-sm uppercase transition-colors ${!selectedCategory ? 'text-black dark:text-white font-bold' : 'text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white'}`}
+                  onClick={() => {
+                    setSelectedCategory(null);
+                    setIsFilterOpen(false);
+                  }}
+                  className={`w-full block text-left text-xs uppercase tracking-wide py-3 px-3.5 rounded-lg border transition-colors cursor-pointer ${
+                    !selectedCategory 
+                      ? 'bg-white/10 text-white font-bold border-white/30' 
+                      : 'bg-[#111] text-white/50 hover:text-white border-white/5 hover:border-white/20'
+                  }`}
                 >
-                  Todas
+                  Todas las categorías
                 </button>
                 <button 
-                  onClick={() => setSelectedCategory('Descuentos')}
-                  className={`block text-left text-sm uppercase transition-colors ${selectedCategory === 'Descuentos' ? 'text-red-600 font-bold' : 'text-red-500 hover:text-red-600'}`}
+                  onClick={() => {
+                    setSelectedCategory('Descuentos');
+                    setIsFilterOpen(false);
+                  }}
+                  className={`w-full block text-left text-xs uppercase tracking-wide py-3 px-3.5 rounded-lg border transition-colors cursor-pointer ${
+                    selectedCategory === 'Descuentos' 
+                      ? 'bg-red-500/20 text-red-400 font-bold border-red-500/40' 
+                      : 'bg-[#111] text-red-400/80 hover:text-red-300 border-white/5 hover:border-red-500/30'
+                  }`}
                 >
                   % Descuentos
                 </button>
-                {categories.length === 0 && <span className="text-xs text-black/50 dark:text-white/50">Sin categorías</span>}
                 {categories.map(cat => (
                   <button 
                     key={cat.id}
-                    onClick={() => setSelectedCategory(cat.name)}
-                    className={`block text-left text-sm uppercase transition-colors ${selectedCategory === cat.name ? 'text-black dark:text-white font-bold' : 'text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white'}`}
+                    onClick={() => {
+                      setSelectedCategory(cat.name);
+                      setIsFilterOpen(false);
+                    }}
+                    className={`w-full block text-left text-xs uppercase tracking-wide py-3 px-3.5 rounded-lg border transition-colors cursor-pointer ${
+                      selectedCategory === cat.name 
+                        ? 'bg-white/10 text-white font-bold border-white/30' 
+                        : 'bg-[#111] text-white/50 hover:text-white border-white/5 hover:border-white/20'
+                    }`}
                   >
                     {cat.name}
                   </button>
@@ -477,16 +542,19 @@ export default function StoreCatalog() {
             {/* Sizes */}
             {currentSizes.length > 0 && (
               <div>
-                <h3 className="font-bold uppercase tracking-widest text-sm mb-4">Talla</h3>
+                <h3 className="font-bold uppercase tracking-widest text-xs mb-3 text-white">TALLA</h3>
                 <div className="flex flex-wrap gap-2">
                   {currentSizes.map(size => (
                     <button 
                       key={size}
-                      onClick={() => setSelectedSize(selectedSize === size ? null : size)}
-                      className={`w-10 h-10 border flex items-center justify-center text-sm font-medium transition-colors ${
+                      onClick={() => {
+                        setSelectedSize(selectedSize === size ? null : size);
+                        setIsFilterOpen(false);
+                      }}
+                      className={`w-12 h-12 rounded-lg border flex items-center justify-center text-xs font-bold transition-all cursor-pointer ${
                         selectedSize === size 
-                          ? 'bg-red-600 text-white border-red-600' 
-                          : 'bg-white dark:bg-transparent text-black dark:text-white border-gray-200 dark:border-gray-800 hover:border-black dark:hover:border-white'
+                          ? 'bg-white text-black border-white shadow-md' 
+                          : 'bg-[#111] text-white/70 border-white/10 hover:border-white/40 hover:text-white'
                       }`}
                     >
                       {size}
@@ -498,7 +566,7 @@ export default function StoreCatalog() {
 
             {/* Price Range */}
             <div>
-              <h3 className="font-bold uppercase tracking-widest text-sm mb-4">Precio Máximo</h3>
+              <h3 className="font-bold uppercase tracking-widest text-xs mb-3 text-white">PRECIO MÁXIMO</h3>
               <div className="pt-2">
                 <input 
                   type="range" 
@@ -507,14 +575,41 @@ export default function StoreCatalog() {
                   step="10000"
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(Number(e.target.value))}
-                  className="w-full h-1 bg-gray-200 dark:bg-white/20 rounded-lg appearance-none cursor-pointer"
+                  className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                  style={{ accentColor: 'white' }}
                 />
-                <div className="flex justify-between items-center text-xs text-gray-500 dark:text-white/50 mt-4">
+                <div className="flex justify-between items-center text-xs text-white/50 mt-4">
                   <span>$0</span>
-                  <span>{maxPrice >= 150000 ? '$150.000+' : `$${maxPrice.toLocaleString('es-CO')}`}</span>
+                  <span className="font-bold text-white">{maxPrice >= 150000 ? '$150.000+' : `${maxPrice.toLocaleString('es-CO')}`}</span>
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Sticky Bottom Actions */}
+          <div className="p-4 bg-[#0a0a0a] border-t border-white/10 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsFilterOpen(false)}
+              className="w-full py-3.5 bg-white text-black font-black uppercase tracking-widest text-xs rounded-xl hover:bg-white/90 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+            >
+              Ver Resultados ({filteredProducts.length})
+            </button>
+            {(selectedCategory || selectedSize || sortBy || maxPrice < 150000) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCategory(null);
+                  setSelectedSize(null);
+                  setSortBy(null);
+                  setMaxPrice(150000);
+                  setIsFilterOpen(false);
+                }}
+                className="w-full mt-2.5 py-2 text-center text-xs font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors cursor-pointer"
+              >
+                Limpiar todos los filtros
+              </button>
+            )}
           </div>
         </aside>
 
