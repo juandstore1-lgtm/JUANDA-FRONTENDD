@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ProductService, HomeService } from "../services/api";
 import { Product, HeroSlide, HomeCategoryCollection, MysteryBoxSetting } from "../types";
-import { ArrowRight, ChevronLeft, ChevronRight, Package, MapPin, Clock, ShieldCheck } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Package, MapPin, Clock, ShieldCheck } from "lucide-react";
 import AnimatedSection from "../components/AnimatedSection";
 import ProductCard from "../components/ProductCard";
 import { formatPrice } from "../utils/format";
@@ -21,6 +21,13 @@ export default function Home() {
   // Interactive Collections State
   const [categoryCollections, setCategoryCollections] = useState<HomeCategoryCollection[]>([]);
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
+  const [openFaqs, setOpenFaqs] = useState<number[]>([]);
+
+  const toggleFaq = (idx: number) => {
+    setOpenFaqs((prev) =>
+      prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx]
+    );
+  };
 
   useEffect(() => {
     if (slides.length === 0) return;
@@ -456,7 +463,7 @@ export default function Home() {
               PREGUNTAS FRECUENTES
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 items-start">
               {[
                 {
                   q: "¿DÓNDE ESTÁN UBICADOS?",
@@ -482,12 +489,51 @@ export default function Home() {
                   q: "¿VENDEN AL POR MAYOR?",
                   a: "¡Sí! Contamos con una línea mayorista ideal para distribuidores y emprendedores. Escríbenos por WhatsApp y uno de nuestros asesores te brindará toda la información."
                 }
-              ].map((faq, idx) => (
-                <div key={idx} className="bg-[#050505] border border-white/10 p-8 rounded-2xl hover:border-white/30 transition-colors">
-                  <h3 className="text-lg font-black uppercase tracking-tight mb-4 text-white/90">{faq.q}</h3>
-                  <p className="text-sm text-white/50 leading-relaxed">{faq.a}</p>
-                </div>
-              ))}
+              ].map((faq, idx) => {
+                const isOpen = openFaqs.includes(idx);
+                return (
+                  <div
+                    key={idx}
+                    className={`bg-[#050505] border rounded-2xl overflow-hidden transition-all duration-300 ${
+                      isOpen ? "border-white/30 shadow-[0_0_20px_rgba(255,255,255,0.05)]" : "border-white/10 hover:border-white/20"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleFaq(idx)}
+                      className="w-full p-6 text-left flex items-center justify-between gap-4 cursor-pointer select-none group"
+                    >
+                      <h3 className="text-sm md:text-base font-black uppercase tracking-tight text-white/90 group-hover:text-white transition-colors">
+                        {faq.q}
+                      </h3>
+                      <div className={`w-8 h-8 rounded-full border border-white/10 flex items-center justify-center shrink-0 transition-transform duration-300 ${
+                        isOpen ? "rotate-180 bg-white/10 border-white/30" : "group-hover:border-white/30"
+                      }`}>
+                        <ChevronDown className="w-4 h-4 text-white/70" />
+                      </div>
+                    </button>
+
+                    <AnimatePresence initial={false}>
+                      {isOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.25, ease: "easeInOut" }}
+                          className="overflow-hidden"
+                        >
+                          <div className="px-6 pb-6 pt-0">
+                            <div className="w-full h-[1px] bg-white/10 mb-4"></div>
+                            <p className="text-sm text-white/60 leading-relaxed font-light">
+                              {faq.a}
+                            </p>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
             </div>
           </AnimatedSection>
         </div>

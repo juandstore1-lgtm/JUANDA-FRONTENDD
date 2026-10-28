@@ -1,14 +1,13 @@
 import AnimatedSection from "../components/AnimatedSection";
 import { MapPin, Clock } from "lucide-react";
 
-import ciudadModeloImg from "@/assets/sede-ciudad-modelo.png";
-import villaColombiaImg from "@/assets/sede-villa-colombia.png";
-import republicaIsraelImg from "@/assets/sede-republica-israel.png";
-import marianoRamosImg from "@/assets/sede-mariano-ramos.png";
+import logoQuality from "@/assets/logo-quality-store.png";
+import logoJuand from "@/assets/logo-juand-store.png";
 
 interface StoreSchedule {
   name: string;
-  image: string;
+  brand: string;
+  logo: string;
   schedules: {
     days: string;
     hours: string;
@@ -18,7 +17,8 @@ interface StoreSchedule {
 const storesScheduleData: StoreSchedule[] = [
   {
     name: "CIUDAD MODELO",
-    image: ciudadModeloImg,
+    brand: "JUAN'D STORE",
+    logo: logoJuand,
     schedules: [
       { days: "LUNES A VIERNES", hours: "10:00 A.M. - 8:00 P.M." },
       { days: "SÁBADOS", hours: "10:00 A.M. - 8:30 P.M." },
@@ -27,7 +27,8 @@ const storesScheduleData: StoreSchedule[] = [
   },
   {
     name: "VILLA COLOMBIA",
-    image: villaColombiaImg,
+    brand: "QUALITY STORE",
+    logo: logoQuality,
     schedules: [
       { days: "LUNES A VIERNES", hours: "10:00 A.M. - 8:00 P.M." },
       { days: "SÁBADOS", hours: "10:00 A.M. - 8:30 P.M." },
@@ -36,7 +37,8 @@ const storesScheduleData: StoreSchedule[] = [
   },
   {
     name: "REPÚBLICA DE ISRAEL",
-    image: republicaIsraelImg,
+    brand: "JUAN'D STORE",
+    logo: logoJuand,
     schedules: [
       { days: "LUNES A VIERNES", hours: "10:00 A.M. - 8:00 P.M." },
       { days: "SÁBADOS", hours: "10:00 A.M. - 8:30 P.M." },
@@ -45,7 +47,8 @@ const storesScheduleData: StoreSchedule[] = [
   },
   {
     name: "MARIANO RAMOS",
-    image: marianoRamosImg,
+    brand: "QUALITY STORE",
+    logo: logoQuality,
     schedules: [
       { days: "LUNES A VIERNES", hours: "10:00 A.M. - 8:00 P.M." },
       { days: "SÁBADOS", hours: "10:00 A.M. - 8:30 P.M." },
@@ -78,50 +81,50 @@ export default function Schedules() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {storesScheduleData.map((store, index) => (
             <AnimatedSection key={store.name} delay={index * 0.08}>
-              <div className="flex flex-col bg-[#0a0a0a] border border-white/10 rounded-2xl overflow-hidden hover:border-white/30 transition-all duration-300 h-full group">
+              <div className="flex flex-col bg-[#0a0a0a] border border-white/10 rounded-2xl overflow-hidden hover:border-white/30 transition-all duration-300 h-full p-6 sm:p-7 group">
                 
-                {/* Foto superior con difuminado suave */}
-                <div className="aspect-[16/10] overflow-hidden bg-black/60 relative">
+                {/* Logo de la Marca en la Sede */}
+                <div className="h-24 w-full flex items-center justify-center mb-6 bg-white/[0.02] border border-white/5 rounded-xl p-3 group-hover:border-white/15 transition-colors">
                   <img
-                    src={store.image}
-                    alt={store.name}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 grayscale-[15%]"
+                    src={store.logo}
+                    alt={store.brand}
+                    className="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-105"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/30 to-transparent" />
                 </div>
 
-                {/* Contenido */}
-                <div className="p-6 flex flex-col flex-1">
-                  
-                  {/* Ícono de ubicación */}
-                  <MapPin className="w-5 h-5 text-white mb-2 shrink-0" />
+                {/* Ícono de ubicación y badge */}
+                <div className="flex items-center gap-2 mb-2">
+                  <MapPin className="w-4 h-4 text-white/70 shrink-0" />
+                  <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/40">
+                    SEDE
+                  </span>
+                </div>
 
-                  {/* Nombre de la Sede */}
-                  <h2 className="text-xl font-black italic uppercase tracking-wider text-white leading-tight">
-                    {store.name}
-                  </h2>
+                {/* Nombre de la Sede */}
+                <h2 className="text-xl font-black italic uppercase tracking-wider text-white leading-tight">
+                  {store.name}
+                </h2>
 
-                  {/* Línea divisoria decorativa bajo el nombre */}
-                  <div className="w-12 h-[2px] bg-white/40 mb-6 mt-2"></div>
+                {/* Línea divisoria decorativa bajo el nombre */}
+                <div className="w-12 h-[2px] bg-white/30 mb-6 mt-3"></div>
 
-                  {/* Lista de horarios */}
-                  <div className="space-y-4 flex-1">
-                    {store.schedules.map((schedule, sIdx) => (
-                      <div key={sIdx} className="flex items-start gap-3">
-                        <Clock className="w-4 h-4 text-white/70 shrink-0 mt-0.5" />
-                        <div className="flex flex-col">
-                          <span className="text-[10px] font-bold tracking-widest text-white/50 uppercase">
-                            {schedule.days}
-                          </span>
-                          <span className="text-xs sm:text-sm font-bold text-white tracking-wide">
-                            {schedule.hours}
-                          </span>
-                        </div>
+                {/* Lista de horarios */}
+                <div className="space-y-5 flex-1">
+                  {store.schedules.map((schedule, sIdx) => (
+                    <div key={sIdx} className="flex items-start gap-3">
+                      <Clock className="w-4 h-4 text-white/60 shrink-0 mt-0.5" />
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-bold tracking-widest text-white/50 uppercase">
+                          {schedule.days}
+                        </span>
+                        <span className="text-xs sm:text-sm font-bold text-white tracking-wide mt-0.5">
+                          {schedule.hours}
+                        </span>
                       </div>
-                    ))}
-                  </div>
-
+                    </div>
+                  ))}
                 </div>
+
               </div>
             </AnimatedSection>
           ))}

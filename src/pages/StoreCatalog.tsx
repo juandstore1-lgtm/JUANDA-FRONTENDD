@@ -186,7 +186,7 @@ export default function StoreCatalog() {
         </div>
 
         {/* Search Bar & Popular Searches */}
-        <div className="mb-10 relative z-50">
+        <div className="mb-10 relative z-20">
           <div className="relative w-full">
             <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-6 h-6 text-white/40" />
             <input 
@@ -210,7 +210,7 @@ export default function StoreCatalog() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  className="absolute top-full left-0 right-0 mt-2 bg-[#1a1a1a] border border-white/10 rounded-sm shadow-2xl overflow-hidden z-50"
+                  className="absolute top-full left-0 right-0 mt-2 bg-[#1a1a1a] border border-white/10 rounded-sm shadow-2xl overflow-hidden z-30"
                 >
                   {(() => {
                     const matchedCats = categories.filter(c => c.name.toLowerCase().startsWith(searchQuery.toLowerCase().trim()));

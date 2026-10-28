@@ -6,6 +6,21 @@ import AnimatedSection from "../components/AnimatedSection";
 import { MapPin, Clock, ExternalLink } from "lucide-react";
 import sedesImg from "@/assets/sedes.png";
 
+function formatSchedule(scheduleText?: string): string[] {
+  if (!scheduleText) return [];
+
+  // Reemplazar días comunes que vienen pegados sin salto de línea
+  const normalized = scheduleText
+    .replace(/\s+(S[aá]bados?)/gi, "\n$1")
+    .replace(/\s+(Domingos?)/gi, "\n$1")
+    .replace(/\s+(Festivos?)/gi, "\n$1");
+
+  return normalized
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
 export default function Locations() {
   const [stores, setStores] = useState<Store[]>([]);
 
@@ -75,11 +90,17 @@ export default function Locations() {
 
                     {/* Schedule */}
                     <div>
-                      <div className="flex items-center gap-1.5 mb-0.5">
+                      <div className="flex items-center gap-1.5 mb-1.5">
                         <Clock className="w-3 h-3 text-white/50 flex-shrink-0" />
                         <span className="text-[9px] font-black uppercase tracking-widest text-white/50">Horarios</span>
                       </div>
-                      <p className="text-xs text-white font-medium leading-snug whitespace-pre-line pl-4">{store.schedule}</p>
+                      <div className="space-y-1 pl-4">
+                        {formatSchedule(store.schedule).map((line, idx) => (
+                          <p key={idx} className="text-xs text-white font-medium leading-snug">
+                            {line}
+                          </p>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
