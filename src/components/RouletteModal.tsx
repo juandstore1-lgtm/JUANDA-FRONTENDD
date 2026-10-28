@@ -174,7 +174,7 @@ export default function RouletteModal({ isOpen, onClose }: { isOpen: boolean; on
                 <p className="text-2xl font-black uppercase text-white">¡Ganaste un {result}%!</p>
                 <div className="bg-white/5 p-4 border border-white/20 rounded-lg">
                   <p className="text-[10px] text-white/50 uppercase tracking-widest mb-2">Tu cupón:</p>
-                  <p className="text-2xl font-black tracking-widest text-white">JDQSTORE{result}</p>
+                  <p className="text-2xl font-black tracking-widest text-white">JUANDSTORE{result}</p>
                 </div>
                 <p className="text-xs text-white/40 flex items-center justify-center gap-2">
                   <Lock className="w-3 h-3" /> Válido por 24 horas.

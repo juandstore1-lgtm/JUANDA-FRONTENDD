@@ -33,7 +33,7 @@ export default function About() {
             </span>
           </h1>
           <p className="text-white/40 text-sm md:text-base max-w-2xl leading-relaxed">
-            Nacimos en el asfalto. JDQSTORE no es solo una marca de ropa, es un movimiento que fusiona la estética minimalista con la funcionalidad urbana extrema.
+            Nacimos en el asfalto. JUANDSTORE no es solo una marca de ropa, es un movimiento que fusiona la estética minimalista con la funcionalidad urbana extrema.
           </p>
         </AnimatedSection>
 

@@ -336,12 +336,12 @@ export default function Navbar() {
               )}
 
               {/* Lion Watermark Emblem at Bottom */}
-              <div className="flex items-center justify-center gap-3 pt-6 pb-2 w-full max-w-[220px] mx-auto select-none pointer-events-none">
+              <div className="flex items-center justify-center gap-3 pt-6 pb-2 w-full max-w-[280px] mx-auto select-none pointer-events-none">
                 <div className="h-[1px] bg-gradient-to-r from-transparent to-zinc-700/60 flex-1"></div>
                 <img 
                   src={lionWatermark} 
                   alt="" 
-                  className="w-12 h-12 object-contain opacity-25 filter grayscale contrast-125" 
+                  className="w-20 h-20 object-contain opacity-40 filter grayscale contrast-125" 
                 />
                 <div className="h-[1px] bg-gradient-to-l from-transparent to-zinc-700/60 flex-1"></div>
               </div>

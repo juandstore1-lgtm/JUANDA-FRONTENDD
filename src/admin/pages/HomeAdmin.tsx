@@ -597,7 +597,7 @@ export default function HomeAdmin() {
                   </label>
                   <textarea
                     required
-                    placeholder="Ej. Colección urbana de JDQSTORE con estilo oscuro..."
+                    placeholder="Ej. Colección urbana de JUANDSTORE con estilo oscuro..."
                     value={collectionFormData.description}
                     onChange={(e) => setCollectionFormData({ ...collectionFormData, description: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-black focus:border-black text-sm"

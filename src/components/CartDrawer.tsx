@@ -16,7 +16,7 @@ export default function CartDrawer() {
           )}\nLink: ${window.location.origin}/product/${item.product.id}`
       )
       .join('\n');
-    const message = `Hola JDQSTORE, me gustaría realizar el siguiente pedido:\n\n${itemsText}\n\n*Total a pagar: ${formatPrice(totalPrice)}*`;
+    const message = `Hola JUANDSTORE, me gustaría realizar el siguiente pedido:\n\n${itemsText}\n\n*Total a pagar: ${formatPrice(totalPrice)}*`;
     window.open(`https://wa.me/573012690047?text=${encodeURIComponent(message)}`, '_blank');
   };
 

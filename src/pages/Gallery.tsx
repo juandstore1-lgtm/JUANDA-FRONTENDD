@@ -118,7 +118,7 @@ export default function Gallery() {
             Galería & <br/><span className="text-chrome">Lifestyle.</span>
           </h1>
           <p className="text-white/40 text-sm max-w-2xl mx-auto leading-relaxed">
-            Nuestra estética capturada. Eventos, tiendas, behind the scenes y la comunidad que hace posible JDQSTORE.
+            Nuestra estética capturada. Eventos, tiendas, behind the scenes y la comunidad que hace posible JUANDSTORE.
           </p>
         </AnimatedSection>
 

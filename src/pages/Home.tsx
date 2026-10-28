@@ -76,7 +76,7 @@ export default function Home() {
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center text-white font-mono text-sm tracking-widest uppercase">
-        Cargando JDQSTORE...
+        Cargando JUANDSTORE...
       </div>
     );
   }

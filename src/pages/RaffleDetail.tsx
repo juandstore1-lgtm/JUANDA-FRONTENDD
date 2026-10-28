@@ -72,7 +72,7 @@ export default function RaffleDetail() {
 
   const generateWhatsAppLink = () => {
     if (!raffle) return "#";
-    const phone = "573012690047"; // Official JDQSTORE number
+    const phone = "573012690047"; // Official JUANDSTORE number
     const ticketList = selectedIds.map(id => tickets.find(t => t.id === id)?.ticketNumber).filter(Boolean).join(", ");
     const text = `Hola, acabo de reservar las boletas *${ticketList}* para la rifa *${raffle.name}*. Mi nombre es ${buyerData.name}. ¿A dónde transfiero?`;
     return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;

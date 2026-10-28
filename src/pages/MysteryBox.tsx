@@ -84,7 +84,7 @@ export default function MysteryBox() {
 
   const handleBuyOnWhatsApp = () => {
     const formattedPrice = formatPrice(config.price);
-    const message = `Hola JDQSTORE!  Me interesa comprar la *${config.title}*\n\n` +
+    const message = `Hola JUANDSTORE!  Me interesa comprar la *${config.title}*\n\n` +
       ` *Detalles del pedido:*\n` +
       `• Producto: ${config.title}\n` +
       `• Talla de productos: ${selectedSize}\n` +
