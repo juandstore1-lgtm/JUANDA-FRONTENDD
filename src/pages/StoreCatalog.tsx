@@ -392,7 +392,7 @@ export default function StoreCatalog() {
                 <input 
                   type="range" 
                   min="0" 
-                  max="150000" 
+                  max="500000" 
                   step="10000"
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(Number(e.target.value))}
@@ -571,7 +571,7 @@ export default function StoreCatalog() {
                 <input 
                   type="range" 
                   min="0" 
-                  max="150000" 
+                  max="500000" 
                   step="10000"
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(Number(e.target.value))}
