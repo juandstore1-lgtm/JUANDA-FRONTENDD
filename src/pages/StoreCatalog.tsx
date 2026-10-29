@@ -168,7 +168,16 @@ export default function StoreCatalog() {
       <AnimatedSection>
         <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div>
-            <div className="text-sm text-white/40 mb-4 font-medium tracking-wide">Inicio <span className="mx-2">/</span> Productos</div>
+            <div className="text-sm text-white/40 mb-4 font-medium tracking-wide">
+              Inicio <span className="mx-2">/</span> <Link to="/catalogs" className="hover:text-white transition-colors">Catálogos</Link>
+              {store && (
+                <>
+                  <span className="mx-2">/</span>
+                  <span className="text-white font-bold">{store.name}</span>
+                  {store.barrio && <span className="text-zinc-400 ml-1.5 font-normal">({store.barrio})</span>}
+                </>
+              )}
+            </div>
             <div className="flex items-baseline gap-4">
                <h1 className="text-5xl md:text-6xl font-black uppercase tracking-tighter mb-3">PRODUCTOS</h1>
             </div>
@@ -401,7 +410,7 @@ export default function StoreCatalog() {
                 />
                 <div className="flex justify-between items-center text-xs text-white/50 mt-4">
                   <span>$0</span>
-                  <span>{maxPrice >= 150000 ? '$150.000+' : `$${maxPrice.toLocaleString('es-CO')}`}</span>
+                  <span>{maxPrice >= 500000 ? '$500.000+' : `$${maxPrice.toLocaleString('es-CO')}`}</span>
                 </div>
               </div>
             </div>
@@ -580,7 +589,7 @@ export default function StoreCatalog() {
                 />
                 <div className="flex justify-between items-center text-xs text-white/50 mt-4">
                   <span>$0</span>
-                  <span className="font-bold text-white">{maxPrice >= 150000 ? '$150.000+' : `${maxPrice.toLocaleString('es-CO')}`}</span>
+                  <span className="font-bold text-white">{maxPrice >= 500000 ? '$500.000+' : `${maxPrice.toLocaleString('es-CO')}`}</span>
                 </div>
               </div>
             </div>
@@ -595,14 +604,14 @@ export default function StoreCatalog() {
             >
               Ver Resultados ({filteredProducts.length})
             </button>
-            {(selectedCategory || selectedSize || sortBy || maxPrice < 150000) && (
+            {(selectedCategory || selectedSize || sortBy || maxPrice < 500000) && (
               <button
                 type="button"
                 onClick={() => {
                   setSelectedCategory(null);
                   setSelectedSize(null);
                   setSortBy(null);
-                  setMaxPrice(150000);
+                  setMaxPrice(500000);
                   setIsFilterOpen(false);
                 }}
                 className="w-full mt-2.5 py-2 text-center text-xs font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors cursor-pointer"

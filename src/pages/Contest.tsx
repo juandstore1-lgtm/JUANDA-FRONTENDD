@@ -40,13 +40,8 @@ export default function Contest() {
   const loadContestData = async () => {
     setLoading(true);
     try {
-      let activeData = await ContestService.getActiveContest();
-      if (!activeData) {
-        const all = await ContestService.getAllContests().catch(() => []);
-        if (all && all.length > 0) {
-          activeData = all.sort((a, b) => b.id - a.id)[0];
-        }
-      }
+      // Solo el endpoint público: sin concurso activo la página muestra su estado vacío
+      const activeData = await ContestService.getActiveContest();
       setContest(activeData);
 
       if (activeData?.id) {

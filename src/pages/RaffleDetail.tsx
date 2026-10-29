@@ -5,8 +5,11 @@ import { ArrowLeft, Ticket as TicketIcon, Check, X } from "lucide-react";
 import Swal from "sweetalert2";
 import AnimatedSection from "../components/AnimatedSection";
 import { RaffleService, TicketService } from "../services/api";
-import { Raffle, Ticket } from "../types";
+import { Raffle, Ticket, TicketReservation } from "../types";
 import { formatPrice } from "../utils/format";
+import { BuyerErrors, BuyerForm, formatReservationDeadline, unavailableSelection, validateBuyer } from "../utils/purchase";
+
+const EMPTY_BUYER: BuyerForm = { name: '', phone: '', email: '' };
 
 export default function RaffleDetail() {
   const { id } = useParams();
@@ -16,8 +19,20 @@ export default function RaffleDetail() {
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showCheckout, setShowCheckout] = useState(false);
-  const [purchaseSuccess, setPurchaseSuccess] = useState(false);
-  const [buyerData, setBuyerData] = useState({ name: '', phone: '', email: '' });
+  // Datos personales solo en memoria: se borran al cerrar la reserva
+  const [buyerData, setBuyerData] = useState<BuyerForm>(EMPTY_BUYER);
+  const [formErrors, setFormErrors] = useState<BuyerErrors>({});
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [reservation, setReservation] = useState<TicketReservation | null>(null);
+  const purchaseSuccess = reservation !== null;
+
+  const refreshTickets = async () => {
+    if (!id) return [];
+    const fresh = await TicketService.getTicketsByRaffle(id);
+    setTickets(fresh);
+    return fresh;
+  };
 
   const loadData = async () => {
     if (!id) return;
@@ -40,7 +55,13 @@ export default function RaffleDetail() {
     loadData();
     // Refresh tickets every 30s for realtime feel
     const interval = setInterval(() => {
-      if(id && !showCheckout) TicketService.getTicketsByRaffle(id).then(setTickets);
+      if (id && !showCheckout) {
+        TicketService.getTicketsByRaffle(id).then(fresh => {
+          setTickets(fresh);
+          // Un número que otra persona reservó deja de estar seleccionado
+          setSelectedIds(prev => prev.filter(sid => fresh.some((t: Ticket) => t.id === sid && t.status === 'AVAILABLE')));
+        }).catch(() => undefined);
+      }
     }, 30000);
     return () => clearInterval(interval);
   }, [id, showCheckout]);
@@ -56,24 +77,53 @@ export default function RaffleDetail() {
 
   const handlePurchase = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!id || selectedIds.length === 0) return;
-    
+    // Evita el doble envío mientras la petición está en curso
+    if (!id || selectedIds.length === 0 || submitting) return;
+
+    const errors = validateBuyer(buyerData);
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0 || !acceptedPrivacy) return;
+
+    setSubmitting(true);
     try {
-      await TicketService.purchaseTickets(id, {
+      const result = await TicketService.purchaseTickets(id, {
         ticketIds: selectedIds,
         buyer: buyerData
       });
-      setPurchaseSuccess(true);
-      loadData();
+      setReservation(result);
+      refreshTickets().catch(() => undefined);
     } catch (err: any) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err.message, background: '#0a0a0a', color: '#fff' });
+      // Siempre se vuelve a leer la disponibilidad: si algún boleto se ocupó, se quita de la selección para elegir otros
+      const fresh = await refreshTickets().catch(() => null);
+      const taken = fresh ? unavailableSelection(selectedIds, fresh) : [];
+      if (taken.length > 0) {
+        setSelectedIds(prev => prev.filter(sid => !taken.some(t => t.id === sid)));
+        setShowCheckout(false);
+      }
+      const text = taken.length > 0
+        ? `Ya no están disponibles: ${taken.map(t => '#' + t.ticketNumber).join(', ')}. Elige otros números.`
+        : err.message || 'No se pudo completar la reserva. Intenta de nuevo.';
+      Swal.fire({ icon: 'error', title: 'No se pudo reservar', text, background: '#0a0a0a', color: '#fff' });
+    } finally {
+      setSubmitting(false);
     }
   };
 
+  const closeCheckout = () => {
+    setShowCheckout(false);
+    if (reservation) {
+      setSelectedIds([]);
+      setReservation(null);
+      setBuyerData(EMPTY_BUYER);
+      setAcceptedPrivacy(false);
+    }
+    setFormErrors({});
+  };
+
   const generateWhatsAppLink = () => {
-    if (!raffle) return "#";
+    if (!raffle || !reservation) return "#";
     const phone = "573012690047"; // Official JUANDSTORE number
-    const ticketList = selectedIds.map(id => tickets.find(t => t.id === id)?.ticketNumber).filter(Boolean).join(", ");
+    const ticketList = reservation.ticketNumbers.join(", ");
     const text = `Hola, acabo de reservar las boletas *${ticketList}* para la rifa *${raffle.name}*. Mi nombre es ${buyerData.name}. ¿A dónde transfiero?`;
     return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
   };
@@ -102,7 +152,8 @@ export default function RaffleDetail() {
               <div className="flex gap-4 mb-6">
                 <div className="flex items-center text-xs text-white/50"><span className="w-3 h-3 bg-white/5 border border-white/10 mr-2"></span> Disponible</div>
                 <div className="flex items-center text-xs text-white/50"><span className="w-3 h-3 bg-red-600 mr-2"></span> Seleccionado</div>
-                <div className="flex items-center text-xs text-white/50"><span className="w-3 h-3 bg-gray-800 line-through decoration-white/30 mr-2"></span> Ocupado</div>
+                <div className="flex items-center text-xs text-white/50"><span className="w-3 h-3 bg-orange-900/60 border border-orange-700/60 mr-2"></span> Reservado (pago pendiente)</div>
+                <div className="flex items-center text-xs text-white/50"><span className="w-3 h-3 bg-gray-800 line-through decoration-white/30 mr-2"></span> Vendido</div>
               </div>
             </div>
 
@@ -122,8 +173,10 @@ export default function RaffleDetail() {
                     whileTap={isAvailable ? { scale: 0.95 } : {}}
                     onClick={() => toggleTicket(t)}
                     disabled={!isAvailable}
+                    title={t.status === 'RESERVED' ? 'Reservado: pago pendiente' : t.status === 'SOLD' ? 'Vendido' : undefined}
                     className={`aspect-square flex items-center justify-center text-[10px] sm:text-xs font-black transition-all ${
                       isSelected ? 'bg-red-600 text-white border border-red-400 shadow-[0_0_15px_rgba(220,38,38,0.5)] z-10' :
+                      t.status === 'RESERVED' ? 'bg-orange-900/40 text-orange-300/60 cursor-not-allowed border border-orange-700/40' :
                       !isAvailable ? 'bg-gray-900 text-gray-700 cursor-not-allowed border border-gray-800' :
                       'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white border border-white/10 cursor-pointer'
                     }`}
@@ -178,8 +231,11 @@ export default function RaffleDetail() {
               </div>
             </div>
 
-            <button 
-              disabled={selectedIds.length === 0}
+            {raffle.status !== 'ACTIVE' && (
+              <p className="text-xs text-orange-400 text-center mb-4">Esta rifa no está disponible para la venta en este momento.</p>
+            )}
+            <button
+              disabled={selectedIds.length === 0 || raffle.status !== 'ACTIVE'}
               onClick={() => setShowCheckout(true)}
               className="w-full bg-white text-black py-4 font-black uppercase tracking-widest hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
@@ -200,63 +256,77 @@ export default function RaffleDetail() {
               initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
               className="bg-[#111] border border-white/10 w-full max-w-lg p-8 relative"
             >
-              <button onClick={() => setShowCheckout(false)} className="absolute top-6 right-6 text-white/50 hover:text-white"><X className="w-6 h-6" /></button>
-              
+              <button onClick={closeCheckout} disabled={submitting} className="absolute top-6 right-6 text-white/50 hover:text-white disabled:opacity-30"><X className="w-6 h-6" /></button>
+
               <h2 className="text-2xl font-black uppercase tracking-widest text-white mb-2">
-                {purchaseSuccess ? "¡Reserva Exitosa!" : "Finalizar Reserva"}
+                {purchaseSuccess ? "¡Boletas Reservadas!" : "Finalizar Reserva"}
               </h2>
-              <p className="text-white/50 text-sm mb-8">
-                {purchaseSuccess 
-                  ? "Tus boletas han sido separadas. Haz clic en el botón de abajo para enviarnos el comprobante de pago por WhatsApp y hacerlas tuyas oficialmente." 
-                  : "Ingresa tus datos para asegurar tus boletas. Te contactaremos para el pago."}
-              </p>
+              {/* Reservado no es pagado: el pago lo confirma un administrador después del comprobante por WhatsApp */}
+              {purchaseSuccess && reservation ? (
+                <div className="text-white/70 text-sm mb-8 space-y-3">
+                  <p>
+                    Separamos tus boletas <span className="font-black text-white">{reservation.ticketNumbers.map(n => '#' + n).join(', ')}</span> hasta
+                    las <span className="font-black text-white">{formatReservationDeadline(reservation.reservedUntil)}</span>.
+                  </p>
+                  <p className="text-orange-300">
+                    Tu reserva aún no está pagada. Envíanos el comprobante por WhatsApp antes de esa hora; si no confirmamos el pago a tiempo,
+                    las boletas se liberan automáticamente.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-white/50 text-sm mb-8">Ingresa tus datos para separar tus boletas. Te contactaremos para el pago.</p>
+              )}
 
               {!purchaseSuccess ? (
-                <form onSubmit={handlePurchase} className="space-y-6">
+                <form onSubmit={handlePurchase} noValidate className="space-y-6">
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-widest text-white/50 mb-2">Nombre Completo</label>
-                    <input required type="text" value={buyerData.name} onChange={e => setBuyerData({...buyerData, name: e.target.value})} className="w-full bg-black border border-white/20 text-white px-4 py-3 focus:border-red-500 focus:outline-none" />
+                    <input required type="text" maxLength={100} autoComplete="name" value={buyerData.name} onChange={e => setBuyerData({...buyerData, name: e.target.value})} className="w-full bg-black border border-white/20 text-white px-4 py-3 focus:border-red-500 focus:outline-none" />
+                    {formErrors.name && <p className="text-xs text-red-400 mt-1">{formErrors.name}</p>}
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-widest text-white/50 mb-2">WhatsApp</label>
-                    <input required type="tel" value={buyerData.phone} onChange={e => setBuyerData({...buyerData, phone: e.target.value})} className="w-full bg-black border border-white/20 text-white px-4 py-3 focus:border-red-500 focus:outline-none" />
+                    <input required type="tel" maxLength={20} autoComplete="tel" value={buyerData.phone} onChange={e => setBuyerData({...buyerData, phone: e.target.value})} className="w-full bg-black border border-white/20 text-white px-4 py-3 focus:border-red-500 focus:outline-none" />
+                    {formErrors.phone && <p className="text-xs text-red-400 mt-1">{formErrors.phone}</p>}
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-widest text-white/50 mb-2">Correo Electrónico (Opcional)</label>
-                    <input type="email" value={buyerData.email} onChange={e => setBuyerData({...buyerData, email: e.target.value})} className="w-full bg-black border border-white/20 text-white px-4 py-3 focus:border-red-500 focus:outline-none" />
+                    <input type="email" maxLength={254} autoComplete="email" value={buyerData.email} onChange={e => setBuyerData({...buyerData, email: e.target.value})} className="w-full bg-black border border-white/20 text-white px-4 py-3 focus:border-red-500 focus:outline-none" />
+                    {formErrors.email && <p className="text-xs text-red-400 mt-1">{formErrors.email}</p>}
                   </div>
-                  
+
+                  {/* Aviso de privacidad: texto pendiente de revisión legal por el negocio */}
+                  <label className="flex items-start gap-3 text-xs text-white/60 cursor-pointer">
+                    <input type="checkbox" checked={acceptedPrivacy} onChange={e => setAcceptedPrivacy(e.target.checked)} className="mt-0.5 accent-red-600" />
+                    <span>
+                      Autorizo a JUANDSTORE a usar mi nombre, teléfono y correo únicamente para gestionar esta reserva y contactarme por el pago.
+                      No se publican ni se comparten con terceros.
+                    </span>
+                  </label>
+
                   <div className="pt-4 mt-8 border-t border-white/10">
                     <div className="flex justify-between items-center mb-6">
                       <span className="text-white/50 text-sm">Total a pagar ({selectedIds.length} boletas)</span>
                       <span className="text-xl font-black text-red-500">{formatPrice(totalAmount)}</span>
                     </div>
-                    <button type="submit" className="w-full bg-red-600 text-white py-4 font-black uppercase tracking-widest hover:bg-red-700 transition-colors flex items-center justify-center">
-                      <Check className="w-5 h-5 mr-2" /> Confirmar Reserva
+                    <button type="submit" disabled={submitting || !acceptedPrivacy} className="w-full bg-red-600 text-white py-4 font-black uppercase tracking-widest hover:bg-red-700 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
+                      <Check className="w-5 h-5 mr-2" /> {submitting ? 'Reservando...' : 'Confirmar Reserva'}
                     </button>
                   </div>
                 </form>
               ) : (
                 <div className="flex flex-col gap-4">
-                  <a 
-                    href={generateWhatsAppLink()} 
-                    target="_blank" 
+                  <a
+                    href={generateWhatsAppLink()}
+                    target="_blank"
                     rel="noreferrer"
-                    onClick={() => {
-                      setShowCheckout(false);
-                      setSelectedIds([]);
-                      setPurchaseSuccess(false);
-                    }}
+                    onClick={() => setTimeout(closeCheckout, 0)}
                     className="w-full bg-green-500 text-black py-4 font-black uppercase tracking-widest hover:bg-green-400 transition-colors flex items-center justify-center"
                   >
-                    Pagar vía WhatsApp
+                    Enviar comprobante por WhatsApp
                   </a>
-                  <button 
-                    onClick={() => {
-                      setShowCheckout(false);
-                      setSelectedIds([]);
-                      setPurchaseSuccess(false);
-                    }}
+                  <button
+                    onClick={closeCheckout}
                     className="text-white/50 hover:text-white uppercase text-xs font-bold tracking-widest text-center mt-4"
                   >
                     Cerrar

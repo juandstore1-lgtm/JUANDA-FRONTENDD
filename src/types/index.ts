@@ -16,6 +16,7 @@ export interface Store {
   id: string;
   name: string;
   address: string;
+  barrio?: string;
   phone: string;
   schedule: string;
   image: string;
@@ -192,6 +193,8 @@ export interface Ticket {
   status: TicketStatus;
   buyer?: Buyer;
   updatedAt?: string;
+  // Solo en reservas con vencimiento (instante ISO-8601 en UTC)
+  reservedUntil?: string;
 }
 
 export interface TicketPurchaseRequest {
@@ -201,6 +204,15 @@ export interface TicketPurchaseRequest {
     phone: string;
     email: string;
   };
+}
+
+// Respuesta de la compra: boletos reservados (pendientes de pago), no vendidos
+export interface TicketReservation {
+  raffleId: string;
+  ticketIds: string[];
+  ticketNumbers: string[];
+  status: 'RESERVED';
+  reservedUntil: string;
 }
 
 export interface ContestWinner {

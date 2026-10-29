@@ -11,7 +11,8 @@ export default function RaffleDashboardAdmin() {
   const [raffle, setRaffle] = useState<Raffle | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
-  
+  const [ticketsError, setTicketsError] = useState<string | null>(null);
+
   const [filterText, setFilterText] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
@@ -19,24 +20,29 @@ export default function RaffleDashboardAdmin() {
   useEffect(() => {
     if (!id) return;
     const loadData = async () => {
-      try {
-        const [r, t] = await Promise.all([
-          RaffleService.getRaffleById(id),
-          TicketService.getTicketsByRaffle(id)
-        ]);
-        setRaffle(r);
-        setTickets(t);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
+      // Endpoint de administración: los compradores solo llegan con sesión GLOBAL_ADMIN
+      const [r, t] = await Promise.allSettled([
+        RaffleService.getRaffleById(id),
+        TicketService.getTicketsWithBuyers(id)
+      ]);
+      if (r.status === 'fulfilled') setRaffle(r.value);
+      else console.error(r.reason);
+      if (t.status === 'fulfilled') {
+        setTickets(t.value);
+        setTicketsError(null);
+      } else {
+        console.error(t.reason);
+        setTicketsError(t.reason?.message || 'No se pudieron cargar las boletas.');
       }
+      setLoading(false);
     };
     loadData();
   }, [id]);
 
   if (loading) return <div className="p-12 text-center text-gray-500 font-bold uppercase">Cargando Dashboard...</div>;
   if (!raffle) return <div className="p-12 text-center text-red-500 font-bold">Rifa no encontrada</div>;
+  // Sin boletas no se pueden calcular recaudación ni progreso: no se muestran cifras engañosas en cero
+  if (ticketsError) return <div className="p-12 text-center text-red-500 font-bold">{ticketsError}</div>;
 
   const sold = tickets.filter(t => t.status === 'SOLD').length;
   const reserved = tickets.filter(t => t.status === 'RESERVED').length;
@@ -59,18 +65,25 @@ export default function RaffleDashboardAdmin() {
     return true;
   });
 
+  // Tras un error (reserva vencida o tomada por otra persona) se recarga la lista para no actuar sobre datos viejos
+  const reloadAfterError = () => {
+    if (!id) return;
+    setSelectedTicket(null);
+    TicketService.getTicketsWithBuyers(id).then(setTickets).catch(() => undefined);
+  };
+
   const handleApprove = async () => {
     if (!selectedTicket || !id) return;
     try {
-      await TicketService.approveTicket(id, selectedTicket.id);
+      await TicketService.approveTicket(id, selectedTicket.id, selectedTicket.buyer?.id);
       
       // Update local state
-      setTickets(prev => prev.map(t => 
-        t.id === selectedTicket.id 
-          ? { ...t, status: 'SOLD', buyer: { ...t.buyer!, paymentStatus: 'CONFIRMED' } } 
+      setTickets(prev => prev.map(t =>
+        t.id === selectedTicket.id
+          ? { ...t, status: 'SOLD', reservedUntil: undefined, buyer: { ...t.buyer!, paymentStatus: 'CONFIRMED' } }
           : t
       ));
-      setSelectedTicket(prev => prev ? { ...prev, status: 'SOLD', buyer: { ...prev.buyer!, paymentStatus: 'CONFIRMED' } } : null);
+      setSelectedTicket(prev => prev ? { ...prev, status: 'SOLD', reservedUntil: undefined, buyer: { ...prev.buyer!, paymentStatus: 'CONFIRMED' } } : null);
       
       Swal.fire({
         icon: 'success',
@@ -82,7 +95,8 @@ export default function RaffleDashboardAdmin() {
       });
     } catch (err: any) {
       console.error(err);
-      Swal.fire({ icon: 'error', title: 'Error', text: 'Error al aprobar boleta', background: '#0a0a0a', color: '#fff' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'Error al aprobar boleta', background: '#0a0a0a', color: '#fff' });
+      reloadAfterError();
     }
   };
 
@@ -105,15 +119,15 @@ export default function RaffleDashboardAdmin() {
     if (!result.isConfirmed) return;
 
     try {
-      await TicketService.cancelTicket(id, selectedTicket.id);
-      
+      await TicketService.cancelTicket(id, selectedTicket.id, selectedTicket.buyer?.id);
+
       // Update local state
-      setTickets(prev => prev.map(t => 
-        t.id === selectedTicket.id 
-          ? { ...t, status: 'AVAILABLE', buyer: undefined } 
+      setTickets(prev => prev.map(t =>
+        t.id === selectedTicket.id
+          ? { ...t, status: 'AVAILABLE', buyer: undefined, reservedUntil: undefined }
           : t
       ));
-      setSelectedTicket(prev => prev ? { ...prev, status: 'AVAILABLE', buyer: undefined } : null);
+      setSelectedTicket(prev => prev ? { ...prev, status: 'AVAILABLE', buyer: undefined, reservedUntil: undefined } : null);
       
       Swal.fire({
         icon: 'success',
@@ -125,7 +139,8 @@ export default function RaffleDashboardAdmin() {
       });
     } catch (err: any) {
       console.error(err);
-      Swal.fire({ icon: 'error', title: 'Error', text: 'Error al cancelar boleta', background: '#0a0a0a', color: '#fff' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'Error al cancelar boleta', background: '#0a0a0a', color: '#fff' });
+      reloadAfterError();
     }
   };
 
@@ -217,8 +232,15 @@ export default function RaffleDashboardAdmin() {
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1">Información de Boleta</p>
               <h2 className="text-4xl font-black">#{selectedTicket.ticketNumber}</h2>
               <span className={`inline-block mt-2 px-3 py-1 text-[10px] font-bold uppercase tracking-widest ${selectedTicket.status === 'SOLD' ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800'}`}>
-                {selectedTicket.status === 'SOLD' ? 'Vendido' : 'Reservado'}
+                {selectedTicket.status === 'SOLD' ? 'Vendido · pago aprobado' : 'Reservado · pago pendiente'}
               </span>
+              {selectedTicket.status === 'RESERVED' && (
+                <p className="text-xs text-gray-500 mt-2">
+                  {selectedTicket.reservedUntil
+                    ? `La reserva vence el ${new Date(selectedTicket.reservedUntil).toLocaleString('es-CO')}. Si no se aprueba antes, el boleto se libera automáticamente.`
+                    : 'Reserva anterior al vencimiento automático: no vence sola.'}
+                </p>
+              )}
             </div>
             
             <div className="space-y-4">

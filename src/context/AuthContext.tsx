@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { User, Role } from '../types';
-import { UserService } from '../services/api';
+import { UserService, ApiError, SESSION_EXPIRED_EVENT, clearStoredSession } from '../services/api';
 
 interface AuthContextType {
   user: User | null;
@@ -12,9 +12,28 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const isUnauthorized = (e: unknown) => e instanceof ApiError && e.status === 401;
+
+const readCachedUser = (): User | null => {
+  try {
+    const cached = localStorage.getItem('admin_user');
+    return cached ? JSON.parse(cached) : null;
+  } catch {
+    return null;
+  }
+};
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // handleResponse ya limpió el token al recibir un 401: aquí solo se cierra la sesión en memoria
+  // (AdminLayout redirige al login; las páginas públicas siguen funcionando como anónimas)
+  useEffect(() => {
+    const onSessionExpired = () => setUser(null);
+    window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem('jwt_token');
@@ -24,10 +43,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setUser(freshUser);
           localStorage.setItem('admin_user', JSON.stringify(freshUser));
         })
-        .catch(() => {
-          localStorage.removeItem('admin_user');
-          localStorage.removeItem('jwt_token');
-          setUser(null);
+        .catch((e) => {
+          if (isUnauthorized(e)) {
+            clearStoredSession();
+            setUser(null);
+          } else {
+            // Error de red o del servidor: no se borra el token; el backend sigue validando cada petición
+            setUser(readCachedUser());
+          }
         })
         .finally(() => {
           setIsLoading(false);
@@ -87,7 +110,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(freshUser);
         localStorage.setItem('admin_user', JSON.stringify(freshUser));
       } catch (e) {
-        logout();
+        if (isUnauthorized(e)) logout();
       }
     }
   };

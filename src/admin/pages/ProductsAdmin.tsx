@@ -5,18 +5,23 @@ import { Plus, Edit2, Trash2, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import Swal from 'sweetalert2';
 import { formatPrice } from '../../utils/format';
+import { canManageProduct } from '../../utils/permissions';
+
+const NOT_MANAGEABLE_PRODUCT = 'Este producto también pertenece a otras sedes: solo un administrador global puede modificarlo';
 
 // Sub-component for individual store product table with search & filters
 function StoreProductTable({
   store,
   products,
   onEdit,
-  onDelete
+  onDelete,
+  canManage
 }: {
   store: Store;
   products: Product[];
   onEdit: (product: Product) => void;
   onDelete: (id: string) => void;
+  canManage: (product: Product) => boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -159,15 +164,17 @@ function StoreProductTable({
                       <td className="py-4 text-right space-x-1">
                         <button
                           onClick={() => onEdit(product)}
-                          className="p-1.5 text-gray-400 hover:text-black transition-colors"
-                          title="Editar"
+                          disabled={!canManage(product)}
+                          className="p-1.5 text-gray-400 hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-gray-400"
+                          title={canManage(product) ? 'Editar' : NOT_MANAGEABLE_PRODUCT}
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => onDelete(product.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 transition-colors"
-                          title="Eliminar"
+                          disabled={!canManage(product)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-gray-400"
+                          title={canManage(product) ? 'Eliminar' : NOT_MANAGEABLE_PRODUCT}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -447,6 +454,7 @@ export default function ProductsAdmin() {
                 products={storeProds}
                 onEdit={openModal}
                 onDelete={handleDelete}
+                canManage={(product) => canManageProduct(user, product)}
               />
             );
           })

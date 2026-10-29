@@ -67,12 +67,10 @@ export default function Schedules() {
           <span className="text-xs md:text-sm font-semibold uppercase tracking-[0.35em] text-zinc-400 block mb-2">
             HORARIOS DE ATENCIÓN
           </span>
-          <h1 className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-black uppercase tracking-tight text-chrome italic leading-none mb-4 drop-shadow-[0_10px_20px_rgba(255,255,255,0.12)]">
+          <h1 className="text-5xl sm:text-5xl md:text-5xl lg:text-7xl font-black uppercase tracking-tight text-chrome italic leading-none mb-4 drop-shadow-[0_10px_20px_rgba(255,255,255,0.12)]">
             HORARIOS
           </h1>
-          <p className="text-xs md:text-sm font-bold uppercase tracking-[0.3em] text-zinc-400">
-            NUESTRAS 4 SEDES, SIEMPRE CERCA DE TI
-          </p>
+
         </AnimatedSection>
       </div>
 

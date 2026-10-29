@@ -11,7 +11,8 @@ import {
   Radio, 
   ChevronRight, 
   Trophy, 
-  Ticket 
+  Ticket,
+  Video
 } from "lucide-react";
 import lionWatermark from "@/assets/lion-watermark.png";
 import { motion, AnimatePresence } from "motion/react";
@@ -88,14 +89,8 @@ export default function Navbar() {
       });
 
     ContestService.getActiveContest()
-      .then(async (contest) => {
-        let target = contest;
-        if (!target) {
-          const all = await ContestService.getAllContests().catch(() => []);
-          if (all && all.length > 0) {
-            target = all.sort((a, b) => b.id - a.id)[0];
-          }
-        }
+      .then((target) => {
+        // Sin concurso activo no se consulta /contests/admin/all: es de administración (GLOBAL_ADMIN)
         if (target && (target.showInMenu === true || String(target.showInMenu) === 'true')) {
           setShowContests(true);
         } else {
@@ -140,6 +135,7 @@ export default function Navbar() {
     { name: "Mayorista", path: "/mayorista" },
     { name: "Ubicaciones", path: "/ubicaciones" },
     { name: "Horarios", path: "/horarios" },
+    { name: "Puntos Físicos", path: "/puntos-fisicos" },
 
   ];
 
@@ -151,6 +147,7 @@ export default function Navbar() {
     { name: "MAYORISTA", path: "/mayorista", icon: User },
     { name: "UBICACIONES", path: "/ubicaciones", icon: MapPin },
     { name: "HORARIOS", path: "/horarios", icon: Clock },
+    { name: "PUNTOS FÍSICOS", path: "/puntos-fisicos", icon: Video },
     { 
       name: "DIFUSIÓN", 
       icon: Radio, 

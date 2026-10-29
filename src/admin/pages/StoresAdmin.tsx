@@ -12,6 +12,7 @@ export default function StoresAdmin() {
   const [formData, setFormData] = useState({
     name: '',
     address: '',
+    barrio: '',
     phone: '',
     schedule: '',
     image: '',
@@ -32,6 +33,7 @@ export default function StoresAdmin() {
       setFormData({
         name: store.name,
         address: store.address,
+        barrio: store.barrio || '',
         phone: store.phone,
         schedule: store.schedule,
         image: store.image,
@@ -40,7 +42,13 @@ export default function StoresAdmin() {
     } else {
       setEditingId(null);
       setFormData({
-        name: '', address: '', phone: '', schedule: '', image: '', description: ''
+        name: '',
+        address: '',
+        barrio: '',
+        phone: '',
+        schedule: '',
+        image: '',
+        description: ''
       });
     }
     setIsModalOpen(true);
@@ -94,6 +102,7 @@ export default function StoresAdmin() {
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
               <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-gray-500">Sede</th>
+              <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-gray-500">Barrio</th>
               <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-gray-500">Dirección</th>
               <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-gray-500 text-right">Acciones</th>
             </tr>
@@ -109,6 +118,7 @@ export default function StoresAdmin() {
                     </div>
                   </div>
                 </td>
+                <td className="px-6 py-4 text-sm text-gray-700 uppercase font-semibold">{store.barrio || '-'}</td>
                 <td className="px-6 py-4 text-sm text-gray-600 uppercase">{store.address}</td>
                 <td className="px-6 py-4 text-right space-x-2">
                   <button onClick={() => openModal(store)} className="p-2 text-gray-400 hover:text-black transition-colors" title="Editar">
@@ -254,6 +264,17 @@ function StoreModal({ editingId, formData, setFormData, loading, handleSubmit, o
           <div>
             <label className="block text-xs font-bold uppercase tracking-widest text-gray-700 mb-1">Nombre</label>
             <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-black focus:border-black text-black" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-widest text-gray-700 mb-1">Barrio</label>
+            <input 
+              type="text" 
+              placeholder="Ej: Villa Colombia, Ciudad Modelo, República de Israel..." 
+              value={formData.barrio} 
+              onChange={e => setFormData({...formData,barrio: e.target.value})} 
+              className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-black focus:border-black text-black" 
+            />
           </div>
 
           <div className="relative">

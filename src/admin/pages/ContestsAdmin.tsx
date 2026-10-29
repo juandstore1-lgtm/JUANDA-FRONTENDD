@@ -10,6 +10,7 @@ export default function ContestsAdmin() {
   const [contest, setContest] = useState<Contest | null>(null);
   const [participants, setParticipants] = useState<ContestParticipant[]>([]);
   const [winner, setWinner] = useState<ContestWinner | null>(null);
+  const [winnerError, setWinnerError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"summary" | "participants" | "settings">("summary");
 
@@ -87,8 +88,14 @@ export default function ContestsAdmin() {
         setFormData(target);
         const partsData = await ContestService.getParticipants(target.id).catch(() => []);
         setParticipants(partsData);
-        const winnerData = await ContestService.getPublicWinner(target.id).catch(() => null);
-        setWinner(winnerData);
+        // Endpoint de administración: el público ya no devuelve email ni teléfono del ganador
+        try {
+          setWinner(await ContestService.getWinner(target.id));
+          setWinnerError(null);
+        } catch (err: any) {
+          setWinner(null);
+          setWinnerError(err.message || "No se pudo cargar el ganador.");
+        }
       }
     } catch (err) {
       console.error("Error loading contest admin data:", err);
@@ -386,6 +393,13 @@ export default function ContestsAdmin() {
                   </div>
                 </div>
               </div>
+            </div>
+          ) : winnerError ? (
+            // No se sabe si hay ganador: no se muestra "aún no se ha seleccionado" para no inducir un nuevo sorteo
+            <div className="bg-red-50 border border-red-200 p-8 text-center">
+              <AlertTriangle className="w-12 h-12 text-red-300 mx-auto mb-3" />
+              <h3 className="text-lg font-black uppercase tracking-tight">No se pudo cargar el ganador</h3>
+              <p className="text-xs text-red-600 max-w-md mx-auto mt-1">{winnerError}</p>
             </div>
           ) : (
             <div className="bg-gray-50 border border-gray-200 p-8 text-center">

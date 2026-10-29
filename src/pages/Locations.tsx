@@ -3,8 +3,18 @@ import { Link } from "react-router-dom";
 import { StoreService } from "../services/api";
 import { Store } from "../types";
 import AnimatedSection from "../components/AnimatedSection";
-import { MapPin, Clock, ExternalLink } from "lucide-react";
+import { MapPin, Clock, ExternalLink, Building2 } from "lucide-react";
 import sedesImg from "@/assets/sedes.png";
+
+function getStoreBarrioFallback(name?: string): string {
+  if (!name) return "";
+  const n = name.toUpperCase();
+  if (n.includes("CIUDAD MODELO")) return "Ciudad Modelo";
+  if (n.includes("VILLA COLOMBIA")) return "Villa Colombia";
+  if (n.includes("ISRAEL")) return "República de Israel";
+  if (n.includes("MARIANO RAMOS")) return "Mariano Ramos";
+  return "";
+}
 
 function formatSchedule(scheduleText?: string): string[] {
   if (!scheduleText) return [];
@@ -79,6 +89,17 @@ export default function Locations() {
 
                   {/* Info */}
                   <div className="space-y-3 mb-5 flex-1">
+                    {/* Barrio */}
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <Building2 className="w-3 h-3 text-white/50 flex-shrink-0" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-white/50">Barrio</span>
+                      </div>
+                      <p className="text-xs text-white font-medium leading-snug pl-4">
+                        {store.barrio || getStoreBarrioFallback(store.name) || "No especificado"}
+                      </p>
+                    </div>
+
                     {/* Address */}
                     <div>
                       <div className="flex items-center gap-1.5 mb-0.5">
@@ -110,7 +131,7 @@ export default function Locations() {
                   {/* Buttons */}
                   <div className="flex gap-2">
                     <a
-                      href={`https://maps.google.com/?q=${encodeURIComponent(store.address)}`}
+                      href={`https://maps.google.com/?q=${encodeURIComponent(`${store.address}${(store.barrio || getStoreBarrioFallback(store.name)) ? `, Barrio ${store.barrio || getStoreBarrioFallback(store.name)}` : ""}, Cali`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1 border border-white/20 text-white hover:bg-white/10 transition-colors px-3 py-2.5 text-[9px] font-black uppercase tracking-widest inline-flex items-center justify-center gap-1.5"

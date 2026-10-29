@@ -5,7 +5,7 @@ export default function Wholesale() {
   const benefits = [
     { 
       title: "ACCESO A DIFUSIÓN", 
-      desc: "Ingresa a nuestra difusión de whatsapp para visualizar todos nuestros productos a precio mayoristaVisualiza todos nuestros productos y precios mayoristas directamente en WhatsApp.", 
+      desc: "Ingresa a nuestra lista de difusión de WhatsApp y descubre todos nuestros productos con precios al por mayor. 🛍️", 
       icon: <Sparkles className="w-5 h-5 text-white" /> 
     },
     { 
@@ -15,7 +15,7 @@ export default function Wholesale() {
     },
     { 
       title: "Asesoría VIP", 
-      desc: "Acompañamiento y seguimiento personalizado de ventas.", 
+      desc: "Recibe asesoría, acompañamiento y seguimiento personalizado durante todo tu proceso de compra.", 
       icon: <Users className="w-5 h-5 text-white" /> 
     }
   ];
@@ -36,7 +36,7 @@ export default function Wholesale() {
             Línea <span className="text-white">Mayorista.</span>
           </h1>
           <p className="text-white/60 text-base md:text-lg leading-relaxed max-w-2xl mx-auto">
-Únete a nuestra comunidad JDQ STORE. Somos proveedores a nivel nacional con excelentes precios mayoristas. ¡Contáctanos y haz crecer tu negocio!          </p>
+Únete a nuestra comunidad JUANDSTORE / QUALITY STORE. Somos proveedores a nivel nacional con excelentes precios mayoristas. ¡Contáctanos y haz crecer tu negocio!          </p>
         </AnimatedSection>
 
         {/* Benefits Grid */}

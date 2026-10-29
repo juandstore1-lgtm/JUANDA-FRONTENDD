@@ -4,6 +4,9 @@ import { Category, Store } from '../../types';
 import { Plus, Trash2, Edit2, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import Swal from 'sweetalert2';
+import { canManageCategory } from '../../utils/permissions';
+
+const NOT_MANAGEABLE_CATEGORY = 'Categoría global: solo un administrador global puede modificarla';
 
 export default function CategoriesAdmin() {
   const { user, refreshUser } = useAuth();
@@ -310,16 +313,17 @@ export default function CategoriesAdmin() {
                       <td className="px-6 py-4 text-right space-x-1">
                         <button
                           onClick={() => handleEditClick(c)}
-                          disabled={loading}
+                          disabled={loading || !canManageCategory(user, c)}
                           className="p-2 text-gray-400 hover:text-black transition-colors disabled:opacity-50"
-                          title="Editar Nombre"
+                          title={canManageCategory(user, c) ? 'Editar Nombre' : NOT_MANAGEABLE_CATEGORY}
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteCategory(c.id)}
-                          className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                          title="Eliminar"
+                          disabled={!canManageCategory(user, c)}
+                          className="p-2 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title={canManageCategory(user, c) ? 'Eliminar' : NOT_MANAGEABLE_CATEGORY}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

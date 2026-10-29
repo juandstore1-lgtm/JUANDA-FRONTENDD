@@ -1,6 +1,32 @@
-import { User, Store, Category, Product, HeroSlide, RouletteSetting, MysteryBoxSetting, Contest, ContestParticipant, ContestWinner, HomeCategoryCollection } from '../types';
+import { User, Store, Category, Product, HeroSlide, RouletteSetting, MysteryBoxSetting, Contest, ContestParticipant, ContestWinner, HomeCategoryCollection, TicketPurchaseRequest, TicketReservation } from '../types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://juanda-backend-production.up.railway.app/api';
+const API_URL = import.meta.env?.VITE_API_URL || 'https://juanda-backend-production.up.railway.app/api';
+
+// Evento que AuthContext escucha para cerrar la sesión en memoria cuando el backend responde 401
+export const SESSION_EXPIRED_EVENT = 'auth:session-expired';
+export const SESSION_EXPIRED_MESSAGE = 'Tu sesión ha expirado. Inicia sesión nuevamente.';
+export const ACCESS_DENIED_MESSAGE = 'No tienes permisos para realizar esta acción.';
+
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+export const clearStoredSession = () => {
+  localStorage.removeItem('jwt_token');
+  localStorage.removeItem('admin_user');
+};
+
+// Solo el primer 401 encuentra el token guardado: así varias peticiones fallidas a la vez avisan una sola vez
+const expireSession = () => {
+  if (localStorage.getItem('jwt_token') === null) return;
+  clearStoredSession();
+  window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+};
 
 const getHeaders = () => {
   const token = localStorage.getItem('jwt_token');
@@ -10,11 +36,20 @@ const getHeaders = () => {
   };
 };
 
-const handleResponse = async (res: Response) => {
+// sentToken = false en las peticiones públicas que nunca envían el token: su 401 no significa sesión expirada
+const handleResponse = async (res: Response, sentToken = true) => {
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
-    const msg = error.message || error.error || error.detail || `Error (${res.status}): No se pudo completar la solicitud`;
-    throw new Error(msg);
+    const backendMsg = error.message || error.error || error.detail;
+    if (res.status === 401 && sentToken) {
+      expireSession();
+      throw new ApiError(SESSION_EXPIRED_MESSAGE, 401);
+    }
+    if (res.status === 403) {
+      // 403 = sesión válida sin permiso para esta acción: no se cierra la sesión
+      throw new ApiError(backendMsg || ACCESS_DENIED_MESSAGE, 403);
+    }
+    throw new ApiError(backendMsg || `Error (${res.status}): No se pudo completar la solicitud`, res.status);
   }
   const text = await res.text();
   return text ? JSON.parse(text) : {};
@@ -455,6 +490,7 @@ export const VideoService = {
 };
 
 export const ContestService = {
+  // Solo el endpoint público: /contests/admin/** requiere GLOBAL_ADMIN y no se consulta desde aquí
   getActiveContest: async (): Promise<Contest | null> => {
     try {
       const res = await fetch(`${API_URL}/contests/public/active`);
@@ -463,13 +499,6 @@ export const ContestService = {
         if (text && text.trim().length > 0) {
           const data = JSON.parse(text);
           if (data && data.id) return data;
-        }
-      }
-      const resAll = await fetch(`${API_URL}/contests/admin/all`);
-      if (resAll.ok) {
-        const list = await resAll.json();
-        if (Array.isArray(list) && list.length > 0) {
-          return list.sort((a: any, b: any) => b.id - a.id)[0];
         }
       }
       return null;
@@ -483,7 +512,7 @@ export const ContestService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(participant)
     });
-    return await handleResponse(res);
+    return await handleResponse(res, false);
   },
   getPublicWinner: async (contestId?: number): Promise<ContestWinner | null> => {
     try {
@@ -508,6 +537,12 @@ export const ContestService = {
   getAllContests: async (): Promise<Contest[]> => {
     const res = await fetch(`${API_URL}/contests/admin/all`, { headers: getHeaders() });
     return await handleResponse(res);
+  },
+  // Ganador con datos de contacto (GLOBAL_ADMIN); el endpoint público ya no los devuelve. Sin ganador: null
+  getWinner: async (contestId: number): Promise<ContestWinner | null> => {
+    const res = await fetch(`${API_URL}/contests/admin/${contestId}/winner`, { headers: getHeaders() });
+    const data = await handleResponse(res);
+    return data && data.id ? data : null;
   },
   createContest: async (contest: Partial<Contest>): Promise<Contest> => {
     const res = await fetch(`${API_URL}/contests/admin`, {
@@ -585,17 +620,25 @@ export const RaffleService = {
   }
 };
 
+const mapTickets = (data: any[]) => data.map((d: any) => ({
+  ...d,
+  id: String(d.id),
+  raffleId: String(d.raffleId)
+}));
+
 export const TicketService = {
+  // Vista pública: "buyer" siempre llega null
   getTicketsByRaffle: async (raffleId: string): Promise<any[]> => {
     const res = await fetch(`${API_URL}/raffles/${raffleId}/tickets`);
-    const data = await handleResponse(res);
-    return data.map((d: any) => ({ 
-      ...d, 
-      id: String(d.id),
-      raffleId: String(d.raffleId)
-    }));
+    return mapTickets(await handleResponse(res, false));
   },
-  purchaseTickets: async (raffleId: string, request: any): Promise<void> => {
+  // Vista de administración (GLOBAL_ADMIN): incluye los datos del comprador
+  getTicketsWithBuyers: async (raffleId: string): Promise<any[]> => {
+    const res = await fetch(`${API_URL}/raffles/${raffleId}/tickets/admin`, { headers: getHeaders() });
+    return mapTickets(await handleResponse(res));
+  },
+  // Compra pública: nunca envía el JWT. Reserva los boletos (no los vende) hasta reservedUntil
+  purchaseTickets: async (raffleId: string, request: TicketPurchaseRequest): Promise<TicketReservation> => {
     const payload = {
       ticketIds: request.ticketIds.map((id: string) => Number(id)),
       buyer: request.buyer
@@ -605,17 +648,27 @@ export const TicketService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    await handleResponse(res);
+    const data = await handleResponse(res, false);
+    return {
+      raffleId: String(data.raffleId),
+      ticketIds: (data.ticketIds ?? []).map(String),
+      ticketNumbers: data.ticketNumbers ?? [],
+      status: data.status,
+      reservedUntil: data.reservedUntil
+    };
   },
-  approveTicket: async (raffleId: string, ticketId: string): Promise<void> => {
-    const res = await fetch(`${API_URL}/raffles/${raffleId}/tickets/${ticketId}/approve`, {
+  // buyerId: comprador que muestra el panel; el backend rechaza la acción si la reserva cambió de comprador
+  approveTicket: async (raffleId: string, ticketId: string, buyerId?: string): Promise<void> => {
+    const query = buyerId ? `?buyerId=${encodeURIComponent(buyerId)}` : '';
+    const res = await fetch(`${API_URL}/raffles/${raffleId}/tickets/${ticketId}/approve${query}`, {
       method: 'PUT',
       headers: getHeaders()
     });
     await handleResponse(res);
   },
-  cancelTicket: async (raffleId: string, ticketId: string): Promise<void> => {
-    const res = await fetch(`${API_URL}/raffles/${raffleId}/tickets/${ticketId}/cancel`, {
+  cancelTicket: async (raffleId: string, ticketId: string, buyerId?: string): Promise<void> => {
+    const query = buyerId ? `?buyerId=${encodeURIComponent(buyerId)}` : '';
+    const res = await fetch(`${API_URL}/raffles/${raffleId}/tickets/${ticketId}/cancel${query}`, {
       method: 'PUT',
       headers: getHeaders()
     });
