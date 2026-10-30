@@ -160,14 +160,38 @@ export default function CategoriesAdmin() {
     }
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Reduce la imagen antes de guardarla (máx. 800 px, JPEG 0.8): se guarda como base64 y viaja en cada listado
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_SIZE = 800;
+          const scale = Math.min(1, MAX_SIZE / Math.max(img.width, img.height));
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        };
+        img.onerror = (error) => reject(error);
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewCategoryImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        setNewCategoryImage(await compressImage(file));
+      } catch {
+        Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo procesar la imagen.', confirmButtonColor: '#000000' });
+      }
     }
   };
 

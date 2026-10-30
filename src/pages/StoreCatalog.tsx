@@ -59,7 +59,7 @@ export default function StoreCatalog() {
             setStore(foundStore);
             const [prods, cats] = await Promise.all([
               ProductService.getProducts(String(foundStore.id)),
-              CategoryService.getCategories(String(foundStore.id))
+              CategoryService.getCategories(String(foundStore.id), { includeImage: false })
             ]);
             setProducts(prods);
             setCategories(cats);

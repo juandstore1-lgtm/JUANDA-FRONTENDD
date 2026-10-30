@@ -31,7 +31,7 @@ function StoreProductTable({
 
   useEffect(() => {
     if (isOpen) {
-      CategoryService.getCategories(store.id).then(setCategories);
+      CategoryService.getCategories(store.id, { includeImage: false }).then(setCategories);
     }
   }, [isOpen, store.id]);
 
@@ -250,7 +250,7 @@ export default function ProductsAdmin() {
   // Load categories whenever the selected store in the form changes
   useEffect(() => {
     if (formData.selectedStoreId) {
-      CategoryService.getCategories(formData.selectedStoreId).then(setCategories);
+      CategoryService.getCategories(formData.selectedStoreId, { includeImage: false }).then(setCategories);
     } else {
       setCategories([]);
     }

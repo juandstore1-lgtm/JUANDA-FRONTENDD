@@ -251,8 +251,13 @@ export const DashboardService = {
 };
 
 export const CategoryService = {
-  getCategories: async (storeId?: string | number): Promise<Category[]> => {
-    const url = storeId ? `${API_URL}/categories?storeId=${storeId}` : `${API_URL}/categories`;
+  // includeImage: false pide el listado sin imágenes (solo para pantallas que no las muestran)
+  getCategories: async (storeId?: string | number, options: { includeImage?: boolean } = {}): Promise<Category[]> => {
+    const params = new URLSearchParams();
+    if (storeId) params.set('storeId', String(storeId));
+    if (options.includeImage === false) params.set('includeImage', 'false');
+    const query = params.toString();
+    const url = query ? `${API_URL}/categories?${query}` : `${API_URL}/categories`;
     const res = await fetch(url, { headers: getHeaders() });
     const data = await handleResponse(res);
     return data.map((c: any) => ({

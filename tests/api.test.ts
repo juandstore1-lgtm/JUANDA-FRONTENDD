@@ -6,6 +6,7 @@ import {
   ACCESS_DENIED_MESSAGE,
   SESSION_EXPIRED_EVENT,
   SESSION_EXPIRED_MESSAGE,
+  CategoryService,
   ContestService,
   ProductService,
   TicketService
@@ -229,6 +230,21 @@ test('aprobar y cancelar envían el comprador que muestra el panel', async () =>
   assert.match(calls[1].url, /\/raffles\/301\/tickets\/502\/cancel\?buyerId=402$/);
   assert.match(calls[2].url, /\/raffles\/301\/tickets\/503\/approve$/);
   assert.ok(calls.every((c) => authHeader(c) === `Bearer ${TOKEN}`));
+});
+
+test('categorías: por defecto piden las imágenes; con includeImage false piden el listado ligero', async () => {
+  respondWith(() => json([{ id: 21, name: 'Camisas', image: null, storeId: 11 }]));
+
+  await CategoryService.getCategories('11');
+  await CategoryService.getCategories('11', { includeImage: false });
+  await CategoryService.getCategories(undefined, { includeImage: false });
+  const categories = await CategoryService.getCategories();
+
+  assert.match(calls[0].url, /\/categories\?storeId=11$/);
+  assert.match(calls[1].url, /\/categories\?storeId=11&includeImage=false$/);
+  assert.match(calls[2].url, /\/categories\?includeImage=false$/);
+  assert.match(calls[3].url, /\/categories$/);
+  assert.deepEqual(categories, [{ id: '21', name: 'Camisas', image: null, storeId: '11' }]);
 });
 
 // ---------- getActiveContest ----------
