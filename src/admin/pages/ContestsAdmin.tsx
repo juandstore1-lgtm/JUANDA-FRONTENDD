@@ -22,7 +22,7 @@ export default function ContestsAdmin() {
   // Winner Draw Animation State
   // Roulette Animation States
   const [rouletteActive, setRouletteActive] = useState(false);
-  const [roulettePhase, setRoulettePhase] = useState<'READY' | 'SPINNING' | 'WINNER'>('READY');
+  const [roulettePhase, setRoulettePhase] = useState<'READY' | 'SPINNING' | 'REVEAL'>('READY');
   const [rouletteHighlightIndex, setRouletteHighlightIndex] = useState(-1);
   const [rouletteWinnerResult, setRouletteWinnerResult] = useState<ContestWinner | null>(null);
 
@@ -189,7 +189,7 @@ export default function ContestsAdmin() {
           // Detenerse exactamente en el ganador
           const winnerIndex = validParts.findIndex(p => p.id === selectedWinner.participant.id);
           setRouletteHighlightIndex(winnerIndex !== -1 ? winnerIndex : 0);
-          setRoulettePhase('WINNER');
+          setRoulettePhase('REVEAL');
           setRouletteWinnerResult(selectedWinner);
           setWinner(selectedWinner);
           

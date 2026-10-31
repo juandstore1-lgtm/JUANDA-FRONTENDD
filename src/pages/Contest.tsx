@@ -611,7 +611,7 @@ export default function Contest() {
                     <Gift className="w-4 h-4 text-white" />
                     <h3 className="text-[11px] font-black uppercase tracking-widest text-white">Premios Increíbles</h3>
                   </div>
-                  <p className="text-xs text-white/50 mb-4 leading-relaxed">Participa por premios exclusivos y sorpresas de JDQ STORE.</p>
+                  <p className="text-xs text-white/50 mb-4 leading-relaxed">Participa por premios exclusivos y sorpresas de JUANDSTORE & QUALITY STORE.</p>
                   <div className="flex items-center justify-between px-2 opacity-60">
                     <Shirt className="w-6 h-6" />
                     <Crosshair className="w-6 h-6" />
