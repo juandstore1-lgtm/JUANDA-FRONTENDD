@@ -6,7 +6,7 @@ export interface Role {
 export interface User {
   id: string;
   name: string;
-  email: string;
+  email?: string;
   role: Role;
   storeIds: string[]; // empty if GLOBAL_ADMIN
   isActive: boolean;

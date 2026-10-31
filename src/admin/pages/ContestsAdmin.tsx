@@ -335,7 +335,7 @@ export default function ContestsAdmin() {
   const filteredParticipants = participants.filter((p) => {
     const matchesSearch =
       p.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.email ? p.email.toLowerCase().includes(searchQuery.toLowerCase()) : false) ||
       p.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.phone.includes(searchQuery);
 
@@ -448,7 +448,7 @@ export default function ContestsAdmin() {
                 <div className="space-y-3">
                   <h3 className="text-3xl font-black uppercase text-white tracking-wider drop-shadow-md">{winner.participant.fullName}</h3>
                   <div className="space-y-1">
-                    <p className="text-sm text-gray-400"><b>Email:</b> <span className="text-gray-100">{winner.participant.email}</span></p>
+                    <p className="text-sm text-gray-400"><b>Email:</b> <span className="text-gray-100">{winner.participant.email || "No registrado"}</span></p>
                     <p className="text-sm text-gray-400"><b>Teléfono:</b> <span className="text-gray-100">{winner.participant.phone}</span></p>
                     <p className="text-sm text-gray-400"><b>Ciudad:</b> <span className="text-gray-100">{winner.participant.city}</span></p>
                     {winner.participant.socialMedia && <p className="text-sm text-gray-400"><b>Red Social:</b> <span className="text-gray-100">{winner.participant.socialMedia}</span></p>}
@@ -661,7 +661,7 @@ export default function ContestsAdmin() {
                   <div className="p-5 space-y-3 flex-1 flex flex-col justify-between">
                     <div>
                       <h3 className="font-black text-lg uppercase tracking-wide text-black">{p.fullName}</h3>
-                      <p className="text-xs text-gray-500 font-mono mt-0.5">{p.email}</p>
+                      <p className="text-xs text-gray-500 font-mono mt-0.5">{p.email || "Sin correo"}</p>
                     </div>
 
                     <div className="space-y-1 text-xs text-gray-600 pt-3 border-t border-gray-100">

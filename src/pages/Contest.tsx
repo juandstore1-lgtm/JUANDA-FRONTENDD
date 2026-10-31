@@ -182,7 +182,7 @@ export default function Contest() {
         fullName,
         identificationNumber: idNumber,
         phone,
-        email,
+        email: email.trim() || undefined,
         city,
         socialMedia,
         outfitImageUrl: finalImage,
@@ -425,13 +425,15 @@ export default function Contest() {
 
                     {/* Email */}
                     <div className="space-y-2">
-                      <label className="block text-[10px] font-bold uppercase tracking-widest text-white/70">Correo Electrónico *</label>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-white/70">
+                        Correo Electrónico <span className="text-white/40 font-normal lowercase">(opcional)</span>
+                      </label>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                           <Mail className="w-4 h-4 text-white/40" />
                         </div>
                         <input
-                          type="email" required placeholder="Ej: ejemplo@correo.com"
+                          type="email" placeholder="Ej: ejemplo@correo.com (opcional)"
                           value={email} onChange={(e) => setEmail(e.target.value)}
                           className="w-full pl-11 pr-4 py-3 bg-[#111] border border-white/10 rounded text-sm text-white placeholder-white/20 focus:outline-none focus:border-white/30 transition-colors"
                         />
