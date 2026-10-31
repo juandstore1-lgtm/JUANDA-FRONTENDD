@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Users, Settings, RefreshCw, Search, Eye, Filter, Sparkles, AlertTriangle, CheckCircle, Trash2, Calendar, FileText } from "lucide-react";
+import { Trophy, Users, Settings, RefreshCw, Search, Eye, EyeOff, Filter, Sparkles, AlertTriangle, CheckCircle, Trash2, Calendar, FileText } from "lucide-react";
 import Swal from "sweetalert2";
 import confetti from "canvas-confetti";
 import { ContestService } from "../../services/api";
@@ -17,6 +17,7 @@ export default function ContestsAdmin() {
   // Filters & Lightbox
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [visibilityFilter, setVisibilityFilter] = useState<string>("ALL");
   const [selectedImageModal, setSelectedImageModal] = useState<string | null>(null);
 
   // Winner Draw Animation State
@@ -270,6 +271,67 @@ export default function ContestsAdmin() {
     }
   };
 
+  const handleToggleDisplay = async (p: ContestParticipant) => {
+    if (!p.id) return;
+    try {
+      const updated = await ContestService.toggleParticipantDisplay(p.id);
+      setParticipants((prev) =>
+        prev.map((item) => (item.id === p.id ? { ...item, agreesToPublicDisplay: updated.agreesToPublicDisplay } : item))
+      );
+      Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: updated.agreesToPublicDisplay ? "Publicación visible en /concursos" : "Publicación oculta de /concursos",
+        showConfirmButton: false,
+        timer: 2500
+      });
+    } catch (err: any) {
+      Swal.fire({
+        icon: "error",
+        title: "Error al cambiar visibilidad",
+        text: err.message || "No se pudo actualizar la visibilidad.",
+        confirmButtonColor: "#000000"
+      });
+    }
+  };
+
+  const handleDeleteParticipant = async (p: ContestParticipant) => {
+    if (!p.id) return;
+    const confirm = await Swal.fire({
+      icon: "warning",
+      title: "¿Eliminar publicación?",
+      html: `¿Estás seguro de que deseas eliminar permanentemente la publicación de <b>${p.fullName}</b>?<br/><span class="text-xs text-red-600 font-semibold mt-1 inline-block">Esta acción eliminará la foto y el registro del participante.</span>`,
+      showCancelButton: true,
+      confirmButtonText: "Sí, eliminar",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#d33"
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    try {
+      await ContestService.deleteParticipant(p.id);
+      setParticipants((prev) => prev.filter((item) => item.id !== p.id));
+      if (winner?.participant?.id === p.id) {
+        setWinner(null);
+      }
+      Swal.fire({
+        icon: "success",
+        title: "Eliminado",
+        text: "La publicación ha sido eliminada correctamente.",
+        confirmButtonColor: "#000000"
+      });
+    } catch (err: any) {
+      Swal.fire({
+        icon: "error",
+        title: "Error al eliminar",
+        text: err.message || "No se pudo eliminar la publicación.",
+        confirmButtonColor: "#000000"
+      });
+    }
+  };
+
   const filteredParticipants = participants.filter((p) => {
     const matchesSearch =
       p.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -278,7 +340,12 @@ export default function ContestsAdmin() {
       p.phone.includes(searchQuery);
 
     const matchesStatus = statusFilter === "ALL" || p.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesVisibility =
+      visibilityFilter === "ALL" ||
+      (visibilityFilter === "VISIBLE" && p.agreesToPublicDisplay) ||
+      (visibilityFilter === "HIDDEN" && !p.agreesToPublicDisplay);
+
+    return matchesSearch && matchesStatus && matchesVisibility;
   });
 
   if (loading) {
@@ -533,17 +600,27 @@ export default function ContestsAdmin() {
               />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Filter className="w-4 h-4 text-gray-500" />
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 text-sm font-semibold uppercase tracking-wider"
+                className="px-3 py-2 border border-gray-300 text-sm font-semibold uppercase tracking-wider bg-white"
               >
                 <option value="ALL">Todos los Estados</option>
                 <option value="PARTICIPANT">Participantes</option>
                 <option value="WINNER">Ganadores</option>
                 <option value="DISQUALIFIED">Eliminados</option>
+              </select>
+
+              <select
+                value={visibilityFilter}
+                onChange={(e) => setVisibilityFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 text-sm font-semibold uppercase tracking-wider bg-white"
+              >
+                <option value="ALL">Visibilidad: Todas</option>
+                <option value="VISIBLE">Públicas (/concursos)</option>
+                <option value="HIDDEN">Ocultas</option>
               </select>
             </div>
           </div>
@@ -560,11 +637,25 @@ export default function ContestsAdmin() {
                         <Eye className="w-4 h-4" /> Ver Foto Completa
                       </span>
                     </div>
+
                     {p.status === "WINNER" && (
                       <span className="absolute top-3 left-3 px-3 py-1 bg-yellow-500 text-black font-black text-xs uppercase tracking-widest shadow-lg">
                         🏆 GANADOR
                       </span>
                     )}
+
+                    {/* Badge de Visibilidad en /concursos */}
+                    <div className="absolute top-3 right-3">
+                      {p.agreesToPublicDisplay ? (
+                        <span className="px-2.5 py-1 bg-emerald-600/95 backdrop-blur-sm text-white font-bold text-[10px] uppercase tracking-wider shadow flex items-center gap-1">
+                          <Eye className="w-3 h-3" /> Pública
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-1 bg-rose-600/95 backdrop-blur-sm text-white font-bold text-[10px] uppercase tracking-wider shadow flex items-center gap-1">
+                          <EyeOff className="w-3 h-3" /> Oculta
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="p-5 space-y-3 flex-1 flex flex-col justify-between">
@@ -579,6 +670,48 @@ export default function ContestsAdmin() {
                       {p.socialMedia && <p><b>Red Social:</b> {p.socialMedia}</p>}
                       {p.identificationNumber && <p><b>Documento:</b> {p.identificationNumber}</p>}
                       <p className="text-[10px] text-gray-400 pt-1">Inscrito: {new Date(p.createdAt || "").toLocaleString()}</p>
+                    </div>
+
+                    {/* Barra de Acciones para Ocultar/Mostrar y Eliminar */}
+                    <div className="pt-3 border-t border-gray-200 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleDisplay(p);
+                        }}
+                        className={`flex-1 py-2 px-3 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 border transition-all ${
+                          p.agreesToPublicDisplay
+                            ? "border-amber-400 text-amber-800 bg-amber-50 hover:bg-amber-100"
+                            : "border-emerald-500 text-emerald-800 bg-emerald-50 hover:bg-emerald-100"
+                        }`}
+                        title={p.agreesToPublicDisplay ? "Ocultar de la página /concursos" : "Mostrar en la página /concursos"}
+                      >
+                        {p.agreesToPublicDisplay ? (
+                          <>
+                            <EyeOff className="w-3.5 h-3.5" />
+                            <span>Ocultar</span>
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Mostrar</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteParticipant(p);
+                        }}
+                        className="py-2 px-3 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 hover:border-red-400 transition-all"
+                        title="Eliminar permanentemente publicación y participante"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Eliminar</span>
+                      </button>
                     </div>
                   </div>
                 </div>

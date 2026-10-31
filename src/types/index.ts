@@ -152,6 +152,7 @@ export interface ContestParticipant {
   socialMedia?: string;
   outfitImageUrl: string;
   acceptedTerms: boolean;
+  agreesToPublicDisplay?: boolean;
   status?: ParticipantStatus;
   createdAt?: string;
 }

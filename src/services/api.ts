@@ -582,6 +582,20 @@ export const ContestService = {
       headers: getHeaders()
     });
     return await handleResponse(res);
+  },
+  toggleParticipantDisplay: async (participantId: number): Promise<ContestParticipant> => {
+    const res = await fetch(`${API_URL}/contests/admin/participants/${participantId}/toggle-display`, {
+      method: 'PUT',
+      headers: getHeaders()
+    });
+    return await handleResponse(res);
+  },
+  deleteParticipant: async (participantId: number): Promise<{ message: string }> => {
+    const res = await fetch(`${API_URL}/contests/admin/participants/${participantId}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return await handleResponse(res);
   }
 };
 
