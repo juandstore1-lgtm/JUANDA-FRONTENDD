@@ -694,3 +694,50 @@ export const TicketService = {
     await handleResponse(res);
   }
 };
+
+
+// ----------------- CLOUDFLARE R2 STORAGE -----------------
+
+export interface PresignedUrlResponse {
+  uploadUrl: string;
+  publicUrl: string;
+  key: string;
+  contentType: string;
+  expiresInSeconds: number;
+}
+
+export const StorageService = {
+  getPresignedUrl: async (entity: string, file: File, isPublic = false): Promise<PresignedUrlResponse> => {
+    const endpoint = isPublic ? '/storage/public/presigned-url' : '/storage/presigned-url';
+    const url = API_URL + endpoint;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: isPublic ? { 'Content-Type': 'application/json' } : getHeaders(),
+      body: JSON.stringify({
+        entity,
+        contentType: file.type || 'image/webp',
+        originalFilename: file.name,
+        fileSize: file.size
+      })
+    });
+    return await handleResponse(res, !isPublic);
+  },
+
+  uploadFile: async (entity: string, file: File, isPublic = false): Promise<string> => {
+    const presigned = await StorageService.getPresignedUrl(entity, file, isPublic);
+    const uploadRes = await fetch(presigned.uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': presigned.contentType,
+        'Cache-Control': 'public, max-age=31536000, immutable'
+      },
+      body: file
+    });
+
+    if (!uploadRes.ok) {
+      throw new Error('Error al subir imagen a R2 (status: ' + uploadRes.status + ')');
+    }
+
+    return presigned.publicUrl;
+  }
+};
