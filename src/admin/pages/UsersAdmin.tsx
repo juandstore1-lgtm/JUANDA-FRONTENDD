@@ -3,6 +3,7 @@ import { UserService, StoreService } from '../../services/api';
 import { User, Store } from '../../types';
 import { Plus, Edit2, Trash2, X } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { formatStoreName } from '../../utils/format';
 
 export default function UsersAdmin() {
   const [users, setUsers] = useState<User[]>([]);
@@ -260,7 +261,7 @@ export default function UsersAdmin() {
                             onChange={() => handleStoreToggle(store.id)}
                             className="rounded-none border-gray-300 text-black focus:ring-black"
                           />
-                          <label htmlFor={`store-${store.id}`} className="text-sm cursor-pointer">{store.name}</label>
+                          <label htmlFor={`store-${store.id}`} className="text-sm cursor-pointer">{formatStoreName(store)}</label>
                         </div>
                       ))}
                       {stores.length === 0 && <p className="text-xs text-gray-500">No hay sedes disponibles.</p>}

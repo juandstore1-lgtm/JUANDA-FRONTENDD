@@ -5,6 +5,7 @@ import { Plus, Trash2, Edit2, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import Swal from 'sweetalert2';
 import { canManageCategory } from '../../utils/permissions';
+import { formatStoreName } from '../../utils/format';
 
 const NOT_MANAGEABLE_CATEGORY = 'Categoría global: solo un administrador global puede modificarla';
 
@@ -235,7 +236,7 @@ export default function CategoriesAdmin() {
               {stores.length === 0 && <option value="">Sin sedes disponibles</option>}
               {stores.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.name}
+                  {formatStoreName(s)}
                 </option>
               ))}
             </select>

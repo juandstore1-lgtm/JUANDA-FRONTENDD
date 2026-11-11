@@ -23,3 +23,21 @@ export function formatDate(dateString: string | undefined): string {
     minute: '2-digit'
   }).format(date);
 }
+
+export function getStoreBarrio(store?: { name?: string; barrio?: string; address?: string } | null): string {
+  if (!store) return '';
+  if (store.barrio && store.barrio.trim()) return store.barrio.trim();
+  const n = (store.name || '').toUpperCase();
+  const a = (store.address || '').toUpperCase();
+  if (n.includes('CIUDAD MODELO') || a.includes('MODELO')) return 'Ciudad Modelo';
+  if (n.includes('VILLA COLOMBIA') || a.includes('52#13A') || a.includes('COLOMBIA')) return 'Villa Colombia';
+  if (n.includes('ISRAEL') || a.includes('ISRAEL')) return 'República de Israel';
+  if (n.includes('MARIANO RAMOS') || a.includes('MARIANO')) return 'Mariano Ramos';
+  return '';
+}
+
+export function formatStoreName(store?: { name?: string; barrio?: string; address?: string } | null): string {
+  if (!store || !store.name) return '';
+  const barrio = getStoreBarrio(store);
+  return barrio ? `${store.name} - ${barrio}` : store.name;
+}

@@ -6,6 +6,7 @@ import AnimatedSection from "../components/AnimatedSection";
 import ProductCard from "../components/ProductCard";
 import { SlidersHorizontal, X, RefreshCw, Grid, List, Search, MapPin } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import { formatStoreName, getStoreBarrio } from "../utils/format";
 
 export default function StoreCatalog() {
   const { storeId } = useParams();
@@ -174,7 +175,7 @@ export default function StoreCatalog() {
                 <>
                   <span className="mx-2">/</span>
                   <span className="text-white font-bold">{store.name}</span>
-                  {store.barrio && <span className="text-zinc-400 ml-1.5 font-normal">({store.barrio})</span>}
+                  {getStoreBarrio(store) && <span className="text-zinc-400 ml-1.5 font-normal">({getStoreBarrio(store)})</span>}
                 </>
               )}
             </div>
@@ -304,7 +305,9 @@ export default function StoreCatalog() {
                 >
                   <option value="" disabled className="bg-[#111] text-white">Selecciona tu sede</option>
                   {allStores.map(s => (
-                    <option key={s.id} value={s.id} className="bg-[#111] text-white">{s.name}</option>
+                    <option key={s.id} value={s.id} className="bg-[#111] text-white">
+                      {formatStoreName(s)}
+                    </option>
                   ))}
                 </select>
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -458,7 +461,9 @@ export default function StoreCatalog() {
                   >
                     <option value="" disabled className="bg-[#111] text-white">Selecciona tu sede</option>
                     {allStores.map(s => (
-                      <option key={s.id} value={s.id} className="bg-[#111] text-white">{s.name}</option>
+                      <option key={s.id} value={s.id} className="bg-[#111] text-white">
+                        {formatStoreName(s)}
+                      </option>
                     ))}
                   </select>
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -683,7 +688,9 @@ export default function StoreCatalog() {
                   >
                     <option value="" className="bg-[#111] text-white">Todas las sedes</option>
                     {allStores.map(store => (
-                      <option key={store.id} value={store.id} className="bg-[#111] text-white">{store.name}</option>
+                      <option key={store.id} value={store.id} className="bg-[#111] text-white">
+                        {formatStoreName(store)}
+                      </option>
                     ))}
                   </select>
                   <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none">
