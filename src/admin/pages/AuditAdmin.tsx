@@ -26,6 +26,16 @@ import { AuditLog, Product, Store, User } from '../../types';
 import { formatPrice, formatStoreName } from '../../utils/format';
 import Swal from 'sweetalert2';
 
+// Helper to safely parse dates avoiding UTC vs local mismatch when ISO string has no timezone indicator
+export function parseDateSafe(dateStr?: string | null): Date {
+  if (!dateStr) return new Date();
+  const normalized = (dateStr.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(dateStr))
+    ? dateStr
+    : `${dateStr}Z`;
+  const d = new Date(normalized);
+  return isNaN(d.getTime()) ? new Date(dateStr) : d;
+}
+
 export default function AuditAdmin() {
   const [activeTab, setActiveTab] = useState<'summary' | 'history' | 'availability'>('summary');
   const [dateFilter, setDateFilter] = useState<'today' | '7days' | '30days' | 'all'>('today');
@@ -80,23 +90,27 @@ export default function AuditAdmin() {
     const now = new Date();
     return auditLogs.filter((log) => {
       if (dateFilter === 'all') return true;
-      const logDate = new Date(log.createdAt);
+      const logDate = parseDateSafe(log.createdAt);
       if (isNaN(logDate.getTime())) return true;
 
+      const diffMs = now.getTime() - logDate.getTime();
+      const diffHours = diffMs / (1000 * 3600);
+
       if (dateFilter === 'today') {
-        return (
+        const isSameCalendarDay =
           logDate.getDate() === now.getDate() &&
           logDate.getMonth() === now.getMonth() &&
-          logDate.getFullYear() === now.getFullYear()
-        );
+          logDate.getFullYear() === now.getFullYear();
+        // Return true if same calendar day OR occurred within the last 24 hours
+        return isSameCalendarDay || (diffHours >= -1 && diffHours <= 24);
       }
       if (dateFilter === '7days') {
-        const diffDays = (now.getTime() - logDate.getTime()) / (1000 * 3600 * 24);
-        return diffDays <= 7;
+        const diffDays = diffMs / (1000 * 3600 * 24);
+        return diffDays >= -1 && diffDays <= 7;
       }
       if (dateFilter === '30days') {
-        const diffDays = (now.getTime() - logDate.getTime()) / (1000 * 3600 * 24);
-        return diffDays <= 30;
+        const diffDays = diffMs / (1000 * 3600 * 24);
+        return diffDays >= -1 && diffDays <= 30;
       }
       return true;
     });
@@ -155,9 +169,19 @@ export default function AuditAdmin() {
       }
     }
 
+    // Entity type adjustments
+    if (log.entityType === 'CATEGORY') {
+      if (name === 'Producto') name = 'Categoría';
+      ref = log.entityId ? `Cat: #${log.entityId}` : 'Categoría';
+    }
+
     // Human readable detail
     let detail = 'Acción registrada en el catálogo';
-    if (log.actionType === 'CREATE') {
+    if (log.entityType === 'CATEGORY') {
+      if (log.actionType === 'CREATE') detail = 'Se creó la categoría';
+      else if (log.actionType === 'DELETE') detail = 'Se eliminó la categoría';
+      else if (log.actionType === 'UPDATE') detail = 'Se actualizó la categoría';
+    } else if (log.actionType === 'CREATE') {
       detail = 'Se agregó al catálogo';
     } else if (log.actionType === 'DELETE') {
       detail = 'Se eliminó del catálogo';
@@ -171,7 +195,7 @@ export default function AuditAdmin() {
       }
     } else if (log.actionType === 'LOGIN') {
       detail = `Inicio de sesión exitoso desde ${log.ipAddress || 'IP desconocida'}`;
-      name = 'Sesión de Administrador';
+      name = `Sesión de ${log.userName}`;
       ref = 'Auth';
     } else if (log.actionType === 'ACCESS_DENIED') {
       detail = 'Intento no autorizado bloqueado por permisos de sede';
@@ -209,7 +233,7 @@ export default function AuditAdmin() {
         const current = map.get(parsed.storeId)!;
         current.count += 1;
         if (current.lastTime === 'Sin actividad') {
-          const d = new Date(log.createdAt);
+          const d = parseDateSafe(log.createdAt);
           current.lastTime = isNaN(d.getTime())
             ? 'Hoy'
             : d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
@@ -336,7 +360,7 @@ export default function AuditAdmin() {
             <div><strong>Acción:</strong> ${log.actionType}</div>
             <div><strong>Entidad:</strong> ${log.entityType} #${log.entityId || 'N/A'}</div>
             <div><strong>IP Origen:</strong> ${log.ipAddress || '127.0.0.1'}</div>
-            <div><strong>Fecha:</strong> ${new Date(log.createdAt).toLocaleString('es-CO')}</div>
+            <div><strong>Fecha:</strong> ${parseDateSafe(log.createdAt).toLocaleString('es-CO')}</div>
           </div>
           ${
             log.previousData
@@ -715,7 +739,7 @@ export default function AuditAdmin() {
                           </div>
 
                           <span className="text-[10px] text-gray-400 font-medium whitespace-nowrap ml-2">
-                            {new Date(log.createdAt).toLocaleTimeString('es-CO', {
+                            {parseDateSafe(log.createdAt).toLocaleTimeString('es-CO', {
                               hour: '2-digit',
                               minute: '2-digit'
                             })}
@@ -939,7 +963,7 @@ export default function AuditAdmin() {
                           className="hover:bg-gray-50/70 transition-colors cursor-pointer group"
                         >
                           <td className="py-4 px-5 whitespace-nowrap text-gray-600 font-medium">
-                            {new Date(log.createdAt).toLocaleString('es-CO', {
+                            {parseDateSafe(log.createdAt).toLocaleString('es-CO', {
                               day: '2-digit',
                               month: 'short',
                               year: 'numeric',
