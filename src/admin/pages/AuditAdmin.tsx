@@ -2,7 +2,9 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { 
   ShieldCheck, 
   BarChart3, 
-  Clock, 
+  Clock,
+  Calendar,
+  Filter, 
   Layers, 
   Plus, 
   Trash2, 
@@ -47,6 +49,7 @@ export default function AuditAdmin() {
   const [loading, setLoading] = useState(true);
 
   // Tab 2 (History) filter states
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [historyStoreFilter, setHistoryStoreFilter] = useState('');
   const [historyUserFilter, setHistoryUserFilter] = useState('');
   const [historyActionFilter, setHistoryActionFilter] = useState('');
@@ -474,41 +477,44 @@ export default function AuditAdmin() {
       </div>
 
       {/* Tabs Navigation Pills */}
-      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-gray-100/80 rounded-2xl w-fit border border-gray-200/50 shadow-inner">
+      <div className="flex items-center gap-1.5 sm:gap-2 p-1.5 bg-gray-100/90 rounded-2xl w-full sm:w-fit border border-gray-200/60 shadow-inner overflow-x-auto no-scrollbar">
         <button
           onClick={() => setActiveTab('summary')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+          className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-bold sm:font-black tracking-tight transition-all whitespace-nowrap ${
             activeTab === 'summary'
               ? 'bg-black text-white shadow-md'
               : 'text-gray-600 hover:text-black hover:bg-white/60'
           }`}
         >
-          <BarChart3 className="w-4 h-4" />
-          <span>Resumen por sedes</span>
+          <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <span className="hidden sm:inline uppercase">Resumen por sedes</span>
+          <span className="sm:hidden font-medium">Resumen</span>
         </button>
 
         <button
           onClick={() => setActiveTab('history')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+          className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-bold sm:font-black tracking-tight transition-all whitespace-nowrap ${
             activeTab === 'history'
               ? 'bg-black text-white shadow-md'
               : 'text-gray-600 hover:text-black hover:bg-white/60'
           }`}
         >
-          <Clock className="w-4 h-4" />
-          <span>Historial de movimientos</span>
+          <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <span className="hidden sm:inline uppercase">Historial de movimientos</span>
+          <span className="sm:hidden font-medium">Historial de movimientos</span>
         </button>
 
         <button
           onClick={() => setActiveTab('availability')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+          className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-bold sm:font-black tracking-tight transition-all whitespace-nowrap ${
             activeTab === 'availability'
               ? 'bg-black text-white shadow-md'
               : 'text-gray-600 hover:text-black hover:bg-white/60'
           }`}
         >
-          <Layers className="w-4 h-4" />
-          <span>Control de disponibilidad</span>
+          <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <span className="hidden sm:inline uppercase">Control de disponibilidad</span>
+          <span className="sm:hidden font-medium">Disponibilidad</span>
         </button>
       </div>
 
@@ -801,9 +807,123 @@ export default function AuditAdmin() {
 
       {/* TAB 2: HISTORIAL DE MOVIMIENTOS */}
       {activeTab === 'history' && (
-        <div className="space-y-6">
-          {/* KPI Cards (5 cards) */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="space-y-4 sm:space-y-6">
+          {/* Mobile Search and Filter Button */}
+          <div className="sm:hidden flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Buscar por producto, ref o usuario..."
+                value={historySearchTerm}
+                onChange={(e) => {
+                  setHistorySearchTerm(e.target.value);
+                  setHistoryPage(1);
+                }}
+                className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-200/80 rounded-2xl text-xs focus:outline-none focus:ring-1 focus:ring-black shadow-sm"
+              />
+            </div>
+            <button
+              onClick={() => setShowMobileFilters(!showMobileFilters)}
+              className={`p-2.5 rounded-2xl border transition-all shadow-sm flex items-center justify-center ${
+                showMobileFilters || historyStoreFilter || historyUserFilter || historyActionFilter
+                  ? 'bg-black text-white border-black'
+                  : 'bg-white text-gray-700 border-gray-200/80 hover:bg-gray-50'
+              }`}
+              title="Filtrar"
+            >
+              <Filter className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Mobile Title Header */}
+          <div className="sm:hidden px-1">
+            <h2 className="text-xl font-black text-gray-900 tracking-tight">
+              Historial de movimientos
+            </h2>
+            <p className="text-xs text-gray-500">
+              Registro de todas las acciones realizadas en el catálogo.
+            </p>
+          </div>
+
+          {/* Collapsible Mobile Filters */}
+          {showMobileFilters && (
+            <div className="sm:hidden bg-white border border-gray-200/80 rounded-2xl p-4 shadow-sm space-y-3 animate-fadeIn">
+              <div className="text-xs font-bold text-gray-900 flex justify-between items-center pb-2 border-b border-gray-100">
+                <span>Filtros avanzados</span>
+                {(historyStoreFilter || historyUserFilter || historyActionFilter) && (
+                  <button
+                    onClick={() => {
+                      setHistoryStoreFilter('');
+                      setHistoryUserFilter('');
+                      setHistoryActionFilter('');
+                      setHistoryPage(1);
+                    }}
+                    className="text-[10px] text-rose-600 font-bold"
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase text-gray-400 block mb-1">Sede</label>
+                <select
+                  value={historyStoreFilter}
+                  onChange={(e) => {
+                    setHistoryStoreFilter(e.target.value);
+                    setHistoryPage(1);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 bg-white"
+                >
+                  <option value="">Todas las sedes</option>
+                  {stores.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {formatStoreName(s)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase text-gray-400 block mb-1">Usuario</label>
+                <select
+                  value={historyUserFilter}
+                  onChange={(e) => {
+                    setHistoryUserFilter(e.target.value);
+                    setHistoryPage(1);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 bg-white"
+                >
+                  <option value="">Todos los usuarios</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.name}>
+                      {u.name} ({u.role?.name || 'ADMIN'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase text-gray-400 block mb-1">Movimiento</label>
+                <select
+                  value={historyActionFilter}
+                  onChange={(e) => {
+                    setHistoryActionFilter(e.target.value);
+                    setHistoryPage(1);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 bg-white"
+                >
+                  <option value="">Todos los movimientos</option>
+                  <option value="CREATE">Producto agregado</option>
+                  <option value="UPDATE">Producto editado</option>
+                  <option value="DELETE">Producto eliminado</option>
+                  <option value="LOGIN">Inicio de sesión</option>
+                  <option value="ACCESS_DENIED">Acceso denegado</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Desktop KPI Cards (hidden in mobile to match screenshot cleanly, visible sm+) */}
+          <div className="hidden sm:grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex flex-col justify-between">
               <div className="flex items-center space-x-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
@@ -867,8 +987,8 @@ export default function AuditAdmin() {
             </div>
           </div>
 
-          {/* Filter Toolbar */}
-          <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex flex-wrap gap-3 items-center justify-between">
+          {/* Desktop Filter Toolbar */}
+          <div className="hidden sm:flex bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex-wrap gap-3 items-center justify-between">
             <div className="flex flex-wrap gap-3 items-center w-full lg:w-auto flex-1">
               {/* Sede */}
               <select
@@ -938,8 +1058,118 @@ export default function AuditAdmin() {
             </div>
           </div>
 
-          {/* Movements Data Table */}
-          <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+          {/* MOBILE CARDS VIEW (md:hidden) - EXACT MOCKUP MATCH */}
+          <div className="sm:hidden space-y-3.5">
+            {paginatedHistoryLogs.length === 0 ? (
+              <div className="bg-white border border-gray-100 rounded-2xl p-8 text-center text-gray-400 text-xs">
+                No se encontraron registros de movimientos.
+              </div>
+            ) : (
+              paginatedHistoryLogs.map((log) => {
+                const parsed = parseLogProduct(log);
+                const isDelete = log.actionType === 'DELETE';
+                const isCreate = log.actionType === 'CREATE';
+                const isUpdate = log.actionType === 'UPDATE';
+                const logDate = parseDateSafe(log.createdAt);
+
+                const dateStr = logDate.toLocaleDateString('es-CO', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric'
+                });
+                const timeStr = logDate.toLocaleTimeString('es-CO', {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                });
+
+                return (
+                  <div
+                    key={log.id}
+                    onClick={() => handleViewLogDetail(log)}
+                    className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:border-black/20 transition-all cursor-pointer"
+                  >
+                    {/* Top Row: Date/Time + User/Sede + Action Pill */}
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      {/* Left: Date and time */}
+                      <div className="space-y-1 text-xs text-gray-700">
+                        <div className="flex items-center space-x-1.5 font-medium text-gray-600">
+                          <Calendar className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                          <span>{dateStr}</span>
+                        </div>
+                        <div className="flex items-center space-x-1.5 text-gray-500">
+                          <Clock className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                          <span>{timeStr}</span>
+                        </div>
+                      </div>
+
+                      {/* Center: User and Store */}
+                      <div className="space-y-1 text-xs">
+                        <div className="flex items-center space-x-1.5">
+                          <UserIcon className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                          <span className="font-black text-gray-900 uppercase tracking-tight text-[11px]">
+                            {log.userName}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-1.5 text-gray-500">
+                          <StoreIcon className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                          <span className="text-[11px] font-semibold uppercase text-gray-600 truncate max-w-[130px]">
+                            {parsed.storeName}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Right: Action Pill */}
+                      <div className="flex-shrink-0">
+                        {isCreate && (
+                          <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                            <Plus className="w-3 h-3 stroke-[2.5]" /> Producto agregado
+                          </span>
+                        )}
+                        {isUpdate && (
+                          <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                            <Edit2 className="w-3 h-3 stroke-[2]" /> Producto editado
+                          </span>
+                        )}
+                        {isDelete && (
+                          <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-100">
+                            <Trash2 className="w-3 h-3 stroke-[2]" /> Producto eliminado
+                          </span>
+                        )}
+                        {!isCreate && !isUpdate && !isDelete && (
+                          <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold bg-gray-100 text-gray-700">
+                            {log.actionType}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Bottom Row: Product Preview with Arrow */}
+                    <div className="flex items-center justify-between pt-2.5 border-t border-gray-100/80">
+                      <div className="flex items-center space-x-3 min-w-0">
+                        <img
+                          src={parsed.image}
+                          alt={parsed.name}
+                          className="w-11 h-11 object-cover rounded-xl bg-gray-50 border border-gray-100 flex-shrink-0 shadow-sm"
+                        />
+                        <div className="min-w-0">
+                          <h4 className="font-black text-xs uppercase text-gray-900 truncate">
+                            {parsed.name}
+                          </h4>
+                          <p className="text-[11px] text-gray-400 font-medium">
+                            {parsed.ref}
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0 ml-2" />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* DESKTOP TABLE VIEW (hidden in sm:block) */}
+          <div className="hidden sm:block bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
