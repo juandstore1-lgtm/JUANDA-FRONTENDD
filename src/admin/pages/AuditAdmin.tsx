@@ -145,6 +145,9 @@ export default function AuditAdmin() {
         if (parsedOld.status) oldStatus = parsedOld.status;
         if (!storeId && parsedOld.storeIds && parsedOld.storeIds[0]) storeId = String(parsedOld.storeIds[0]);
         if (!storeId && parsedOld.storeId) storeId = String(parsedOld.storeId);
+        if (!storeId && parsedOld.stores && parsedOld.stores[0]) {
+          storeId = String(parsedOld.stores[0].id || parsedOld.stores[0]);
+        }
       }
     } catch (e) {
       // Ignored
@@ -157,6 +160,14 @@ export default function AuditAdmin() {
         name = found.name;
         if (found.images && found.images[0]) image = found.images[0];
         if (!storeId && found.storeIds && found.storeIds[0]) storeId = String(found.storeIds[0]);
+      }
+    }
+
+    // Fallback: If storeId is still not found, check the user's assigned store
+    if (!storeId && log.userId && users.length > 0) {
+      const foundUser = users.find((u) => u.id === log.userId);
+      if (foundUser && foundUser.stores && foundUser.stores.length > 0) {
+        storeId = String(foundUser.stores[0].id);
       }
     }
 
