@@ -23,6 +23,21 @@ export interface Store {
   description: string;
 }
 
+
+export interface AuditLog {
+  id: number;
+  userId?: number;
+  userName: string;
+  userEmail: string;
+  userRole: string;
+  actionType: string;
+  entityType: string;
+  entityId?: string;
+  previousData?: string;
+  newData?: string;
+  ipAddress?: string;
+  createdAt: string;
+}
 export interface Product {
   id: string;
   name: string;

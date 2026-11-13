@@ -12,7 +12,8 @@ import {
   Tag,
   Sliders,
   Trophy,
-  Ticket
+  Ticket,
+  ShieldCheck
 } from 'lucide-react';
 
 import Logo from '../../components/Logo';
@@ -34,6 +35,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
     { name: 'Categorías', path: '/admin/categories', icon: Tag, exact: false },
     ...(isGlobal ? [
       { name: 'Sedes', path: '/admin/stores', icon: Store, exact: false },
+      { name: 'Auditoría de Catálogos', path: '/admin/audit', icon: ShieldCheck, exact: false },
       { name: 'Usuarios', path: '/admin/users', icon: Users, exact: false },
       { name: 'Inicio', path: '/admin/home', icon: Sliders, exact: false },
       { name: 'Concursos', path: '/admin/contests', icon: Trophy, exact: false },

@@ -1,4 +1,4 @@
-import { User, Store, Category, Product, HeroSlide, RouletteSetting, MysteryBoxSetting, Contest, ContestParticipant, ContestWinner, HomeCategoryCollection, TicketPurchaseRequest, TicketReservation } from '../types';
+import { AuditLog, User, Store, Category, Product, HeroSlide, RouletteSetting, MysteryBoxSetting, Contest, ContestParticipant, ContestWinner, HomeCategoryCollection, TicketPurchaseRequest, TicketReservation } from '../types';
 
 const API_URL = import.meta.env?.VITE_API_URL || 'https://juanda-backend-production.up.railway.app/api';
 
@@ -739,5 +739,33 @@ export const StorageService = {
     }
 
     return presigned.publicUrl;
+  }
+};
+
+
+export const AuditService = {
+  getAuditLogs: async (params?: {
+    userId?: number | string;
+    actionType?: string;
+    entityType?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    size?: number;
+  }): Promise<{ content: AuditLog[]; totalElements: number; totalPages: number; number: number }> => {
+    const query = new URLSearchParams();
+    if (params?.userId) query.append('userId', String(params.userId));
+    if (params?.actionType) query.append('actionType', params.actionType);
+    if (params?.entityType) query.append('entityType', params.entityType);
+    if (params?.startDate) query.append('startDate', params.startDate);
+    if (params?.endDate) query.append('endDate', params.endDate);
+    if (params?.page !== undefined) query.append('page', String(params.page));
+    if (params?.size !== undefined) query.append('size', String(params.size));
+    query.append('sort', 'createdAt,desc');
+
+    const res = await fetch(`${API_URL}/admin/audit-logs?${query.toString()}`, {
+      headers: getHeaders()
+    });
+    return await handleResponse(res);
   }
 };

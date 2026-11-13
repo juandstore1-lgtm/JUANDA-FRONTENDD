@@ -33,6 +33,7 @@ import ProductsAdmin from "./admin/pages/ProductsAdmin";
 import CategoriesAdmin from "./admin/pages/CategoriesAdmin";
 import StoresAdmin from "./admin/pages/StoresAdmin";
 import UsersAdmin from "./admin/pages/UsersAdmin";
+import AuditAdmin from "./admin/pages/AuditAdmin";
 import ContestsAdmin from "./admin/pages/ContestsAdmin";
 import HomeAdmin from "./admin/pages/HomeAdmin";
 import RafflesAdmin from "./admin/pages/RafflesAdmin";
@@ -126,6 +127,7 @@ function MainApp() {
             <Route path="categories" element={<CategoriesAdmin />} />
             <Route path="stores" element={<StoresAdmin />} />
             <Route path="users" element={<UsersAdmin />} />
+            <Route path="audit" element={<AuditAdmin />} />
             <Route path="contests" element={<ContestsAdmin />} />
             <Route path="raffles" element={<RafflesAdmin />} />
             <Route path="raffles/:id" element={<RaffleDashboardAdmin />} />
