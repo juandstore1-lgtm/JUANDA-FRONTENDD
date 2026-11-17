@@ -1,4 +1,4 @@
-import { AuditLog, User, Store, Category, Product, HeroSlide, RouletteSetting, MysteryBoxSetting, Contest, ContestParticipant, ContestWinner, HomeCategoryCollection, TicketPurchaseRequest, TicketReservation } from '../types';
+import { AuditLog, User, Store, Category, Product, HeroSlide, RouletteSetting, MysteryBoxSetting, Contest, ContestParticipant, ContestWinner, HomeCategoryCollection, TicketPurchaseRequest, TicketReservation, JobVacancy, JobApplication, JobInterview, RecruitmentSummary } from '../types';
 
 const API_URL = import.meta.env?.VITE_API_URL || 'https://juanda-backend-production.up.railway.app/api';
 
@@ -769,3 +769,350 @@ export const AuditService = {
     return await handleResponse(res);
   }
 };
+
+export const RecruitmentService = {
+  // --- Admin Endpoints ---
+  getSummary: async (): Promise<RecruitmentSummary> => {
+    const res = await fetch(`${API_URL}/recruitment/admin/summary`, { headers: getHeaders() });
+    return await handleResponse(res);
+  },
+
+  getAllVacancies: async (params?: { sede?: string; status?: string; search?: string }): Promise<JobVacancy[]> => {
+    const query = new URLSearchParams();
+    if (params?.sede) query.append('sede', params.sede);
+    if (params?.status) query.append('status', params.status);
+    if (params?.search) query.append('search', params.search);
+    const res = await fetch(`${API_URL}/recruitment/admin/vacancies?${query.toString()}`, { headers: getHeaders() });
+    return await handleResponse(res);
+  },
+
+  getVacancyById: async (id: number): Promise<JobVacancy> => {
+    const res = await fetch(`${API_URL}/recruitment/admin/vacancies/${id}`, { headers: getHeaders() });
+    return await handleResponse(res);
+  },
+
+  createVacancy: async (vacancy: JobVacancy): Promise<JobVacancy> => {
+    const res = await fetch(`${API_URL}/recruitment/admin/vacancies`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(vacancy)
+    });
+    return await handleResponse(res);
+  },
+
+  updateVacancy: async (id: number, vacancy: JobVacancy): Promise<JobVacancy> => {
+    const res = await fetch(`${API_URL}/recruitment/admin/vacancies/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(vacancy)
+    });
+    return await handleResponse(res);
+  },
+
+  updateVacancyStatus: async (id: number, status: string): Promise<JobVacancy> => {
+    const res = await fetch(`${API_URL}/recruitment/admin/vacancies/${id}/status`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ status })
+    });
+    return await handleResponse(res);
+  },
+
+  deleteVacancy: async (id: number): Promise<void> => {
+    const res = await fetch(`${API_URL}/recruitment/admin/vacancies/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return await handleResponse(res);
+  },
+
+  getApplications: async (params?: { vacancyId?: number; status?: string; search?: string }): Promise<JobApplication[]> => {
+    const query = new URLSearchParams();
+    if (params?.vacancyId) query.append('vacancyId', String(params.vacancyId));
+    if (params?.status) query.append('status', params.status);
+    if (params?.search) query.append('search', params.search);
+    const res = await fetch(`${API_URL}/recruitment/admin/applications?${query.toString()}`, { headers: getHeaders() });
+    return await handleResponse(res);
+  },
+
+  getApplicationById: async (id: number): Promise<JobApplication> => {
+    const res = await fetch(`${API_URL}/recruitment/admin/applications/${id}`, { headers: getHeaders() });
+    return await handleResponse(res);
+  },
+
+  updateApplicationStatus: async (id: number, status: string, notes?: string): Promise<JobApplication> => {
+    const res = await fetch(`${API_URL}/recruitment/admin/applications/${id}/status`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ status, notes })
+    });
+    return await handleResponse(res);
+  },
+
+  rateCandidate: async (id: number, score: number, notes?: string): Promise<JobApplication> => {
+    const res = await fetch(`${API_URL}/recruitment/admin/applications/${id}/score`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ score, notes })
+    });
+    return await handleResponse(res);
+  },
+
+  hireCandidate: async (id: number, data: any): Promise<JobApplication> => {
+    const res = await fetch(`${API_URL}/recruitment/admin/applications/${id}/hire`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return await handleResponse(res);
+  },
+
+  deleteApplication: async (id: number): Promise<{ message: string }> => {
+    const res = await fetch(`${API_URL}/recruitment/admin/applications/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return await handleResponse(res);
+  },
+
+  getInterviews: async (status?: string): Promise<JobInterview[]> => {
+    const query = new URLSearchParams();
+    if (status) query.append('status', status);
+    const res = await fetch(`${API_URL}/recruitment/admin/interviews?${query.toString()}`, { headers: getHeaders() });
+    return await handleResponse(res);
+  },
+
+  scheduleInterview: async (interview: JobInterview): Promise<JobInterview> => {
+    const res = await fetch(`${API_URL}/recruitment/admin/interviews`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(interview)
+    });
+    return await handleResponse(res);
+  },
+
+  updateInterviewStatus: async (id: number, status: string): Promise<JobInterview> => {
+    const res = await fetch(`${API_URL}/recruitment/admin/interviews/${id}/status`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ status })
+    });
+    return await handleResponse(res);
+  },
+
+  recordInterviewResult: async (id: number, result: string, notes?: string): Promise<JobInterview> => {
+    const res = await fetch(`${API_URL}/recruitment/admin/interviews/${id}/result`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ result, notes })
+    });
+    return await handleResponse(res);
+  },
+
+  deleteInterview: async (id: number): Promise<{ message: string }> => {
+    const res = await fetch(`${API_URL}/recruitment/admin/interviews/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return await handleResponse(res);
+  },
+
+  // --- Public Endpoints ---
+  getPublicActiveVacancies: async (): Promise<JobVacancy[]> => {
+    const res = await fetch(`${API_URL}/recruitment/public/vacancies`);
+    return await handleResponse(res, false);
+  },
+
+  getPublicVacancyById: async (id: number): Promise<JobVacancy> => {
+    const res = await fetch(`${API_URL}/recruitment/public/vacancies/${id}`);
+    return await handleResponse(res, false);
+  },
+
+  submitApplication: async (application: JobApplication): Promise<JobApplication> => {
+    const res = await fetch(`${API_URL}/recruitment/public/apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(application)
+    });
+    return await handleResponse(res, false);
+  },
+
+  uploadResume: async (file: File): Promise<{ publicUrl: string; originalName: string }> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const base64Data = reader.result as string;
+          const res = await fetch(`${API_URL}/recruitment/public/upload-resume`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              data: base64Data,
+              name: file.name
+            })
+          });
+          const result = await handleResponse(res, false);
+          resolve(result);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = error => reject(error);
+      reader.readAsDataURL(file);
+    });
+  }
+};
+
+export const TikTokService = {
+  getAccounts: async (): Promise<import('../types').TikTokAccountStatus[]> => {
+    const res = await fetch(`${API_URL}/tiktok/admin/accounts`, { headers: getHeaders() });
+    return await handleResponse(res);
+  },
+
+  validateAccount: async (username: string): Promise<{ valid: boolean; username: string; displayName: string; profileUrl: string }> => {
+    const res = await fetch(`${API_URL}/tiktok/admin/accounts/validate`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ username })
+    });
+    return await handleResponse(res);
+  },
+
+  linkAccount: async (data: {
+    sedeId?: number;
+    sedeName: string;
+    username: string;
+    displayName: string;
+    accountId: string;
+    avatarUrl?: string;
+    accessToken?: string;
+  }): Promise<any> => {
+    const res = await fetch(`${API_URL}/tiktok/admin/accounts/link`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return await handleResponse(res);
+  },
+
+  disconnectAccount: async (id: number): Promise<{ message: string }> => {
+    const res = await fetch(`${API_URL}/tiktok/admin/accounts/${id}/disconnect`, {
+      method: 'POST',
+      headers: getHeaders()
+    });
+    return await handleResponse(res);
+  },
+
+  getSummary: async (sede?: string, period?: string): Promise<import('../types').TikTokSummary> => {
+    const params = new URLSearchParams();
+    if (sede && sede !== 'TODAS') params.append('sede', sede);
+    if (period) params.append('period', period);
+    const res = await fetch(`${API_URL}/tiktok/admin/summary?${params.toString()}`, { headers: getHeaders() });
+    return await handleResponse(res);
+  },
+
+  getHistory: async (params: {
+    sede?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    search?: string;
+    contentType?: string;
+    page?: number;
+    size?: number;
+  }): Promise<{
+    totalVideos: number;
+    totalViews: number;
+    totalLikes: number;
+    totalComments: number;
+    totalShares: number;
+    page: number;
+    size: number;
+    totalPages: number;
+    videos: import('../types').TikTokVideo[];
+  }> => {
+    const query = new URLSearchParams();
+    if (params.sede && params.sede !== 'TODAS') query.append('sede', params.sede);
+    if (params.dateFrom) query.append('dateFrom', params.dateFrom);
+    if (params.dateTo) query.append('dateTo', params.dateTo);
+    if (params.search) query.append('search', params.search);
+    if (params.contentType && params.contentType !== 'TODOS') query.append('contentType', params.contentType);
+    query.append('page', String(params.page || 0));
+    query.append('size', String(params.size || 10));
+
+    const res = await fetch(`${API_URL}/tiktok/admin/history?${query.toString()}`, { headers: getHeaders() });
+    return await handleResponse(res);
+  },
+
+  getWeeklySchedule: async (sede?: string, weekStart?: string): Promise<import('../types').TikTokWeeklySchedule> => {
+    const params = new URLSearchParams();
+    if (sede && sede !== 'TODAS') params.append('sede', sede);
+    if (weekStart) params.append('weekStart', weekStart);
+    const res = await fetch(`${API_URL}/tiktok/admin/scheduled?${params.toString()}`, { headers: getHeaders() });
+    return await handleResponse(res);
+  },
+
+  saveDayNote: async (data: { sedeName: string; date: string; note: string }): Promise<any> => {
+    const res = await fetch(`${API_URL}/tiktok/admin/scheduled/notes`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return await handleResponse(res);
+  },
+
+  syncScheduled: async (sede?: string, weekStart?: string): Promise<import('../types').TikTokWeeklySchedule> => {
+    const params = new URLSearchParams();
+    if (sede && sede !== 'TODAS') params.append('sede', sede);
+    if (weekStart) params.append('weekStart', weekStart);
+    const res = await fetch(`${API_URL}/tiktok/admin/scheduled/sync?${params.toString()}`, {
+      method: 'POST',
+      headers: getHeaders()
+    });
+    return await handleResponse(res);
+  },
+
+  addScheduledVideo: async (video: Partial<import('../types').TikTokScheduledVideo>): Promise<import('../types').TikTokScheduledVideo> => {
+    const res = await fetch(`${API_URL}/tiktok/admin/scheduled`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(video)
+    });
+    return await handleResponse(res);
+  },
+
+  deleteScheduledVideo: async (id: number): Promise<{ message: string }> => {
+    const res = await fetch(`${API_URL}/tiktok/admin/scheduled/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return await handleResponse(res);
+  },
+
+  getOAuthConfig: async (): Promise<{
+    configured: boolean;
+    clientKey: string | null;
+    redirectUri: string;
+    scopes: string[];
+    requiredCredentials: Record<string, string>;
+  }> => {
+    const res = await fetch(`${API_URL}/tiktok/admin/oauth/config`, { headers: getHeaders() });
+    return await handleResponse(res);
+  },
+
+  getAuthorizeUrl: async (sede?: string): Promise<{ url: string }> => {
+    const params = new URLSearchParams();
+    if (sede && sede !== 'TODAS') params.append('sede', sede);
+    const res = await fetch(`${API_URL}/tiktok/admin/oauth/authorize-url?${params.toString()}`, { headers: getHeaders() });
+    return await handleResponse(res);
+  },
+
+  handleOAuthCallback: async (code: string, sede: string): Promise<any> => {
+    const res = await fetch(`${API_URL}/tiktok/admin/oauth/callback`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ code, sede })
+    });
+    return await handleResponse(res);
+  }
+};
+

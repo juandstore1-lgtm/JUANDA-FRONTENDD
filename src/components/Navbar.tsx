@@ -12,7 +12,8 @@ import {
   ChevronRight, 
   Trophy, 
   Ticket,
-  Video
+  Video,
+  Briefcase
 } from "lucide-react";
 import lionWatermark from "@/assets/lion-watermark.png";
 import { motion, AnimatePresence } from "motion/react";
@@ -136,7 +137,7 @@ export default function Navbar() {
     { name: "Ubicaciones", path: "/ubicaciones" },
     { name: "Horarios", path: "/horarios" },
     { name: "Puntos Físicos", path: "/puntos-fisicos" },
-
+    { name: "Trabaja con nosotros", path: "/trabaja-con-nosotros" },
   ];
 
   const mobileMenuItems = [
@@ -148,6 +149,7 @@ export default function Navbar() {
     { name: "UBICACIONES", path: "/ubicaciones", icon: MapPin },
     { name: "HORARIOS", path: "/horarios", icon: Clock },
     { name: "PUNTOS FÍSICOS", path: "/puntos-fisicos", icon: Video },
+    { name: "TRABAJA CON NOSOTROS", path: "/trabaja-con-nosotros", icon: Briefcase },
     { 
       name: "DIFUSIÓN", 
       icon: Radio, 

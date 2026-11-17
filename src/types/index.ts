@@ -245,3 +245,233 @@ export interface HomeCategoryCollection {
   categoryFilter: string;
   displayOrder: number;
 }
+
+export interface JobVacancy {
+  id?: number;
+  company: string;
+  sede: string;
+  position: string;
+  employmentType: string;
+  title: string;
+  description: string;
+  workScheduleType: string;
+  workScheduleHours: string;
+  workDays: string;
+  sundayPolicy: string;
+  sundayHours: string;
+  holidayPolicy: string;
+  holidayHours: string;
+  scheduleObservations?: string;
+  remunerationType: string;
+  baseSalary: string;
+  transportAid: string;
+  sundayHolidaySurcharge: string;
+  benefits: string;
+  salaryObservations?: string;
+  requirements: string;
+  contractType: string;
+  paymentFrequency: string;
+  paymentDates: string;
+  probationPeriod: string;
+  workPlace: string;
+  status: 'ACTIVA' | 'EN_PROCESO' | 'PAUSADA' | 'CERRADA' | 'BORRADOR';
+  vacanciesCount: number;
+  createdAt?: string;
+  updatedAt?: string;
+  postulacionesCount?: number;
+}
+
+export interface JobApplication {
+  id?: number;
+  vacancyId?: number;
+  vacancyTitle?: string;
+  status?: 'EN_REVISION' | 'PRESELECCIONADO' | 'EN_ENTREVISTA' | 'SELECCIONADO' | 'CONTRATADO' | 'NO_SELECCIONADO';
+  score?: number;
+  employeeStatus?: 'Activo' | 'Periodo de prueba' | 'Inactivo';
+  hiredAt?: string;
+  hiredPosition?: string;
+  hiredSede?: string;
+  hiredSalary?: string;
+  hiredContractType?: string;
+  fullName: string;
+  documentType: string;
+  documentNumber: string;
+  phone: string;
+  email: string;
+  city: string;
+  neighborhood: string;
+  address?: string;
+  instagram?: string;
+  facebook?: string;
+  targetPosition: string;
+  salesExperience: string;
+  workedInClothingStores: boolean;
+  experienceDescription?: string;
+  currentlyStudying: boolean;
+  educationLevel: string;
+  weekendHolidayAvailability: string;
+  agreesWithSchedule: string;
+  agreesWithPayment: string;
+  immediateAvailability: boolean;
+  accessibleCommute: string;
+  habitualTransport: string;
+  motivation: string;
+  highlightSkills: string;
+  socialMediaSalesExp?: boolean;
+  salesGoalsAchieved?: string;
+  additionalObservations?: string;
+  familyRefName: string;
+  familyRefRelationship: string;
+  familyRefPhone: string;
+  personalRefName: string;
+  personalRefRelationship: string;
+  personalRefPhone: string;
+  commercialRefCompany: string;
+  commercialRefPosition: string;
+  commercialRefPhone: string;
+  resumeUrl?: string;
+  resumeOriginalName?: string;
+  dataPolicyAccepted: boolean;
+  infoVerificationAccepted: boolean;
+  creditCheckAccepted: boolean;
+  adminNotes?: string;
+  interviewDate?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface JobInterview {
+  id?: number;
+  applicationId?: number;
+  vacancyId?: number;
+  candidateName: string;
+  candidateDocument?: string;
+  candidatePhone?: string;
+  candidateEmail?: string;
+  position: string;
+  sede?: string;
+  interviewer?: string;
+  scheduledAt: string;
+  status: 'PROGRAMADA' | 'REALIZADA' | 'CANCELADA';
+  result?: 'APROBADA' | 'NO_APROBADA' | 'PENDIENTE';
+  notes?: string;
+  createdAt?: string;
+}
+
+export interface RecruitmentSummary {
+  activeVacancies: number;
+  totalApplications: number;
+  scheduledInterviews: number;
+  hiredCount: number;
+  enRevisionCount?: number;
+  preseleccionadoCount?: number;
+  enEntrevistaCount?: number;
+  seleccionadoCount?: number;
+  noSeleccionadoCount?: number;
+  totalInterviews?: number;
+  interviewsPendientes?: number;
+  interviewsRealizadas?: number;
+  interviewsAprobadas?: number;
+  interviewsNoAprobadas?: number;
+  hiredActivos?: number;
+  hiredPeriodoPrueba?: number;
+  hiredInactivos?: number;
+  funnel: {
+    enRevision: number;
+    preseleccionado?: number;
+    enEntrevista: number;
+    seleccionado?: number;
+    noSeleccionado: number;
+    contratado: number;
+  };
+  recentVacancies: (JobVacancy & { postulacionesCount: number })[];
+  recentApplications: JobApplication[];
+  upcomingInterviews: JobInterview[];
+}
+
+// --- TikTok Module Interfaces ---
+export interface TikTokAccountStatus {
+  sedeId?: number;
+  sedeName: string;
+  storeName?: string;
+  address?: string;
+  storeImage?: string;
+  connected: boolean;
+  status: string; // "Conectada" | "Sin vincular"
+  accountId?: number;
+  tiktokAccountId?: string;
+  username?: string;
+  displayName?: string;
+  avatarUrl?: string;
+  connectedAt?: string;
+  permissions?: string;
+}
+
+export interface TikTokVideo {
+  id: number;
+  accountId?: number;
+  sedeName: string;
+  videoId?: string;
+  title: string;
+  description?: string;
+  hashtags?: string;
+  thumbnailUrl?: string;
+  videoUrl?: string;
+  duration?: string;
+  publishedAt: string;
+  viewCount: number;
+  likeCount: number;
+  commentCount: number;
+  shareCount: number;
+  contentType?: string;
+}
+
+export interface TikTokScheduledVideo {
+  id: number;
+  accountId?: number;
+  sedeName: string;
+  title: string;
+  topic?: string;
+  scheduledAt: string;
+  duration?: string;
+  thumbnailUrl?: string;
+  status: string; // "PROGRAMADO" | "PUBLICADO"
+  notes?: string;
+}
+
+export interface TikTokScheduledDay {
+  dayName: string; // "Lunes", "Martes", etc.
+  dayNumber: number;
+  date: string; // "YYYY-MM-DD"
+  videos: TikTokScheduledVideo[];
+  note?: string;
+}
+
+export interface TikTokWeeklySchedule {
+  weekStart: string;
+  weekEnd: string;
+  sede?: string;
+  isLinked?: boolean;
+  linkedUsername?: string;
+  videosProgramados: number;
+  diasConContenido: number;
+  promedioDiario: number;
+  programacionActiva: number;
+  days: TikTokScheduledDay[];
+}
+
+export interface TikTokSummary {
+  isLinked?: boolean;
+  videosPublicados: number;
+  visualizacionesAcumuladas: number;
+  meGusta: number;
+  comentarios: number;
+  compartidos: number;
+  viewsBySede: {
+    sede: string;
+    views: number;
+    percentage: number;
+  }[];
+  recentVideos: TikTokVideo[];
+}
+

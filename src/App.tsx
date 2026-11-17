@@ -20,6 +20,7 @@ import MysteryBox from "./pages/MysteryBox";
 import Contest from "./pages/Contest";
 import Raffles from "./pages/Raffles";
 import RaffleDetail from "./pages/RaffleDetail";
+import TrabajaConNosotros from "./pages/TrabajaConNosotros";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 
@@ -38,6 +39,8 @@ import ContestsAdmin from "./admin/pages/ContestsAdmin";
 import HomeAdmin from "./admin/pages/HomeAdmin";
 import RafflesAdmin from "./admin/pages/RafflesAdmin";
 import RaffleDashboardAdmin from "./admin/pages/RaffleDashboardAdmin";
+import RecruitmentAdmin from "./admin/pages/RecruitmentAdmin";
+import TikTokAdmin from "./admin/pages/TikTokAdmin";
 import Logo from "./components/Logo";
 import SmokeBackground from "./components/SmokeBackground";
 
@@ -115,6 +118,8 @@ function MainApp() {
                 <Route path="/concursos" element={<Contest />} />
                 <Route path="/rifas" element={<Raffles />} />
                 <Route path="/rifas/:id" element={<RaffleDetail />} />
+                <Route path="/trabaja-con-nosotros" element={<TrabajaConNosotros />} />
+                <Route path="/trabaja-con-nosotros/:id" element={<TrabajaConNosotros />} />
               </Routes>
             </Layout>
           } />
@@ -127,6 +132,8 @@ function MainApp() {
             <Route path="categories" element={<CategoriesAdmin />} />
             <Route path="stores" element={<StoresAdmin />} />
             <Route path="users" element={<UsersAdmin />} />
+            <Route path="recruitment" element={<RecruitmentAdmin />} />
+            <Route path="tiktok" element={<TikTokAdmin />} />
             <Route path="audit" element={<AuditAdmin />} />
             <Route path="contests" element={<ContestsAdmin />} />
             <Route path="raffles" element={<RafflesAdmin />} />

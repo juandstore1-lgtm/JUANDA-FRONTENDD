@@ -13,10 +13,19 @@ import {
   Sliders,
   Trophy,
   Ticket,
-  ShieldCheck
+  ShieldCheck,
+  Briefcase
 } from 'lucide-react';
 
 import Logo from '../../components/Logo';
+
+function TikTokIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64c.29 0 .58.04.86.12V9.32a6.34 6.34 0 0 0-.86-.06 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V9.45a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.88z"/>
+    </svg>
+  );
+}
 
 interface SidebarProps {
   isOpen: boolean;
@@ -37,6 +46,8 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
       { name: 'Sedes', path: '/admin/stores', icon: Store, exact: false },
       { name: 'Auditoría de Catálogos', path: '/admin/audit', icon: ShieldCheck, exact: false },
       { name: 'Usuarios', path: '/admin/users', icon: Users, exact: false },
+      { name: 'Reclutamiento', path: '/admin/recruitment', icon: Briefcase, exact: false },
+      { name: 'Control TikTok', path: '/admin/tiktok', icon: TikTokIcon, exact: false },
       { name: 'Inicio', path: '/admin/home', icon: Sliders, exact: false },
       { name: 'Concursos', path: '/admin/contests', icon: Trophy, exact: false },
       { name: 'Rifas', path: '/admin/raffles', icon: Ticket, exact: false },
