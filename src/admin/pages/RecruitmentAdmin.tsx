@@ -151,6 +151,7 @@ export default function RecruitmentAdmin() {
     description: "",
     workScheduleType: "Tiempo completo",
     workScheduleHours: "",
+    saturdayHours: "",
     workDays: "Lunes a sábado",
     sundayPolicy: "Domingos intercalados",
     sundayHours: "",
@@ -184,14 +185,51 @@ export default function RecruitmentAdmin() {
     'Conocimiento en manejo de redes sociales (deseable).',
     'Residir en zonas cercanas a la sede (deseable).'
   ];
+  const [availableReqs, setAvailableReqs] = useState<string[]>(defaultRequirements);
   const [selectedReqs, setSelectedReqs] = useState<string[]>([]);
   const [customReqInput, setCustomReqInput] = useState('');
+  const [editingReqIndex, setEditingReqIndex] = useState<number | null>(null);
+  const [editingReqText, setEditingReqText] = useState('');
 
   const addCustomReq = () => {
     const val = customReqInput.trim();
-    if (val && !selectedReqs.includes(val)) {
-      setSelectedReqs(prev => [...prev, val]);
+    if (val) {
+      if (!availableReqs.includes(val)) {
+        setAvailableReqs(prev => [...prev, val]);
+      }
+      if (!selectedReqs.includes(val)) {
+        setSelectedReqs(prev => [...prev, val]);
+      }
       setCustomReqInput('');
+    }
+  };
+
+  const handleStartEditReq = (index: number) => {
+    setEditingReqIndex(index);
+    setEditingReqText(availableReqs[index]);
+  };
+
+  const handleSaveEditReq = (index: number) => {
+    const trimmed = editingReqText.trim();
+    if (!trimmed) return;
+    const oldVal = availableReqs[index];
+    const updated = [...availableReqs];
+    updated[index] = trimmed;
+    setAvailableReqs(updated);
+
+    if (selectedReqs.includes(oldVal)) {
+      setSelectedReqs(selectedReqs.map(r => (r === oldVal ? trimmed : r)));
+    }
+    setEditingReqIndex(null);
+    setEditingReqText('');
+  };
+
+  const handleDeleteReq = (index: number) => {
+    const target = availableReqs[index];
+    setAvailableReqs(availableReqs.filter((_, i) => i !== index));
+    setSelectedReqs(selectedReqs.filter(r => r !== target));
+    if (editingReqIndex === index) {
+      setEditingReqIndex(null);
     }
   };
 
@@ -298,7 +336,23 @@ export default function RecruitmentAdmin() {
   // --- Vacancy Operations ---
   const openNewVacancyModal = () => {
     setVacancyForm(createEmptyVacancy());
+    setAvailableReqs(defaultRequirements);
     setSelectedReqs([]);
+    setWizardStep(1);
+    setIsWizardOpen(true);
+  };
+
+  const openEditVacancyModal = (v: JobVacancy) => {
+    setVacancyForm(v);
+    const parsed = v.requirements ? v.requirements.split(',').map(r => r.trim()).filter(Boolean) : [];
+    setSelectedReqs(parsed);
+    setAvailableReqs(prev => {
+      const combined = [...prev];
+      parsed.forEach(p => {
+        if (!combined.includes(p)) combined.push(p);
+      });
+      return combined;
+    });
     setWizardStep(1);
     setIsWizardOpen(true);
   };
@@ -1325,10 +1379,7 @@ export default function RecruitmentAdmin() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setVacancyForm(v);
-                                setSelectedReqs(v.requirements ? v.requirements.split(',').map(r => r.trim()).filter(Boolean) : []);
-                                setWizardStep(1);
-                                setIsWizardOpen(true);
+                                openEditVacancyModal(v);
                               }}
                               className="text-gray-500 hover:text-emerald-700 p-1 cursor-pointer"
                               title="Editar vacante"
@@ -1378,12 +1429,7 @@ export default function RecruitmentAdmin() {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => {
-                          setVacancyForm(selectedVacancy);
-                          setSelectedReqs(selectedVacancy.requirements ? selectedVacancy.requirements.split(',').map(r => r.trim()).filter(Boolean) : []);
-                          setWizardStep(1);
-                          setIsWizardOpen(true);
-                        }}
+                        onClick={() => openEditVacancyModal(selectedVacancy)}
                         className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
@@ -1423,8 +1469,9 @@ export default function RecruitmentAdmin() {
                         </span>
                         <ul className="space-y-1 text-gray-600 pl-4 list-disc text-[11px]">
                           <li>Jornada: {selectedVacancy.workScheduleType}</li>
-                          {selectedVacancy.workScheduleHours && <li>Horario: {selectedVacancy.workScheduleHours}</li>}
-                          {selectedVacancy.sundayHours && <li>Domingos: {selectedVacancy.sundayHours}</li>}
+                          {selectedVacancy.workScheduleHours && <li>Lunes a viernes: {selectedVacancy.workScheduleHours}</li>}
+                          {selectedVacancy.saturdayHours && <li>Sábados: {selectedVacancy.saturdayHours}</li>}
+                          {selectedVacancy.sundayHours && <li>Domingos y lunes festivos/trabajados: {selectedVacancy.sundayHours}</li>}
                           {selectedVacancy.holidayHours && <li>Festivos: {selectedVacancy.holidayHours}</li>}
                         </ul>
                       </div>
@@ -3521,12 +3568,23 @@ export default function RecruitmentAdmin() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">Horario laboral (lunes a sábado) *</label>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">Horario laboral (lunes a viernes) *</label>
                         <input
                           type="text"
                           placeholder="Ej. 10:00 a. m. - 8:00 p. m."
                           value={vacancyForm.workScheduleHours}
                           onChange={e => setVacancyForm({ ...vacancyForm, workScheduleHours: e.target.value })}
+                          className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">Horario del sábado *</label>
+                        <input
+                          type="text"
+                          placeholder="Ej. 9:00 a. m. - 8:30 p. m."
+                          value={vacancyForm.saturdayHours || ''}
+                          onChange={e => setVacancyForm({ ...vacancyForm, saturdayHours: e.target.value })}
                           className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg"
                         />
                       </div>
@@ -3545,7 +3603,7 @@ export default function RecruitmentAdmin() {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">Horario del domingo trabajado *</label>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">Horario de domingo y lunes trabajado *</label>
                         <input
                           type="text"
                           placeholder="Ej. 10:00 a. m. - 8:00 p. m."
@@ -3555,7 +3613,7 @@ export default function RecruitmentAdmin() {
                         />
                       </div>
 
-                      <div>
+                      <div className="sm:col-span-2">
                         <label className="block text-xs font-semibold text-gray-700 mb-1">Festivos *</label>
                         <select
                           value={vacancyForm.holidayPolicy}
@@ -3645,45 +3703,95 @@ export default function RecruitmentAdmin() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-2">Requisitos del cargo *</label>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-xs font-semibold text-gray-700">Requisitos del cargo *</label>
+                        <span className="text-[11px] text-gray-400">Puedes crear, editar o eliminar los requisitos según la vacante</span>
+                      </div>
+
                       <div className="space-y-2">
-                        {defaultRequirements.map(req => {
+                        {availableReqs.map((req, idx) => {
                           const isChecked = selectedReqs.includes(req);
+                          const isEditing = editingReqIndex === idx;
+
+                          if (isEditing) {
+                            return (
+                              <div key={idx} className="flex items-center gap-2 p-1.5 bg-emerald-50 rounded-lg border border-emerald-300">
+                                <input
+                                  type="text"
+                                  value={editingReqText}
+                                  onChange={e => setEditingReqText(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleSaveEditReq(idx);
+                                    } else if (e.key === 'Escape') {
+                                      setEditingReqIndex(null);
+                                    }
+                                  }}
+                                  className="flex-1 px-2.5 py-1 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                  autoFocus
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveEditReq(idx)}
+                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded cursor-pointer"
+                                >
+                                  Guardar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingReqIndex(null)}
+                                  className="px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-[11px] font-semibold rounded cursor-pointer"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            );
+                          }
+
                           return (
-                            <label key={req} className="flex items-start gap-2 text-xs text-gray-700 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => {
-                                  if (isChecked) {
-                                    setSelectedReqs(selectedReqs.filter(r => r !== req));
-                                  } else {
-                                    setSelectedReqs([...selectedReqs, req]);
-                                  }
-                                }}
-                                className="w-4 h-4 text-emerald-600 rounded mt-0.5"
-                              />
-                              <span>{req}</span>
-                            </label>
+                            <div key={idx} className="group flex items-center justify-between gap-2 p-1.5 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-colors">
+                              <label className="flex items-start gap-2 text-xs text-gray-700 cursor-pointer flex-1">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => {
+                                    if (isChecked) {
+                                      setSelectedReqs(selectedReqs.filter(r => r !== req));
+                                    } else {
+                                      setSelectedReqs([...selectedReqs, req]);
+                                    }
+                                  }}
+                                  className="w-4 h-4 text-emerald-600 rounded mt-0.5"
+                                />
+                                <span className={isChecked ? 'font-medium text-gray-900' : 'text-gray-600'}>{req}</span>
+                              </label>
+                              <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEditReq(idx)}
+                                  className="p-1 text-gray-400 hover:text-emerald-700 rounded hover:bg-gray-100 cursor-pointer"
+                                  title="Editar requisito"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteReq(idx)}
+                                  className="p-1 text-gray-400 hover:text-red-600 rounded hover:bg-red-50 cursor-pointer"
+                                  title="Eliminar requisito"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
                           );
                         })}
 
-                        {selectedReqs.filter(r => !defaultRequirements.includes(r)).map(req => (
-                          <label key={req} className="flex items-start gap-2 text-xs text-gray-700 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={true}
-                              onChange={() => setSelectedReqs(selectedReqs.filter(r => r !== req))}
-                              className="w-4 h-4 text-emerald-600 rounded mt-0.5"
-                            />
-                            <span className="font-semibold text-emerald-800">{req}</span>
-                          </label>
-                        ))}
-
-                        <div className="flex items-center gap-2 pt-2">
+                        <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
                           <input
                             type="text"
-                            placeholder="Otro requisito personalizado..."
+                            placeholder="+ Agregar nuevo requisito personalizado..."
                             value={customReqInput}
                             onChange={e => setCustomReqInput(e.target.value)}
                             onKeyDown={e => {
@@ -3697,7 +3805,7 @@ export default function RecruitmentAdmin() {
                           <button
                             type="button"
                             onClick={addCustomReq}
-                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-lg cursor-pointer transition-colors"
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg cursor-pointer transition-colors"
                           >
                             + Agregar
                           </button>
@@ -3755,7 +3863,9 @@ export default function RecruitmentAdmin() {
                         </button>
                         <strong className="block text-gray-900 mb-1">Horarios y descansos</strong>
                         <p>Jornada: {vacancyForm.workScheduleType}</p>
-                        <p>Horario: {vacancyForm.workScheduleHours || 'Por definir'}</p>
+                        <p>L-V: {vacancyForm.workScheduleHours || 'Por definir'}</p>
+                        <p>Sábado: {vacancyForm.saturdayHours || 'Por definir'}</p>
+                        <p>Dom/Lun: {vacancyForm.sundayHours || 'Por definir'}</p>
                       </div>
 
                       <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 relative">
@@ -3817,7 +3927,9 @@ export default function RecruitmentAdmin() {
 
                   <div className="pt-2 border-t border-gray-100 text-[11px] space-y-1">
                     <p><strong className="text-gray-900">Salario:</strong> {vacancyForm.baseSalary ? `${vacancyForm.baseSalary} mensual` : 'Por definir'}</p>
-                    <p><strong className="text-gray-900">Horario:</strong> {vacancyForm.workScheduleHours || 'Por definir'}</p>
+                    <p><strong className="text-gray-900">Horario L-V:</strong> {vacancyForm.workScheduleHours || 'Por definir'}</p>
+                    {vacancyForm.saturdayHours && <p><strong className="text-gray-900">Horario Sábado:</strong> {vacancyForm.saturdayHours}</p>}
+                    {vacancyForm.sundayHours && <p><strong className="text-gray-900">Dom/Lun trabajado:</strong> {vacancyForm.sundayHours}</p>}
                   </div>
                 </div>
 
@@ -4443,6 +4555,13 @@ export default function RecruitmentAdmin() {
                   <div><span className="text-gray-400 block text-[10px]">Ciudad y Barrio</span><strong>{selectedApplication.city} - {selectedApplication.neighborhood}</strong></div>
                   <div><span className="text-gray-400 block text-[10px]">Dirección</span><strong>{selectedApplication.address || 'No especificada'}</strong></div>
                   <div><span className="text-gray-400 block text-[10px]">Redes sociales</span><strong>Instagram: {selectedApplication.instagram || '--'} | FB: {selectedApplication.facebook || '--'}</strong></div>
+                  <div className="sm:col-span-3 pt-2 border-t border-gray-100">
+                    <span className="text-gray-400 block text-[10px] uppercase font-bold text-red-600">Contacto de emergencia</span>
+                    <strong className="text-gray-900">{selectedApplication.emergencyContactName || 'No especificado'}</strong>
+                    {selectedApplication.emergencyContactPhone && (
+                      <span className="ml-2 text-xs text-gray-600 font-semibold">({selectedApplication.emergencyContactPhone})</span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -4470,7 +4589,7 @@ export default function RecruitmentAdmin() {
                   3. Horarios y disponibilidad
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-gray-700">
-                  <div><span className="text-gray-400 block text-[10px]">Disponibilidad domingos/festivos</span><strong>{selectedApplication.weekendHolidayAvailability}</strong></div>
+                  <div><span className="text-gray-400 block text-[10px]">Disponibilidad fines de semana / festivos</span><strong>{selectedApplication.weekendHolidayAvailability}</strong></div>
                   <div><span className="text-gray-400 block text-[10px]">De acuerdo con horario</span><strong>{selectedApplication.agreesWithSchedule}</strong></div>
                   <div><span className="text-gray-400 block text-[10px]">De acuerdo con salario</span><strong>{selectedApplication.agreesWithPayment}</strong></div>
                   <div><span className="text-gray-400 block text-[10px]">Medio de transporte</span><strong>{selectedApplication.habitualTransport}</strong></div>
@@ -4478,45 +4597,148 @@ export default function RecruitmentAdmin() {
                 </div>
               </div>
 
-              {/* Step 4 & 5: Referencias y Hoja de Vida */}
+              {/* Step 4: Información adicional */}
+              <div className="p-4 rounded-xl border border-gray-200 space-y-3">
+                <h4 className="font-extrabold text-gray-900 flex items-center gap-2">
+                  <Star className="w-4 h-4 text-emerald-600" />
+                  4. Información adicional
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-gray-700">
+                  <div>
+                    <span className="text-gray-400 block text-[10px]">¿Cómo se enteró de esta vacante?</span>
+                    <strong className="text-emerald-800">{selectedApplication.howDidYouHear || 'No especificado'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block text-[10px]">¿Participa en procesos con otras empresas?</span>
+                    <strong>{selectedApplication.inOtherSelectionProcesses ? 'Sí, en otros procesos' : 'No'}</strong>
+                  </div>
+                  <div className="sm:col-span-2 p-2.5 bg-gray-50 rounded-lg border border-gray-200">
+                    <span className="text-gray-500 block text-[10px] font-bold uppercase">Condición médica / Cirugías / Alergias</span>
+                    <div className="mt-1">
+                      {selectedApplication.hasMedicalCondition ? (
+                        <div>
+                          <span className="inline-block px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded mb-1">Sí presenta</span>
+                          <p className="text-xs text-gray-800 italic">{selectedApplication.medicalConditionDetails || 'No detalló la condición.'}</p>
+                        </div>
+                      ) : (
+                        <span className="inline-block px-2 py-0.5 bg-gray-100 text-gray-700 text-[10px] font-bold rounded">No presenta ninguna condición médica, cirugía reciente o alergia</span>
+                      )}
+                    </div>
+                  </div>
+                  {selectedApplication.whyWorkWithUs && (
+                    <div className="sm:col-span-2">
+                      <span className="text-gray-400 block text-[10px]">Motivación para trabajar con nosotros</span>
+                      <p className="mt-0.5 bg-gray-50 p-2.5 rounded-lg border border-gray-100 text-xs">{selectedApplication.whyWorkWithUs}</p>
+                    </div>
+                  )}
+                  {selectedApplication.skills && (
+                    <div>
+                      <span className="text-gray-400 block text-[10px]">Habilidades destacadas</span>
+                      <strong className="text-xs">{selectedApplication.skills}</strong>
+                    </div>
+                  )}
+                  {selectedApplication.additionalObservations && (
+                    <div className="sm:col-span-2">
+                      <span className="text-gray-400 block text-[10px]">Observaciones del aspirante</span>
+                      <p className="mt-0.5 bg-gray-50 p-2 rounded-lg border border-gray-100 text-xs">{selectedApplication.additionalObservations}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Step 5: Referencias y Documentos */}
               <div className="p-4 rounded-xl border border-gray-200 space-y-3">
                 <h4 className="font-extrabold text-gray-900 flex items-center gap-2">
                   <FileText className="w-4 h-4 text-emerald-600" />
-                  4. Referencias y Hoja de Vida
+                  5. Referencias y Documentos adjuntos
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-gray-700">
                   <div className="p-2.5 bg-gray-50 rounded-lg">
-                    <span className="text-gray-400 block text-[10px]">Ref. Familiar ({selectedApplication.familyRefRelationship})</span>
+                    <span className="text-gray-400 block text-[10px]">Ref. Familiar ({selectedApplication.familyRefRelationship || 'Familiar'})</span>
                     <strong>{selectedApplication.familyRefName}</strong>
                     <span className="block text-[11px] text-gray-500">Tel: {selectedApplication.familyRefPhone}</span>
                   </div>
                   <div className="p-2.5 bg-gray-50 rounded-lg">
-                    <span className="text-gray-400 block text-[10px]">Ref. Personal ({selectedApplication.personalRefRelationship})</span>
+                    <span className="text-gray-400 block text-[10px]">Ref. Personal ({selectedApplication.personalRefRelationship || 'Personal'})</span>
                     <strong>{selectedApplication.personalRefName}</strong>
                     <span className="block text-[11px] text-gray-500">Tel: {selectedApplication.personalRefPhone}</span>
                   </div>
                   <div className="p-2.5 bg-gray-50 rounded-lg">
-                    <span className="text-gray-400 block text-[10px]">Ref. Laboral ({selectedApplication.commercialRefCompany})</span>
-                    <strong>{selectedApplication.commercialRefPosition}</strong>
+                    <span className="text-gray-400 block text-[10px]">Ref. Laboral ({selectedApplication.commercialRefCompany || 'Empresa'})</span>
+                    <strong>{selectedApplication.commercialRefPosition || 'Contacto laboral'}</strong>
                     <span className="block text-[11px] text-gray-500">Tel: {selectedApplication.commercialRefPhone}</span>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
-                  <span className="font-bold text-gray-700">Hoja de Vida (PDF):</span>
-                  {selectedApplication.resumeUrl ? (
-                    <a
-                      href={selectedApplication.resumeUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                      <Download className="w-4 h-4" />
-                      Descargar / Abrir Hoja de Vida (PDF)
-                    </a>
-                  ) : (
-                    <span className="text-gray-400">No adjuntó documento PDF</span>
-                  )}
+                <div className="pt-3 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3 bg-blue-50/60 border border-blue-200 rounded-xl flex flex-col justify-between gap-2">
+                    <div>
+                      <span className="font-bold text-blue-900 text-xs block">Documento de Identidad (PDF / Imagen):</span>
+                      <p className="text-[10px] text-blue-700 mt-0.5">{selectedApplication.documentFileOriginalName || 'Archivo adjunto'}</p>
+                    </div>
+                    {selectedApplication.documentFileUrl ? (
+                      <a
+                        href={selectedApplication.documentFileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer text-xs"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Ver / Descargar Cédula
+                      </a>
+                    ) : (
+                      <span className="text-gray-400 text-xs italic">No adjuntó documento de identidad</span>
+                    )}
+                  </div>
+
+                  <div className="p-3 bg-emerald-50/60 border border-emerald-200 rounded-xl flex flex-col justify-between gap-2">
+                    <div>
+                      <span className="font-bold text-emerald-900 text-xs block">Hoja de Vida (PDF):</span>
+                      <p className="text-[10px] text-emerald-700 mt-0.5">{selectedApplication.resumeOriginalName || 'Curriculum Vitae'}</p>
+                    </div>
+                    {selectedApplication.resumeUrl ? (
+                      <a
+                        href={selectedApplication.resumeUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer text-xs"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Ver / Descargar Hoja de Vida
+                      </a>
+                    ) : (
+                      <span className="text-gray-400 text-xs italic">No adjuntó hoja de vida</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 6: Autorizaciones legales y Derechos de Imagen */}
+              <div className="p-4 rounded-xl border border-gray-200 space-y-2 text-xs">
+                <h4 className="font-extrabold text-gray-900 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  6. Autorizaciones legales
+                </h4>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className={`w-4 h-4 shrink-0 ${selectedApplication.dataPolicyAccepted ? 'text-emerald-600' : 'text-gray-300'}`} />
+                    <span className="text-gray-700">Tratamiento de datos personales: <strong>{selectedApplication.dataPolicyAccepted ? 'Aceptado' : 'No'}</strong></span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className={`w-4 h-4 shrink-0 ${selectedApplication.truthfulInfoAccepted ? 'text-emerald-600' : 'text-gray-300'}`} />
+                    <span className="text-gray-700">Declaración de veracidad de la información: <strong>{selectedApplication.truthfulInfoAccepted ? 'Aceptado' : 'No'}</strong></span>
+                  </div>
+                  <div className="flex items-start gap-2 pt-1 border-t border-gray-100">
+                    <CheckCircle2 className={`w-4 h-4 shrink-0 mt-0.5 ${selectedApplication.imageAuthorizationAccepted ? 'text-emerald-600' : 'text-amber-500'}`} />
+                    <span className="text-gray-700">
+                      Uso de imagen en TikTok y redes comerciales: 
+                      <strong className={`ml-1 ${selectedApplication.imageAuthorizationAccepted ? 'text-emerald-700 font-bold' : 'text-amber-700'}`}>
+                        {selectedApplication.imageAuthorizationAccepted 
+                          ? 'AUTORIZADO (Permite fotos y videos en tienda para transmisiones TikTok y redes publicitarias)' 
+                          : 'NO AUTORIZADO'}
+                      </strong>
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>

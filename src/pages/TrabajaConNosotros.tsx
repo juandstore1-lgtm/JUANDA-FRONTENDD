@@ -43,6 +43,8 @@ export default function TrabajaConNosotros() {
   const [submitting, setSubmitting] = useState(false);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [resumeUploading, setResumeUploading] = useState(false);
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [documentUploading, setDocumentUploading] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState<JobApplication>({
@@ -56,6 +58,8 @@ export default function TrabajaConNosotros() {
     address: '',
     instagram: '',
     facebook: '',
+    emergencyContactName: '',
+    emergencyContactPhone: '',
     targetPosition: '',
     salesExperience: 'Menos de 1 año',
     workedInClothingStores: true,
@@ -72,21 +76,28 @@ export default function TrabajaConNosotros() {
     highlightSkills: 'Servicio al cliente, Trabajo en equipo',
     socialMediaSalesExp: false,
     salesGoalsAchieved: '',
+    howDidYouHear: 'Instagram',
+    hasMedicalCondition: false,
+    medicalConditionDetails: '',
+    inOtherSelectionProcesses: false,
     additionalObservations: '',
     familyRefName: '',
-    familyRefRelationship: 'Madre',
+    familyRefRelationship: '',
     familyRefPhone: '',
     personalRefName: '',
-    personalRefRelationship: 'Amigo',
+    personalRefRelationship: '',
     personalRefPhone: '',
     commercialRefCompany: '',
-    commercialRefPosition: 'Administrador',
+    commercialRefPosition: '',
     commercialRefPhone: '',
     resumeUrl: '',
     resumeOriginalName: '',
+    documentFileUrl: '',
+    documentFileOriginalName: '',
     dataPolicyAccepted: true,
     infoVerificationAccepted: true,
     creditCheckAccepted: true,
+    imageAuthorizationAccepted: true,
   });
 
   const [skillsSelected, setSkillsSelected] = useState<string[]>([
@@ -147,11 +158,11 @@ export default function TrabajaConNosotros() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      if (file.type !== 'application/pdf' && !file.name.endsWith('.pdf')) {
+      if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
         Swal.fire({
           icon: 'warning',
           title: 'Formato inválido',
-          text: 'Solo se permiten archivos en formato PDF.',
+          text: 'Solo se permiten hojas de vida en formato PDF.',
           confirmButtonColor: '#10b981'
         });
         return;
@@ -170,6 +181,35 @@ export default function TrabajaConNosotros() {
     }
   };
 
+  const handleDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      const validExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.webp'];
+      const hasValidExt = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+      if (!validTypes.includes(file.type) && !hasValidExt) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Formato no admitido',
+          text: 'Por favor adjunta el documento de identidad en formato PDF o imagen (JPG, PNG).',
+          confirmButtonColor: '#10b981'
+        });
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Archivo muy pesado',
+          text: 'El documento excede el límite máximo de 5 MB.',
+          confirmButtonColor: '#10b981'
+        });
+        return;
+      }
+      setDocumentFile(file);
+      setFormData(prev => ({ ...prev, documentFileOriginalName: file.name }));
+    }
+  };
+
   const validateStep = (step: number) => {
     if (step === 1) {
       if (!formData.fullName.trim()) return 'Ingresa tu nombre completo.';
@@ -178,6 +218,9 @@ export default function TrabajaConNosotros() {
       if (!formData.email.trim()) return 'Ingresa tu correo electrónico.';
       if (!formData.city.trim()) return 'Ingresa tu ciudad de residencia.';
       if (!formData.neighborhood.trim()) return 'Ingresa tu barrio actual.';
+      if (!formData.emergencyContactName?.trim() || !formData.emergencyContactPhone?.trim()) {
+        return 'Ingresa el nombre completo y teléfono de contacto de una persona en caso de emergencia.';
+      }
     }
     if (step === 2) {
       if (!formData.targetPosition?.trim()) return 'Selecciona el cargo.';
@@ -185,16 +228,34 @@ export default function TrabajaConNosotros() {
     }
     if (step === 4) {
       if (!formData.motivation.trim()) return 'Cuéntanos brevemente por qué te interesa trabajar con nosotros.';
+      if (!formData.howDidYouHear?.trim()) return 'Por favor indícanos cómo te enteraste de esta vacante.';
+      if (formData.hasMedicalCondition && !formData.medicalConditionDetails?.trim()) {
+        return 'Por favor especifica tu condición médica, cirugías o alergias.';
+      }
     }
     if (step === 5) {
-      if (!formData.familyRefName.trim() || !formData.familyRefPhone.trim()) return 'Completa la referencia familiar.';
-      if (!formData.personalRefName.trim() || !formData.personalRefPhone.trim()) return 'Completa la referencia personal.';
-      if (!formData.commercialRefCompany.trim() || !formData.commercialRefPhone.trim()) return 'Completa la referencia comercial o laboral.';
-      if (!resumeFile && !formData.resumeUrl) return 'Por favor adjunta tu hoja de vida en PDF.';
+      if (!formData.familyRefName.trim() || !formData.familyRefPhone.trim() || !formData.familyRefRelationship.trim()) {
+        return 'Completa los datos de la referencia familiar (nombre, parentesco y contacto).';
+      }
+      if (!formData.personalRefName.trim() || !formData.personalRefPhone.trim() || !formData.personalRefRelationship.trim()) {
+        return 'Completa los datos de la referencia personal (nombre, relación y contacto).';
+      }
+      if (!formData.commercialRefCompany.trim() || !formData.commercialRefPhone.trim() || !formData.commercialRefPosition.trim()) {
+        return 'Completa los datos de la referencia comercial/laboral (empresa, cargo y contacto).';
+      }
+      if (!documentFile && !formData.documentFileUrl) {
+        return 'Por favor adjunta una copia de tu documento de identidad (PDF o imagen).';
+      }
+      if (!resumeFile && !formData.resumeUrl) {
+        return 'Por favor adjunta tu hoja de vida en PDF.';
+      }
     }
     if (step === 6) {
       if (!formData.dataPolicyAccepted || !formData.infoVerificationAccepted || !formData.creditCheckAccepted) {
-        return 'Debes aceptar todas las autorizaciones legales para continuar.';
+        return 'Debes aceptar las autorizaciones legales para continuar.';
+      }
+      if (!formData.imageAuthorizationAccepted) {
+        return 'Debes autorizar el uso de imagen para TikTok y redes sociales de la empresa.';
       }
     }
     return null;
@@ -228,14 +289,30 @@ export default function TrabajaConNosotros() {
     try {
       setSubmitting(true);
       let uploadedResumeUrl = formData.resumeUrl;
+      let uploadedDocUrl = formData.documentFileUrl;
 
+      // Subir documento de identidad
+      if (documentFile) {
+        setDocumentUploading(true);
+        try {
+          const docRes = await RecruitmentService.uploadDocument(documentFile);
+          uploadedDocUrl = docRes.publicUrl;
+        } catch (uploadDocErr) {
+          console.warn('Subida directa de documento falló, continuando con fallback:', uploadDocErr);
+          uploadedDocUrl = 'https://pub-63cfe435c9854d2e85c789dd3e2f6e52.r2.dev/documents/' + documentFile.name;
+        } finally {
+          setDocumentUploading(false);
+        }
+      }
+
+      // Subir hoja de vida
       if (resumeFile) {
         setResumeUploading(true);
         try {
           const uploadRes = await RecruitmentService.uploadResume(resumeFile);
           uploadedResumeUrl = uploadRes.publicUrl;
         } catch (uploadErr) {
-          console.warn('Subida directa de archivo a R2 falló, continuando con registro:', uploadErr);
+          console.warn('Subida directa de hoja de vida a R2 falló, continuando con registro:', uploadErr);
           uploadedResumeUrl = 'https://pub-63cfe435c9854d2e85c789dd3e2f6e52.r2.dev/resumes/' + resumeFile.name;
         } finally {
           setResumeUploading(false);
@@ -246,6 +323,8 @@ export default function TrabajaConNosotros() {
         ...formData,
         resumeUrl: uploadedResumeUrl,
         resumeOriginalName: resumeFile ? resumeFile.name : (formData.resumeOriginalName || 'hoja_de_vida.pdf'),
+        documentFileUrl: uploadedDocUrl,
+        documentFileOriginalName: documentFile ? documentFile.name : (formData.documentFileOriginalName || 'documento_identidad.pdf'),
         highlightSkills: skillsSelected.join(', ') + (otherSkill ? `, ${otherSkill}` : '')
       };
 
@@ -269,6 +348,7 @@ export default function TrabajaConNosotros() {
       // Reset form
       setModalStep(1);
       setResumeFile(null);
+      setDocumentFile(null);
     } catch (err: any) {
       console.error('Error al enviar postulación:', err);
       Swal.fire({
@@ -334,7 +414,7 @@ export default function TrabajaConNosotros() {
           <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
           <span>Vacantes</span>
           <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-          <span className="text-gray-900 font-semibold">{selectedVacancy?.position || 'Cargando...'}</span>
+          <span className="text-gray-900 font-semibold">{selectedVacancy?.position || (!loading ? 'Sin vacantes activas' : 'Cargando...')}</span>
         </nav>
 
         {loading ? (
@@ -449,7 +529,7 @@ export default function TrabajaConNosotros() {
                 )}
 
                 {/* Horarios y descansos */}
-                {(selectedVacancy.workScheduleHours || selectedVacancy.sundayHours || selectedVacancy.scheduleObservations) && (
+                {(selectedVacancy.workScheduleHours || selectedVacancy.saturdayHours || selectedVacancy.sundayHours || selectedVacancy.scheduleObservations) && (
                   <div className="border-t border-gray-100 pt-5">
                     <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-3">
                       <Clock className="w-4 h-4 text-emerald-600" />
@@ -457,13 +537,16 @@ export default function TrabajaConNosotros() {
                     </h3>
                     <div className="space-y-1.5 text-xs text-gray-700">
                       {selectedVacancy.workScheduleHours && (
-                        <p><strong className="text-gray-900">Lunes a sábado:</strong> {selectedVacancy.workScheduleHours}</p>
+                        <p><strong className="text-gray-900">Lunes a viernes:</strong> {selectedVacancy.workScheduleHours}</p>
+                      )}
+                      {selectedVacancy.saturdayHours && (
+                        <p><strong className="text-gray-900">Sábado:</strong> {selectedVacancy.saturdayHours}</p>
                       )}
                       {selectedVacancy.sundayHours && (
-                        <p><strong className="text-gray-900">Domingos y festivos:</strong> {selectedVacancy.sundayHours}</p>
+                        <p><strong className="text-gray-900">Domingo y lunes trabajado:</strong> {selectedVacancy.sundayHours}</p>
                       )}
                       {(selectedVacancy.scheduleObservations || selectedVacancy.sundayPolicy) && (
-                        <p><strong className="text-gray-900">Observaciones domingos:</strong> {selectedVacancy.scheduleObservations || selectedVacancy.sundayPolicy}</p>
+                        <p><strong className="text-gray-900">Observaciones domingos/festivos:</strong> {selectedVacancy.scheduleObservations || selectedVacancy.sundayPolicy}</p>
                       )}
                     </div>
                   </div>
@@ -508,7 +591,7 @@ export default function TrabajaConNosotros() {
                   { num: 2, title: 'Experiencia y formación' },
                   { num: 3, title: 'Horarios, pago y disponibilidad' },
                   { num: 4, title: 'Información adicional' },
-                  { num: 5, title: 'Referencias y hoja de vida' },
+                  { num: 5, title: 'Referencias y documentos' },
                   { num: 6, title: 'Autorizaciones legales' }
                 ].map((s) => (
                   <div key={s.num} className="flex items-center gap-3 text-xs text-gray-700">
@@ -578,7 +661,7 @@ export default function TrabajaConNosotros() {
                   { num: 2, label: 'Experiencia y formación' },
                   { num: 3, label: 'Horarios y disponibilidad' },
                   { num: 4, label: 'Información adicional' },
-                  { num: 5, label: 'Referencias y hoja de vida' },
+                  { num: 5, label: 'Referencias y documentos' },
                   { num: 6, label: 'Autorizaciones legales' }
                 ].map(s => {
                   const isDone = modalStep > s.num;
@@ -752,6 +835,36 @@ export default function TrabajaConNosotros() {
                         />
                       </div>
                     </div>
+
+                    {/* Contacto en caso de emergencia */}
+                    <div className="sm:col-span-2 pt-3 border-t border-gray-100">
+                      <h4 className="text-xs font-extrabold text-gray-900 mb-2 flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                        Persona de contacto en caso de emergencia *
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-gray-600 mb-1">Nombre completo *</label>
+                          <input
+                            type="text"
+                            placeholder="Nombre de la persona"
+                            value={formData.emergencyContactName}
+                            onChange={e => setFormData({ ...formData, emergencyContactName: e.target.value })}
+                            className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-gray-600 mb-1">Número de contacto *</label>
+                          <input
+                            type="tel"
+                            placeholder="Número de celular o teléfono"
+                            value={formData.emergencyContactPhone}
+                            onChange={e => setFormData({ ...formData, emergencyContactPhone: e.target.value })}
+                            className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -890,7 +1003,7 @@ export default function TrabajaConNosotros() {
                   <div className="space-y-4 text-xs">
                     <div>
                       <label className="block font-semibold text-gray-700 mb-1.5">
-                        ¿Tienes disponibilidad para trabajar sábados, domingos y festivos, conforme a los turnos y descansos legales? *
+                        ¿Tienes disponibilidad para trabajar sábados, domingos y festivos? *
                       </label>
                       <div className="space-y-1.5">
                         {['Sí, tengo disponibilidad', 'Tengo disponibilidad parcial', 'No tengo disponibilidad'].map(opt => (
@@ -1104,15 +1217,94 @@ export default function TrabajaConNosotros() {
 
                     <div>
                       <label className="block text-xs font-semibold text-gray-700 mb-1">
-                        ¿Qué tipo de metas de ventas has alcanzado? (opcional)
+                        ¿Cómo se enteró de esta vacante? *
                       </label>
-                      <input
-                        type="text"
-                        placeholder="Ej. % de cumplimiento, ventas mensuales, etc."
-                        value={formData.salesGoalsAchieved}
-                        onChange={e => setFormData({ ...formData, salesGoalsAchieved: e.target.value })}
-                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                      />
+                      <select
+                        value={formData.howDidYouHear || 'Instagram'}
+                        onChange={e => setFormData({ ...formData, howDidYouHear: e.target.value })}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
+                      >
+                        <option value="Instagram">Instagram</option>
+                        <option value="TikTok">TikTok</option>
+                        <option value="Facebook">Facebook</option>
+                        <option value="Recomendación / Amigo">Recomendación / Amigo</option>
+                        <option value="Aviso en tienda física">Aviso en tienda física</option>
+                        <option value="Página web Juan'D Store">Página web Juan'D Store</option>
+                        <option value="Portal de empleo">Portal de empleo</option>
+                        <option value="Otro">Otro</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Preguntas de salud y procesos adicionales */}
+                  <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200 space-y-3 text-xs">
+                    <div>
+                      <label className="block font-semibold text-gray-800 mb-1.5">
+                        ¿Actualmente presenta alguna condición médica, ha sido sometido(a) a cirugías o padece alergias? *
+                      </label>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="medicalCond"
+                            checked={formData.hasMedicalCondition === true}
+                            onChange={() => setFormData({ ...formData, hasMedicalCondition: true })}
+                            className="text-emerald-600"
+                          />
+                          <span>Sí</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="medicalCond"
+                            checked={formData.hasMedicalCondition === false}
+                            onChange={() => setFormData({ ...formData, hasMedicalCondition: false, medicalConditionDetails: '' })}
+                            className="text-emerald-600"
+                          />
+                          <span>No</span>
+                        </label>
+                      </div>
+
+                      {formData.hasMedicalCondition && (
+                        <div className="mt-2">
+                          <label className="block text-[11px] font-semibold text-gray-600 mb-1">Especifique su condición, cirugías o alergias *</label>
+                          <textarea
+                            rows={2}
+                            placeholder="Describe aquí tu condición médica, cirugías o alergias..."
+                            value={formData.medicalConditionDetails || ''}
+                            onChange={e => setFormData({ ...formData, medicalConditionDetails: e.target.value })}
+                            className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-gray-200">
+                      <label className="block font-semibold text-gray-800 mb-1.5">
+                        ¿Actualmente se encuentra participando en procesos de selección con otras empresas? *
+                      </label>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="otherProcesses"
+                            checked={formData.inOtherSelectionProcesses === true}
+                            onChange={() => setFormData({ ...formData, inOtherSelectionProcesses: true })}
+                            className="text-emerald-600"
+                          />
+                          <span>Sí</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="otherProcesses"
+                            checked={formData.inOtherSelectionProcesses === false}
+                            onChange={() => setFormData({ ...formData, inOtherSelectionProcesses: false })}
+                            className="text-emerald-600"
+                          />
+                          <span>No</span>
+                        </label>
+                      </div>
                     </div>
                   </div>
 
@@ -1132,18 +1324,18 @@ export default function TrabajaConNosotros() {
                 </div>
               )}
 
-              {/* STEP 5: REFERENCIAS Y HOJA DE VIDA (Image 14) */}
+              {/* STEP 5: REFERENCIAS, DOCUMENTOS Y HOJA DE VIDA */}
               {modalStep === 5 && (
                 <div className="space-y-4">
                   <div className="border-l-4 border-emerald-600 pl-3 mb-4">
-                    <h3 className="text-sm font-bold text-gray-900">Referencias y hoja de vida</h3>
-                    <p className="text-xs text-gray-500">Proporciónanos tus referencias y adjunta tu hoja de vida.</p>
+                    <h3 className="text-sm font-bold text-gray-900">Referencias y documentos</h3>
+                    <p className="text-xs text-gray-500">Proporciónanos tus referencias y adjunta tu documento de identidad y hoja de vida.</p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-                    {/* Left: 3 References (7 cols) */}
-                    <div className="md:col-span-7 space-y-4">
-                      <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Referencias (mínimo 3)</h4>
+                    {/* Left: 3 References (6 cols) */}
+                    <div className="md:col-span-6 space-y-4">
+                      <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Referencias requeridas</h4>
 
                       {/* 1. Referencia Familiar */}
                       <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 text-xs space-y-2">
@@ -1154,14 +1346,14 @@ export default function TrabajaConNosotros() {
                         <div className="grid grid-cols-2 gap-2">
                           <input
                             type="text"
-                            placeholder="Nombre y apellidos"
+                            placeholder="Nombre y apellidos *"
                             value={formData.familyRefName}
                             onChange={e => setFormData({ ...formData, familyRefName: e.target.value })}
                             className="px-2.5 py-1.5 border border-gray-300 rounded-lg bg-white"
                           />
                           <input
                             type="text"
-                            placeholder="Parentesco (Ej. Madre, Hermano)"
+                            placeholder="Parentesco (Ej. Madre, Padre, etc.) *"
                             value={formData.familyRefRelationship}
                             onChange={e => setFormData({ ...formData, familyRefRelationship: e.target.value })}
                             className="px-2.5 py-1.5 border border-gray-300 rounded-lg bg-white"
@@ -1169,7 +1361,7 @@ export default function TrabajaConNosotros() {
                         </div>
                         <input
                           type="tel"
-                          placeholder="Número de contacto"
+                          placeholder="Número de contacto *"
                           value={formData.familyRefPhone}
                           onChange={e => setFormData({ ...formData, familyRefPhone: e.target.value })}
                           className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg bg-white"
@@ -1185,14 +1377,14 @@ export default function TrabajaConNosotros() {
                         <div className="grid grid-cols-2 gap-2">
                           <input
                             type="text"
-                            placeholder="Nombre y apellidos"
+                            placeholder="Nombre y apellidos *"
                             value={formData.personalRefName}
                             onChange={e => setFormData({ ...formData, personalRefName: e.target.value })}
                             className="px-2.5 py-1.5 border border-gray-300 rounded-lg bg-white"
                           />
                           <input
                             type="text"
-                            placeholder="Relación (Ej. Amigo, Vecino)"
+                            placeholder="Vínculo (Ej. Amigo, Conocido, etc.) *"
                             value={formData.personalRefRelationship}
                             onChange={e => setFormData({ ...formData, personalRefRelationship: e.target.value })}
                             className="px-2.5 py-1.5 border border-gray-300 rounded-lg bg-white"
@@ -1200,7 +1392,7 @@ export default function TrabajaConNosotros() {
                         </div>
                         <input
                           type="tel"
-                          placeholder="Número de contacto"
+                          placeholder="Número de contacto *"
                           value={formData.personalRefPhone}
                           onChange={e => setFormData({ ...formData, personalRefPhone: e.target.value })}
                           className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg bg-white"
@@ -1211,19 +1403,19 @@ export default function TrabajaConNosotros() {
                       <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 text-xs space-y-2">
                         <span className="font-bold text-gray-800 flex items-center gap-1.5">
                           <Briefcase className="w-3.5 h-3.5 text-emerald-600" />
-                          3. Referencia comercial / laboral
+                          3. Referencia laboral / comercial
                         </span>
                         <div className="grid grid-cols-2 gap-2">
                           <input
                             type="text"
-                            placeholder="Nombre del establecimiento"
+                            placeholder="Nombre establecimiento / empresa *"
                             value={formData.commercialRefCompany}
                             onChange={e => setFormData({ ...formData, commercialRefCompany: e.target.value })}
                             className="px-2.5 py-1.5 border border-gray-300 rounded-lg bg-white"
                           />
                           <input
                             type="text"
-                            placeholder="Cargo de contacto"
+                            placeholder="Cargo o relación (Ej. Administrador, etc.) *"
                             value={formData.commercialRefPosition}
                             onChange={e => setFormData({ ...formData, commercialRefPosition: e.target.value })}
                             className="px-2.5 py-1.5 border border-gray-300 rounded-lg bg-white"
@@ -1231,7 +1423,7 @@ export default function TrabajaConNosotros() {
                         </div>
                         <input
                           type="tel"
-                          placeholder="Número de contacto"
+                          placeholder="Número de contacto *"
                           value={formData.commercialRefPhone}
                           onChange={e => setFormData({ ...formData, commercialRefPhone: e.target.value })}
                           className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg bg-white"
@@ -1239,44 +1431,82 @@ export default function TrabajaConNosotros() {
                       </div>
                     </div>
 
-                    {/* Right: Hoja de vida (5 cols) */}
-                    <div className="md:col-span-5 space-y-2">
-                      <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5 text-emerald-600" />
-                        Hoja de vida *
-                      </h4>
-                      <p className="text-[11px] text-gray-500">
-                        Adjunta tu hoja de vida en formato PDF (máx. 5 MB).
-                      </p>
-
-                      <div className="border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center hover:border-emerald-500 transition-colors bg-gray-50/50">
-                        <UploadCloud className="w-10 h-10 text-emerald-600 mx-auto mb-2" />
-                        <p className="text-xs font-bold text-gray-800">Arrastra y suelta tu archivo aquí</p>
-                        <p className="text-[10px] text-gray-400 my-1">o</p>
-                        <label className="inline-block px-4 py-2 bg-white border border-gray-300 hover:border-emerald-500 text-gray-800 text-xs font-semibold rounded-lg shadow-sm cursor-pointer transition-all">
-                          <span>Seleccionar archivo</span>
-                          <input
-                            type="file"
-                            accept="application/pdf,.pdf"
-                            onChange={handleFileChange}
-                            className="hidden"
-                          />
-                        </label>
-                        <p className="text-[10px] text-gray-400 mt-3 flex items-center justify-center gap-1">
-                          <FileText className="w-3 h-3 text-red-500" />
-                          Solo archivos PDF (máx. 5 MB)
+                    {/* Right: Archivos adjuntos (6 cols) */}
+                    <div className="md:col-span-6 space-y-4">
+                      {/* 1. Documento de identidad */}
+                      <div className="space-y-1.5">
+                        <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                          Documento de identidad *
+                        </h4>
+                        <p className="text-[11px] text-gray-500">
+                          Adjunta copia de tu cédula o documento (PDF o imagen JPG/PNG, máx. 5 MB).
                         </p>
 
-                        {resumeFile && (
-                          <div className="mt-3 p-2 bg-emerald-50 border border-emerald-200 rounded-lg text-left flex items-center justify-between">
-                            <span className="text-xs text-emerald-800 font-semibold truncate max-w-[180px]">
-                              {resumeFile.name}
-                            </span>
-                            <span className="text-[10px] text-emerald-600">
-                              {(resumeFile.size / (1024 * 1024)).toFixed(2)} MB
-                            </span>
-                          </div>
-                        )}
+                        <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:border-emerald-500 transition-colors bg-gray-50/50">
+                          <UploadCloud className="w-7 h-7 text-emerald-600 mx-auto mb-1.5" />
+                          <label className="inline-block px-3 py-1.5 bg-white border border-gray-300 hover:border-emerald-500 text-gray-800 text-xs font-semibold rounded-lg shadow-sm cursor-pointer transition-all">
+                            <span>Seleccionar documento</span>
+                            <input
+                              type="file"
+                              accept="application/pdf,image/jpeg,image/png,image/webp"
+                              onChange={handleDocumentChange}
+                              className="hidden"
+                            />
+                          </label>
+                          <p className="text-[10px] text-gray-400 mt-2">
+                            PDF, JPG o PNG (máx. 5 MB)
+                          </p>
+
+                          {documentFile && (
+                            <div className="mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded-lg text-left flex items-center justify-between">
+                              <span className="text-xs text-emerald-800 font-semibold truncate max-w-[200px]">
+                                {documentFile.name}
+                              </span>
+                              <span className="text-[10px] text-emerald-600">
+                                {(documentFile.size / (1024 * 1024)).toFixed(2)} MB
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 2. Hoja de vida */}
+                      <div className="space-y-1.5">
+                        <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                          <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                          Hoja de vida *
+                        </h4>
+                        <p className="text-[11px] text-gray-500">
+                          Adjunta tu hoja de vida en formato PDF (máx. 5 MB).
+                        </p>
+
+                        <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:border-emerald-500 transition-colors bg-gray-50/50">
+                          <UploadCloud className="w-7 h-7 text-emerald-600 mx-auto mb-1.5" />
+                          <label className="inline-block px-3 py-1.5 bg-white border border-gray-300 hover:border-emerald-500 text-gray-800 text-xs font-semibold rounded-lg shadow-sm cursor-pointer transition-all">
+                            <span>Seleccionar hoja de vida</span>
+                            <input
+                              type="file"
+                              accept="application/pdf,.pdf"
+                              onChange={handleFileChange}
+                              className="hidden"
+                            />
+                          </label>
+                          <p className="text-[10px] text-gray-400 mt-2">
+                            Solo formato PDF (máx. 5 MB)
+                          </p>
+
+                          {resumeFile && (
+                            <div className="mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded-lg text-left flex items-center justify-between">
+                              <span className="text-xs text-emerald-800 font-semibold truncate max-w-[200px]">
+                                {resumeFile.name}
+                              </span>
+                              <span className="text-[10px] text-emerald-600">
+                                {(resumeFile.size / (1024 * 1024)).toFixed(2)} MB
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1357,6 +1587,28 @@ export default function TrabajaConNosotros() {
                           className="w-4 h-4 text-emerald-600 rounded"
                         />
                         <span className="text-xs font-semibold text-gray-700">Acepto</span>
+                      </label>
+                    </div>
+
+                    {/* 4. Uso de imagen en TikTok y redes sociales */}
+                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex items-start justify-between gap-4">
+                      <div>
+                        <h4 className="text-xs font-bold text-gray-900 flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          Autorización de uso de imagen (TikTok y redes comerciales) *
+                        </h4>
+                        <p className="text-xs text-gray-600 mt-1">
+                          ¿Autoriza el uso de su imagen (fotografías y videos) para transmisiones en TikTok, grabaciones dentro de la tienda y contenido en redes sociales de la empresa con fines comerciales y publicitarios?
+                        </p>
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer shrink-0 mt-1">
+                        <input
+                          type="checkbox"
+                          checked={formData.imageAuthorizationAccepted ?? true}
+                          onChange={e => setFormData({ ...formData, imageAuthorizationAccepted: e.target.checked })}
+                          className="w-4 h-4 text-emerald-600 rounded"
+                        />
+                        <span className="text-xs font-semibold text-gray-700">Autorizo</span>
                       </label>
                     </div>
 

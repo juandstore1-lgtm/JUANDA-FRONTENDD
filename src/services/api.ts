@@ -960,6 +960,31 @@ export const RecruitmentService = {
       reader.onerror = error => reject(error);
       reader.readAsDataURL(file);
     });
+  },
+
+  uploadDocument: async (file: File): Promise<{ publicUrl: string; originalName: string }> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const base64Data = reader.result as string;
+          const res = await fetch(`${API_URL}/recruitment/public/upload-document`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              data: base64Data,
+              name: file.name
+            })
+          });
+          const result = await handleResponse(res, false);
+          resolve(result);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = error => reject(error);
+      reader.readAsDataURL(file);
+    });
   }
 };
 

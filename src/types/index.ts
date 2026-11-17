@@ -256,6 +256,7 @@ export interface JobVacancy {
   description: string;
   workScheduleType: string;
   workScheduleHours: string;
+  saturdayHours?: string;
   workDays: string;
   sundayPolicy: string;
   sundayHours: string;
@@ -303,6 +304,8 @@ export interface JobApplication {
   address?: string;
   instagram?: string;
   facebook?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
   targetPosition: string;
   salesExperience: string;
   workedInClothingStores: boolean;
@@ -319,6 +322,10 @@ export interface JobApplication {
   highlightSkills: string;
   socialMediaSalesExp?: boolean;
   salesGoalsAchieved?: string;
+  howDidYouHear?: string;
+  hasMedicalCondition?: boolean;
+  medicalConditionDetails?: string;
+  inOtherSelectionProcesses?: boolean;
   additionalObservations?: string;
   familyRefName: string;
   familyRefRelationship: string;
@@ -331,9 +338,12 @@ export interface JobApplication {
   commercialRefPhone: string;
   resumeUrl?: string;
   resumeOriginalName?: string;
+  documentFileUrl?: string;
+  documentFileOriginalName?: string;
   dataPolicyAccepted: boolean;
   infoVerificationAccepted: boolean;
   creditCheckAccepted: boolean;
+  imageAuthorizationAccepted?: boolean;
   adminNotes?: string;
   interviewDate?: string;
   createdAt?: string;
