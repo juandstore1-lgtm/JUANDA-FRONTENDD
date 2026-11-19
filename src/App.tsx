@@ -21,6 +21,8 @@ import Contest from "./pages/Contest";
 import Raffles from "./pages/Raffles";
 import RaffleDetail from "./pages/RaffleDetail";
 import TrabajaConNosotros from "./pages/TrabajaConNosotros";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 
@@ -120,6 +122,10 @@ function MainApp() {
                 <Route path="/rifas/:id" element={<RaffleDetail />} />
                 <Route path="/trabaja-con-nosotros" element={<TrabajaConNosotros />} />
                 <Route path="/trabaja-con-nosotros/:id" element={<TrabajaConNosotros />} />
+                <Route path="/terminos" element={<Terms />} />
+                <Route path="/terminos-y-condiciones" element={<Terms />} />
+                <Route path="/privacidad" element={<Privacy />} />
+                <Route path="/politica-de-privacidad" element={<Privacy />} />
               </Routes>
             </Layout>
           } />

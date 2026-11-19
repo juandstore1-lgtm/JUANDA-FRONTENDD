@@ -1,4 +1,5 @@
 import { Phone, Mail, Send } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export default function Footer() {
   return (
@@ -109,8 +110,25 @@ export default function Footer() {
 
         </div>
 
+        {/* ================= ENLACES LEGALES ================= */}
+        <div className="pt-8 flex flex-wrap items-center justify-center gap-6 text-xs text-zinc-400">
+          <Link
+            to="/terminos"
+            className="hover:text-white transition-colors underline-offset-4 hover:underline"
+          >
+            Términos y Condiciones
+          </Link>
+          <span className="text-zinc-600">•</span>
+          <Link
+            to="/privacidad"
+            className="hover:text-white transition-colors underline-offset-4 hover:underline"
+          >
+            Política de Privacidad
+          </Link>
+        </div>
+
         {/* ================= COPYRIGHT ================= */}
-        <div className="pt-8 text-center">
+        <div className="pt-4 text-center">
           <p className="text-xs text-zinc-500 font-light tracking-wide">
             © 2026 JDQ STORE · Todos los derechos reservados
           </p>
