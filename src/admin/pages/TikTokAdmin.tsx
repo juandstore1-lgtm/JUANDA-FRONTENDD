@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
   Play, 
   Eye, 
@@ -59,8 +60,19 @@ function TikTokLogoIcon({ className = "w-5 h-5" }: { className?: string }) {
 }
 
 export default function TikTokAdmin() {
+  const [searchParams] = useSearchParams();
+  const queryTab = searchParams.get('tab') as 'resumen' | 'mi_cuenta' | 'publicar' | 'programacion' | 'historial' | null;
+
   // Tab activo: 'resumen' | 'mi_cuenta' | 'publicar' | 'programacion' | 'historial'
-  const [activeTab, setActiveTab] = useState<'resumen' | 'mi_cuenta' | 'publicar' | 'programacion' | 'historial'>('publicar');
+  const [activeTab, setActiveTab] = useState<'resumen' | 'mi_cuenta' | 'publicar' | 'programacion' | 'historial'>(
+    queryTab && ['resumen', 'mi_cuenta', 'publicar', 'programacion', 'historial'].includes(queryTab) ? queryTab : 'publicar'
+  );
+
+  useEffect(() => {
+    if (queryTab && ['resumen', 'mi_cuenta', 'publicar', 'programacion', 'historial'].includes(queryTab)) {
+      setActiveTab(queryTab);
+    }
+  }, [queryTab]);
 
   // Estado de la cuenta global conectada (100% oficial)
   const [globalAccount, setGlobalAccount] = useState<{
