@@ -36,7 +36,30 @@ export interface AuditLog {
   previousData?: string;
   newData?: string;
   ipAddress?: string;
+  storeId?: number;
+  storeName?: string;
   createdAt: string;
+}
+
+export interface AuditAlert {
+  id: string | number;
+  alertType: 'SIN_ACTUALIZACION' | 'BAJA_ACTIVIDAD' | 'ELIMINACION_MASIVA' | 'EDICION_MASIVA' | 'SIN_CUMPLIMIENTO';
+  title: string;
+  description: string;
+  sedeId?: number | string;
+  sedeName: string;
+  severity: 'CRITICA' | 'SEGUIMIENTO' | 'INFORMATIVA';
+  status: 'PENDIENTE' | 'REVISADA';
+  createdAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+}
+
+export interface AuditAlertSettings {
+  dailyTarget: number;
+  inactiveDaysThreshold: number;
+  massEditThreshold: number;
+  massDeleteThreshold: number;
 }
 export interface Product {
   id: string;

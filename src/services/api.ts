@@ -36,6 +36,11 @@ const getHeaders = () => {
   };
 };
 
+const getAuthHeadersOnly = () => {
+  const token = localStorage.getItem('jwt_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 // sentToken = false en las peticiones públicas que nunca envían el token: su 401 no significa sesión expirada
 const handleResponse = async (res: Response, sentToken = true) => {
   if (!res.ok) {
@@ -746,8 +751,10 @@ export const StorageService = {
 export const AuditService = {
   getAuditLogs: async (params?: {
     userId?: number | string;
+    storeId?: number | string;
     actionType?: string;
     entityType?: string;
+    search?: string;
     startDate?: string;
     endDate?: string;
     page?: number;
@@ -755,8 +762,10 @@ export const AuditService = {
   }): Promise<{ content: AuditLog[]; totalElements: number; totalPages: number; number: number }> => {
     const query = new URLSearchParams();
     if (params?.userId) query.append('userId', String(params.userId));
+    if (params?.storeId) query.append('storeId', String(params.storeId));
     if (params?.actionType) query.append('actionType', params.actionType);
     if (params?.entityType) query.append('entityType', params.entityType);
+    if (params?.search) query.append('search', params.search);
     if (params?.startDate) query.append('startDate', params.startDate);
     if (params?.endDate) query.append('endDate', params.endDate);
     if (params?.page !== undefined) query.append('page', String(params.page));
@@ -1121,6 +1130,68 @@ export const TikTokService = {
     requiredCredentials: Record<string, string>;
   }> => {
     const res = await fetch(`${API_URL}/tiktok/admin/oauth/config`, { headers: getHeaders() });
+    return await handleResponse(res);
+  },
+
+  saveOAuthConfig: async (config: { clientKey: string; clientSecret: string; redirectUri?: string }): Promise<any> => {
+    const res = await fetch(`${API_URL}/tiktok/admin/oauth/config`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(config)
+    });
+    return await handleResponse(res);
+  },
+
+  getGlobalAccount: async (): Promise<{
+    connected: boolean;
+    id?: number;
+    username?: string;
+    displayName?: string;
+    avatarUrl?: string;
+    accountId?: string;
+    openId?: string;
+    status: string;
+    connectedAt?: string;
+    permissions?: string;
+    scope?: string;
+    canPublishDirectly?: boolean;
+    canUploadDraft?: boolean;
+    canListVideos?: boolean;
+    tokenExpiresAt?: string;
+  }> => {
+    const res = await fetch(`${API_URL}/tiktok/admin/account`, { headers: getHeaders() });
+    return await handleResponse(res);
+  },
+
+  disconnectGlobalAccount: async (): Promise<{ message: string }> => {
+    const res = await fetch(`${API_URL}/tiktok/admin/account/disconnect`, {
+      method: 'POST',
+      headers: getHeaders()
+    });
+    return await handleResponse(res);
+  },
+
+  publishVideo: async (formData: FormData): Promise<{
+    success: boolean;
+    publishId: string;
+    status: string;
+    isDraft: boolean;
+    message: string;
+  }> => {
+    const res = await fetch(`${API_URL}/tiktok/admin/publish`, {
+      method: 'POST',
+      headers: getAuthHeadersOnly(),
+      body: formData
+    });
+    return await handleResponse(res);
+  },
+
+  scheduleVideo: async (formData: FormData): Promise<import('../types').TikTokScheduledVideo> => {
+    const res = await fetch(`${API_URL}/tiktok/admin/schedule`, {
+      method: 'POST',
+      headers: getAuthHeadersOnly(),
+      body: formData
+    });
     return await handleResponse(res);
   },
 

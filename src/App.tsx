@@ -134,6 +134,7 @@ function MainApp() {
             <Route path="users" element={<UsersAdmin />} />
             <Route path="recruitment" element={<RecruitmentAdmin />} />
             <Route path="tiktok" element={<TikTokAdmin />} />
+            <Route path="tiktok/callback" element={<TikTokAdmin />} />
             <Route path="audit" element={<AuditAdmin />} />
             <Route path="contests" element={<ContestsAdmin />} />
             <Route path="raffles" element={<RafflesAdmin />} />

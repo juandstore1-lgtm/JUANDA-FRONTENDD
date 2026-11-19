@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Play, 
   Eye, 
@@ -16,7 +16,6 @@ import {
   Check, 
   X, 
   Plus, 
-  Store as StoreIcon, 
   AlertCircle, 
   CheckCircle2, 
   Lock, 
@@ -29,20 +28,28 @@ import {
   MoreVertical,
   Unlink,
   Sparkles,
-  Trash2
+  Trash2,
+  UploadCloud,
+  Send,
+  Save,
+  Settings,
+  HelpCircle,
+  Film,
+  Globe,
+  Users,
+  ShieldCheck,
+  ChevronDown
 } from 'lucide-react';
-import { TikTokService, StoreService } from '../../services/api';
+import { TikTokService } from '../../services/api';
 import { 
-  TikTokAccountStatus, 
   TikTokVideo, 
   TikTokScheduledVideo, 
   TikTokWeeklySchedule, 
-  TikTokSummary,
-  Store 
+  TikTokSummary
 } from '../../types';
 import Swal from 'sweetalert2';
 
-// Custom TikTok musical note SVG
+// Icono oficial SVG de TikTok (nota musical)
 function TikTokLogoIcon({ className = "w-5 h-5" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -52,52 +59,45 @@ function TikTokLogoIcon({ className = "w-5 h-5" }: { className?: string }) {
 }
 
 export default function TikTokAdmin() {
-  const [activeTab, setActiveTab] = useState<'resumen' | 'cuentas' | 'programacion' | 'historial'>('cuentas');
-  
-  // Data states (100% dynamic from DB)
-  const [accounts, setAccounts] = useState<TikTokAccountStatus[]>([]);
+  // Tab activo: 'resumen' | 'mi_cuenta' | 'publicar' | 'programacion' | 'historial'
+  const [activeTab, setActiveTab] = useState<'resumen' | 'mi_cuenta' | 'publicar' | 'programacion' | 'historial'>('publicar');
+
+  // Estado de la cuenta global conectada (100% oficial)
+  const [globalAccount, setGlobalAccount] = useState<{
+    connected: boolean;
+    id?: number;
+    username?: string;
+    displayName?: string;
+    avatarUrl?: string;
+    accountId?: string;
+    openId?: string;
+    status: string;
+    connectedAt?: string;
+    permissions?: string;
+    scope?: string;
+    canPublishDirectly?: boolean;
+    canUploadDraft?: boolean;
+    canListVideos?: boolean;
+    tokenExpiresAt?: string;
+  } | null>(null);
+
+  // Estados de datos
   const [summary, setSummary] = useState<TikTokSummary | null>(null);
   const [schedule, setSchedule] = useState<TikTokWeeklySchedule | null>(null);
+  const [currentWeekStart, setCurrentWeekStart] = useState<string>(new Date().toISOString().split('T')[0]);
   const [historyVideos, setHistoryVideos] = useState<TikTokVideo[]>([]);
   const [historyTotal, setHistoryTotal] = useState(0);
   const [historyMetrics, setHistoryMetrics] = useState({ views: 0, likes: 0, comments: 0, shares: 0 });
-  const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Filters
-  const [selectedSedeFilter, setSelectedSedeFilter] = useState('TODAS');
-  const [summaryPeriod, setSummaryPeriod] = useState('ESTA_SEMANA');
-  const [scheduleViewMode, setScheduleViewMode] = useState<'semanal' | 'lista'>('semanal');
+  // Filtros de historial y resumen
+  const [historySearch, setHistorySearch] = useState('');
   const [historyDateFrom, setHistoryDateFrom] = useState('');
   const [historyDateTo, setHistoryDateTo] = useState('');
-  const [historyContentType, setHistoryContentType] = useState('TODOS');
-  const [historySearch, setHistorySearch] = useState('');
   const [historyPage, setHistoryPage] = useState(0);
 
-  // Check if current sede filter has a connected TikTok account
-  const isSedeLinked = useMemo(() => {
-    if (selectedSedeFilter === 'TODAS') {
-      return accounts.some(a => a.connected);
-    }
-    return accounts.some(a => (a.sedeName?.toLowerCase() === selectedSedeFilter.toLowerCase()) && a.connected);
-  }, [selectedSedeFilter, accounts]);
-
-  // Link Modal States
-  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
-  const [linkStep, setLinkStep] = useState<1 | 2 | 3>(1);
-  const [linkSubStep, setLinkSubStep] = useState<'login' | 'authorize' | 'success'>('login');
-  const [selectedLinkSede, setSelectedLinkSede] = useState<string>('');
-  const [customUsername, setCustomUsername] = useState('');
-  const [linkingAccountData, setLinkingAccountData] = useState<{
-    sedeName: string;
-    username: string;
-    displayName: string;
-    accountId: string;
-    avatarUrl: string;
-    connectedAt: string;
-  } | null>(null);
-
-  // OAuth Config State
+  // Modal de credenciales de desarrollador
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [oauthConfig, setOAuthConfig] = useState<{
     configured: boolean;
     clientKey: string | null;
@@ -105,134 +105,149 @@ export default function TikTokAdmin() {
     scopes: string[];
     requiredCredentials: Record<string, string>;
   } | null>(null);
+  const [inputClientKey, setInputClientKey] = useState('');
+  const [inputClientSecret, setInputClientSecret] = useState('');
+  const [inputRedirectUri, setInputRedirectUri] = useState('http://localhost:3000/admin/tiktok/callback');
 
-  // Add Scheduled Video Modal State
-  const [isAddScheduleModalOpen, setIsAddScheduleModalOpen] = useState(false);
-  const [newSchedule, setNewSchedule] = useState({
-    sedeName: '',
-    title: '',
-    scheduledAt: '',
-    duration: '0:24',
-    topic: 'Colección',
-    thumbnailUrl: 'https://pub-63cfe435c9854d2e85c789dd3e2f6e52.r2.dev/sedes/1_3f46edff.jpg',
-    notes: ''
+  // --- Formulario de Publicación de Video (Pantalla 2) ---
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+  const [videoDuration, setVideoDuration] = useState<string>('0:00');
+  const [description, setDescription] = useState(
+    'Nueva colección disponible en JUANDSTORE 👕🔥\nEstilo, calidad y los mejores outfits para ti.'
+  );
+  const [hashtags, setHashtags] = useState<string[]>(['JUANDSTORE', 'ModaHombre', 'NuevaColección']);
+  const [hashtagInput, setHashtagInput] = useState('');
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
+  const [coverTimestampMs, setCoverTimestampMs] = useState<number>(1000);
+
+  // Opciones de publicación
+  const [privacyLevel, setPrivacyLevel] = useState<'PUBLIC_TO_EVERYONE' | 'MUTUAL_FOLLOW_FRIENDS' | 'SELF_ONLY'>('PUBLIC_TO_EVERYONE');
+  const [allowComments, setAllowComments] = useState(true);
+  const [allowDuet, setAllowDuet] = useState(true);
+  const [allowStitch, setAllowStitch] = useState(true);
+  const [publishMode, setPublishMode] = useState<'now' | 'schedule'>('now');
+  const [scheduleDate, setScheduleDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
   });
+  const [scheduleTime, setScheduleTime] = useState('18:30');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Note Modal
-  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
-  const [noteTargetDate, setNoteTargetDate] = useState('');
-  const [noteContent, setNoteContent] = useState('');
+  // Referencias a inputs de archivos
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
+  const videoPlayerRef = useRef<HTMLVideoElement | null>(null);
 
-  // Video Preview Modal
-  const [previewVideo, setPreviewVideo] = useState<TikTokVideo | null>(null);
-
-  // Load initial data and OAuth configuration
+  // Inicialización y detección de retorno OAuth
   useEffect(() => {
-    loadAllData();
-    loadOAuthConfig();
+    loadInitialData();
 
-    // Check for OAuth 2.0 callback code and state in URL
+    // Detección de retorno de TikTok OAuth
     const query = new URLSearchParams(window.location.search);
     const code = query.get('code');
     const state = query.get('state');
     if (code) {
-      handleOAuthCodeReturn(code, state || '');
+      handleOAuthCallback(code, state || 'GLOBAL');
     }
   }, []);
 
-  // Reload when filters change
+  // Carga según pestaña activa
   useEffect(() => {
     if (activeTab === 'resumen') loadSummary();
-    if (activeTab === 'programacion') loadSchedule();
+    if (activeTab === 'programacion') loadSchedule(currentWeekStart);
     if (activeTab === 'historial') loadHistory();
-  }, [activeTab, selectedSedeFilter, summaryPeriod, historyDateFrom, historyDateTo, historyContentType, historySearch, historyPage]);
+  }, [activeTab, currentWeekStart, historySearch, historyDateFrom, historyDateTo, historyPage]);
 
-  const loadAllData = async () => {
+  const loadInitialData = async () => {
     try {
       setLoading(true);
-      const [accs, sts] = await Promise.all([
-        TikTokService.getAccounts().catch(() => []),
-        StoreService.getStores().catch(() => [])
+      await Promise.all([
+        loadAccount(),
+        loadOAuthConfig(),
+        loadSummary(),
+        loadSchedule(currentWeekStart),
+        loadHistory()
       ]);
-      setAccounts(accs);
-      setStores(sts);
-      if (sts.length > 0 && !selectedLinkSede) {
-        setSelectedLinkSede(sts[0].barrio || sts[0].name);
-      }
-      await Promise.all([loadSummary(), loadSchedule(), loadHistory()]);
-    } catch (err) {
-      console.error('Error cargando módulo TikTok:', err);
+    } catch (e) {
+      console.error('Error cargando datos iniciales de TikTok:', e);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadAccounts = async () => {
+  const loadAccount = async () => {
     try {
-      const accs = await TikTokService.getAccounts();
-      setAccounts(accs);
-    } catch (err) {
-      console.error('Error cargando cuentas:', err);
+      const acc = await TikTokService.getGlobalAccount();
+      setGlobalAccount(acc);
+      return acc;
+    } catch (e) {
+      console.error('Error cargando cuenta global de TikTok:', e);
+      return null;
+    }
+  };
+
+  const loadOAuthConfig = async () => {
+    try {
+      const cfg = await TikTokService.getOAuthConfig();
+      setOAuthConfig(cfg);
+      if (cfg.clientKey) setInputClientKey(cfg.clientKey);
+      if (cfg.redirectUri) setInputRedirectUri(cfg.redirectUri);
+    } catch (e) {
+      console.error('Error cargando configuración OAuth:', e);
     }
   };
 
   const loadSummary = async () => {
     try {
-      const sum = await TikTokService.getSummary(selectedSedeFilter, summaryPeriod);
+      const sum = await TikTokService.getSummary('GLOBAL', 'ESTA_SEMANA');
       setSummary(sum);
-    } catch (err) {
-      console.error('Error cargando resumen:', err);
+    } catch (e) {
+      console.error('Error cargando resumen:', e);
     }
   };
 
-  const loadSchedule = async () => {
+  const loadSchedule = async (weekStart?: string) => {
     try {
-      const sched = await TikTokService.getWeeklySchedule(selectedSedeFilter);
+      const sched = await TikTokService.getWeeklySchedule('GLOBAL', weekStart);
       setSchedule(sched);
-    } catch (err) {
-      console.error('Error cargando programación semanal:', err);
+    } catch (e) {
+      console.error('Error cargando programación semanal:', e);
     }
   };
 
   const loadHistory = async () => {
     try {
       const res = await TikTokService.getHistory({
-        sede: selectedSedeFilter,
+        sede: 'GLOBAL',
         dateFrom: historyDateFrom,
         dateTo: historyDateTo,
         search: historySearch,
-        contentType: historyContentType,
         page: historyPage,
-        size: 5
+        size: 10
       });
-      setHistoryVideos(res.videos);
-      setHistoryTotal(res.totalVideos);
+      setHistoryVideos(res.videos || []);
+      setHistoryTotal(res.totalVideos || 0);
       setHistoryMetrics({
-        views: res.totalViews,
-        likes: res.totalLikes,
-        comments: res.totalComments,
-        shares: res.totalShares
+        views: res.totalViews || 0,
+        likes: res.totalLikes || 0,
+        comments: res.totalComments || 0,
+        shares: res.totalShares || 0
       });
-    } catch (err) {
-      console.error('Error cargando historial:', err);
-    }
-  };
-
-  // --- OAuth Operations ---
-  const loadOAuthConfig = async () => {
-    try {
-      const cfg = await TikTokService.getOAuthConfig();
-      setOAuthConfig(cfg);
     } catch (e) {
-      console.error('Error cargando configuración OAuth:', e);
+      console.error('Error cargando historial de TikTok:', e);
     }
   };
 
-  const handleOAuthCodeReturn = async (code: string, state: string) => {
+  // --- Manejo del retorno OAuth 2.0 Oficial ---
+  const handleOAuthCallback = async (code: string, state: string) => {
+    // Limpiar query params de la URL sin recargar
     window.history.replaceState({}, document.title, window.location.pathname);
+
     Swal.fire({
-      title: 'Completando autorización con TikTok...',
-      text: 'Intercambiando código OAuth 2.0 y sincronizando perfil...',
+      title: 'Completando vinculación con TikTok...',
+      text: 'Intercambiando código de autorización oficial y registrando tokens seguros...',
       allowOutsideClick: false,
       didOpen: () => {
         Swal.showLoading();
@@ -240,182 +255,387 @@ export default function TikTokAdmin() {
     });
 
     try {
-      const sede = decodeURIComponent(state) || 'Villa Colombia';
-      await TikTokService.handleOAuthCallback(code, sede);
-      await loadAccounts();
+      await TikTokService.handleOAuthCallback(code, state || 'GLOBAL');
+      const updatedAcc = await loadAccount();
       await loadSummary();
       await loadSchedule();
       await loadHistory();
+
       Swal.fire({
         icon: 'success',
-        title: '¡Cuenta vinculada con éxito!',
-        text: `La cuenta de TikTok ha sido vinculada oficialmente mediante OAuth 2.0 a la sede ${sede}.`,
+        title: '¡Cuenta de TikTok vinculada con éxito!',
+        html: `Tu cuenta <b>${updatedAcc?.username || '@tu_cuenta'}</b> ha sido autorizada mediante Login Kit OAuth 2.0 oficial.<br/><br/><span class="text-xs text-gray-500">Permisos otorgados: ${updatedAcc?.permissions || 'Básicos'}</span>`,
         confirmButtonColor: '#10b981'
       });
+      setActiveTab('mi_cuenta');
     } catch (err: any) {
       Swal.fire({
         icon: 'error',
-        title: 'Error de autorización OAuth',
-        text: err?.message || 'No se pudo completar el intercambio del código de autorización con TikTok.',
+        title: 'Error de autorización en TikTok',
+        text: err?.message || 'TikTok rechazó la solicitud o el código de autorización expiró.',
         confirmButtonColor: '#ef4444'
       });
     }
   };
 
-  const handleStartOfficialOAuth = async () => {
+  // Redireccionar al Login Oficial de TikTok (OAuth 2.0)
+  const handleConnectWithTikTok = async () => {
     try {
-      const { url } = await TikTokService.getAuthorizeUrl(selectedLinkSede);
+      const { url } = await TikTokService.getAuthorizeUrl('GLOBAL');
       window.location.href = url;
     } catch (err: any) {
       Swal.fire({
         icon: 'warning',
-        title: 'Configuración requerida',
-        text: err?.message || 'Configura TIKTOK_CLIENT_KEY y TIKTOK_CLIENT_SECRET para usar el login oficial de TikTok.',
+        title: 'Configura tus credenciales de TikTok Developers',
+        text: err?.message || 'Ingresa el Client Key y Client Secret de tu aplicación de TikTok para continuar.',
+        showCancelButton: true,
+        confirmButtonText: 'Configurar credenciales',
+        cancelButtonText: 'Cancelar',
         confirmButtonColor: '#10b981'
+      }).then(res => {
+        if (res.isConfirmed) {
+          setIsConfigModalOpen(true);
+        }
       });
     }
   };
 
-  const handleVerifyAndLinkByHandle = async () => {
-    if (!customUsername || !customUsername.trim()) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'Usuario requerido',
-        text: 'Por favor ingresa el nombre de usuario de TikTok (ej. @juand.store).',
-        confirmButtonColor: '#10b981'
-      });
-      return;
-    }
+  // Desconectar cuenta oficial
+  const handleDisconnect = async () => {
+    const confirm = await Swal.fire({
+      title: '¿Desconectar cuenta de TikTok?',
+      text: 'Se eliminarán los tokens de acceso del servidor. Deberás volver a autorizar en TikTok para publicar videos.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, desconectar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#ef4444'
+    });
 
-    const cleanUsername = customUsername.trim().startsWith('@')
-      ? customUsername.trim()
-      : `@${customUsername.trim()}`;
-
-    Swal.fire({
-      title: 'Validando con TikTok...',
-      text: `Consultando los servidores oficiales de TikTok para verificar la cuenta ${cleanUsername}...`,
-      allowOutsideClick: false,
-      didOpen: () => {
-        Swal.showLoading();
+    if (confirm.isConfirmed) {
+      try {
+        await TikTokService.disconnectGlobalAccount();
+        await loadAccount();
+        Swal.fire({
+          icon: 'success',
+          title: 'Cuenta desconectada',
+          text: 'La cuenta de TikTok ha sido desvinculada exitosamente.',
+          timer: 2000,
+          showConfirmButton: false
+        });
+      } catch (err: any) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error al desconectar',
+          text: err?.message || 'No se pudo desconectar la cuenta.'
+        });
       }
-    });
-
-    try {
-      const result = await TikTokService.validateAccount(cleanUsername);
-      Swal.close();
-      setCustomUsername(result.username);
-
-      setLinkingAccountData({
-        sedeName: selectedLinkSede,
-        username: result.username,
-        displayName: result.displayName,
-        accountId: `73${Math.floor(100000000000 + Math.random() * 900000000000)}`,
-        avatarUrl: 'https://pub-63cfe435c9854d2e85c789dd3e2f6e52.r2.dev/sedes/1_3f46edff.jpg',
-        connectedAt: new Date().toLocaleString('es-CO', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        })
-      });
-
-      setLinkSubStep('authorize');
-    } catch (err: any) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Cuenta no encontrada en TikTok',
-        text: err?.message || `La cuenta ${cleanUsername} no existe en TikTok. No se puede vincular una cuenta inexistente.`,
-        confirmButtonColor: '#ef4444'
-      });
     }
   };
 
-  // --- Modal Flow Operations ---
-  const openLinkModal = (preselectedSede?: string) => {
-    if (preselectedSede) {
-      setSelectedLinkSede(preselectedSede);
-    } else if (stores.length > 0) {
-      setSelectedLinkSede(stores[0].barrio || stores[0].name);
-    }
-    setLinkStep(1);
-    setLinkSubStep('login');
-    setCustomUsername('');
-    setLinkingAccountData(null);
-    setIsLinkModalOpen(true);
-  };
-
-  const proceedToStep2 = () => {
-    if (!selectedLinkSede) {
-      Swal.fire({ icon: 'warning', title: 'Selecciona una sede', text: 'Por favor selecciona la sede que deseas vincular.' });
-      return;
-    }
-    setCustomUsername('');
-    setLinkStep(2);
-    setLinkSubStep('login');
-  };
-
-  // --- Programación Semanal Operations ---
-  const openAddScheduleModal = (defaultDate?: string) => {
-    const targetDate = defaultDate ? `${defaultDate}T10:00` : new Date().toISOString().slice(0, 16);
-    setNewSchedule({
-      sedeName: selectedSedeFilter !== 'TODAS' ? selectedSedeFilter : (stores[0]?.barrio || stores[0]?.name || 'Villa Colombia'),
-      title: '',
-      scheduledAt: targetDate,
-      duration: '0:24',
-      topic: 'Colección',
-      thumbnailUrl: 'https://pub-63cfe435c9854d2e85c789dd3e2f6e52.r2.dev/sedes/1_3f46edff.jpg',
-      notes: ''
-    });
-    setIsAddScheduleModalOpen(true);
-  };
-
-  const handleCreateScheduledVideo = async (e: React.FormEvent) => {
+  // Guardar credenciales de TikTok Developers
+  const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSchedule.title || !newSchedule.title.trim()) {
-      Swal.fire({ icon: 'warning', title: 'Título requerido', text: 'Ingresa el título de la publicación.' });
-      return;
-    }
-    if (!newSchedule.scheduledAt) {
-      Swal.fire({ icon: 'warning', title: 'Fecha requerida', text: 'Ingresa la fecha y hora de programación.' });
+    if (!inputClientKey.trim() || !inputClientSecret.trim()) {
+      Swal.fire({ icon: 'warning', text: 'El Client Key y Client Secret son requeridos.' });
       return;
     }
 
     try {
-      await TikTokService.addScheduledVideo({
-        sedeName: newSchedule.sedeName,
-        title: newSchedule.title.trim(),
-        scheduledAt: newSchedule.scheduledAt,
-        duration: newSchedule.duration || '0:24',
-        topic: newSchedule.topic || 'Colección',
-        thumbnailUrl: newSchedule.thumbnailUrl,
-        notes: newSchedule.notes,
-        status: 'PROGRAMADO'
+      await TikTokService.saveOAuthConfig({
+        clientKey: inputClientKey.trim(),
+        clientSecret: inputClientSecret.trim(),
+        redirectUri: inputRedirectUri.trim()
       });
-
-      setIsAddScheduleModalOpen(false);
-      await loadSchedule();
+      await loadOAuthConfig();
+      setIsConfigModalOpen(false);
       Swal.fire({
         icon: 'success',
-        title: '¡Publicación programada!',
-        text: `La publicación "${newSchedule.title}" se registró en el calendario de la sede ${newSchedule.sedeName}.`,
-        confirmButtonColor: '#10b981'
+        title: 'Credenciales guardadas',
+        text: 'Las credenciales de TikTok Developers fueron actualizadas correctamente.',
+        timer: 2000,
+        showConfirmButton: false
       });
     } catch (err: any) {
       Swal.fire({
         icon: 'error',
-        title: 'Error al programar',
-        text: err?.message || 'No se pudo guardar la publicación en el servidor.',
-        confirmButtonColor: '#ef4444'
+        title: 'Error al guardar',
+        text: err?.message || 'No se pudieron almacenar las credenciales.'
       });
     }
   };
 
-  const handleDeleteScheduledVideo = async (id: number, title: string) => {
+  // --- Gestión de Archivo de Video y Preview ---
+  const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('video/')) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Formato no soportado',
+        text: 'Por favor selecciona un archivo de video válido (.mp4 o .mov).'
+      });
+      return;
+    }
+
+    if (file.size > 500 * 1024 * 1024) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Archivo demasiado grande',
+        text: 'El tamaño máximo permitido por TikTok es de 500 MB.'
+      });
+      return;
+    }
+
+    // Revocar preview anterior si existía
+    if (videoPreviewUrl) {
+      URL.revokeObjectURL(videoPreviewUrl);
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setVideoFile(file);
+    setVideoPreviewUrl(previewUrl);
+
+    // Reset de portada para que tome el video nuevo
+    setCoverPreviewUrl(null);
+  };
+
+  const handleRemoveVideo = () => {
+    if (videoPreviewUrl) {
+      URL.revokeObjectURL(videoPreviewUrl);
+    }
+    setVideoFile(null);
+    setVideoPreviewUrl(null);
+    setCoverPreviewUrl(null);
+    if (videoInputRef.current) {
+      videoInputRef.current.value = '';
+    }
+  };
+
+  // Agregar hashtag chip
+  const handleAddHashtag = () => {
+    let tag = hashtagInput.trim().replace(/^#+/, '');
+    if (!tag) return;
+    if (!hashtags.includes(tag)) {
+      setHashtags([...hashtags, tag]);
+    }
+    setHashtagInput('');
+  };
+
+  const handleRemoveHashtag = (tagToRemove: string) => {
+    setHashtags(hashtags.filter(t => t !== tagToRemove));
+  };
+
+  // Capturar fotograma actual del video como portada
+  const handleCaptureFrameAsCover = () => {
+    const video = videoPlayerRef.current;
+    if (!video) return;
+
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 720;
+      canvas.height = video.videoHeight || 1280;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        setCoverPreviewUrl(dataUrl);
+        setCoverTimestampMs(Math.round(video.currentTime * 1000) || 1000);
+        Swal.fire({
+          icon: 'success',
+          title: 'Fotograma capturado',
+          text: `Se seleccionó el fotograma en el segundo ${Math.round(video.currentTime)} como portada del video.`,
+          timer: 1500,
+          showConfirmButton: false
+        });
+      }
+    } catch (e) {
+      console.error('Error al capturar fotograma:', e);
+    }
+  };
+
+  // Subir imagen personalizada para la portada
+  const handleCoverImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      if (evt.target?.result) {
+        setCoverPreviewUrl(evt.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // --- Publicación Directa o Guardar Borrador (Pantalla 2) ---
+  const handleSubmitPublish = async (isDraft: boolean = false) => {
+    if (!globalAccount?.connected) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Cuenta de TikTok requerida',
+        text: 'Primero debes conectar tu cuenta de TikTok mediante Login Kit oficial.',
+        confirmButtonText: 'Conectar cuenta',
+        confirmButtonColor: '#10b981'
+      }).then(res => {
+        if (res.isConfirmed) setActiveTab('mi_cuenta');
+      });
+      return;
+    }
+
+    if (!videoFile) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Video requerido',
+        text: 'Por favor selecciona un video de tu computador para publicar en TikTok.'
+      });
+      return;
+    }
+
+    if (!description.trim()) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Descripción requerida',
+        text: 'Ingresa una descripción para tu publicación de TikTok.'
+      });
+      return;
+    }
+
+    const formattedHashtags = hashtags.map(t => `#${t.replace(/^#+/, '')}`).join(' ');
+
+    // Caso 1: Programar publicación
+    if (publishMode === 'schedule' && !isDraft) {
+      if (!scheduleDate || !scheduleTime) {
+        Swal.fire({ icon: 'warning', text: 'Por favor define la fecha y hora para programar el video.' });
+        return;
+      }
+
+      const scheduledAtIso = `${scheduleDate}T${scheduleTime}:00`;
+      const scheduledDateObj = new Date(scheduledAtIso);
+      if (scheduledDateObj.getTime() <= Date.now()) {
+        Swal.fire({ icon: 'warning', text: 'La fecha y hora de programación debe ser en el futuro.' });
+        return;
+      }
+
+      setIsSubmitting(true);
+      Swal.fire({
+        title: 'Programando publicación en TikTok...',
+        text: 'Almacenando video y registrando tarea en el servidor de JUANDSTORE...',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      });
+
+      try {
+        const formData = new FormData();
+        formData.append('video', videoFile);
+        formData.append('title', description.trim());
+        formData.append('hashtags', formattedHashtags);
+        formData.append('privacyLevel', privacyLevel);
+        formData.append('allowComments', String(allowComments));
+        formData.append('allowDuet', String(allowDuet));
+        formData.append('allowStitch', String(allowStitch));
+        formData.append('coverTimestampMs', String(coverTimestampMs));
+        formData.append('scheduledAt', scheduledAtIso);
+        formData.append('isDraft', 'false');
+
+        await TikTokService.scheduleVideo(formData);
+        await loadSchedule(currentWeekStart);
+
+        Swal.fire({
+          icon: 'success',
+          title: '¡Video programado con éxito!',
+          html: `Tu video se publicará automáticamente en TikTok el <b>${scheduleDate}</b> a las <b>${scheduleTime}</b>.<br/><br/><span class="text-xs text-gray-500">Puedes consultar la publicación en la pestaña "Programación semanal".</span>`,
+          confirmButtonColor: '#10b981'
+        });
+
+        // Limpiar formulario
+        handleRemoveVideo();
+        setActiveTab('programacion');
+      } catch (err: any) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error al programar',
+          text: err?.message || 'No se pudo programar el video en el servidor.',
+          confirmButtonColor: '#ef4444'
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    // Caso 2: Publicación Inmediata (Directa o Borrador)
+    setIsSubmitting(true);
+    Swal.fire({
+      title: isDraft ? 'Enviando borrador a TikTok...' : 'Publicando video en TikTok...',
+      text: isDraft 
+        ? 'Transmitiendo video a TikTok Inbox API...' 
+        : 'Iniciando Content Posting API oficial y subiendo video a TikTok...',
+      allowOutsideClick: false,
+      didOpen: () => Swal.showLoading()
+    });
+
+    try {
+      const formData = new FormData();
+      formData.append('video', videoFile);
+      formData.append('title', description.trim());
+      formData.append('hashtags', formattedHashtags);
+      formData.append('privacyLevel', privacyLevel);
+      formData.append('allowComments', String(allowComments));
+      formData.append('allowDuet', String(allowDuet));
+      formData.append('allowStitch', String(allowStitch));
+      formData.append('coverTimestampMs', String(coverTimestampMs));
+      formData.append('isDraft', String(isDraft));
+
+      const res = await TikTokService.publishVideo(formData);
+      await loadHistory();
+      await loadSummary();
+
+      Swal.fire({
+        icon: 'success',
+        title: isDraft ? '¡Borrador enviado a TikTok!' : '¡Publicado con éxito en TikTok!',
+        html: `
+          <div class="text-left text-sm space-y-2">
+            <p>${res.message}</p>
+            <div class="bg-gray-100 p-2 rounded text-xs font-mono break-all text-gray-700">
+              <b>Publish ID TikTok:</b> ${res.publishId || 'Generado'}
+            </div>
+            ${isDraft ? '<p class="text-xs text-amber-600">Abre tu app oficial de TikTok en el teléfono para revisar y publicar el borrador.</p>' : ''}
+          </div>
+        `,
+        confirmButtonColor: '#10b981'
+      });
+
+      // Limpiar formulario y navegar al historial
+      handleRemoveVideo();
+      setActiveTab('historial');
+    } catch (err: any) {
+      // Manejo estricto de errores de la API oficial de TikTok
+      Swal.fire({
+        icon: 'error',
+        title: 'TikTok rechazó la publicación',
+        html: `
+          <div class="text-left text-sm space-y-3">
+            <p class="text-red-600 font-medium">${err?.message || 'Error desconocido al comunicar con TikTok.'}</p>
+            <div class="bg-amber-50 border border-amber-200 p-3 rounded text-xs text-amber-800">
+              <b>Nota de la integración oficial:</b><br/>
+              Si TikTok indica que el permiso <code>video.publish</code> no está autorizado, tu app de TikTok Developers debe recibir aprobación para publicación directa o tu cuenta debe estar registrada como Tester en la consola de TikTok Developers.
+            </div>
+          </div>
+        `,
+        confirmButtonColor: '#ef4444'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Eliminar video programado
+  const handleDeleteScheduled = async (id: number) => {
     const confirm = await Swal.fire({
-      title: '¿Eliminar publicación?',
-      text: `¿Deseas eliminar la publicación programada "${title}"?`,
+      title: '¿Eliminar publicación programada?',
+      text: 'Esta acción cancelará la publicación automática del video.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Sí, eliminar',
@@ -426,2022 +646,1338 @@ export default function TikTokAdmin() {
     if (confirm.isConfirmed) {
       try {
         await TikTokService.deleteScheduledVideo(id);
-        await loadSchedule();
+        await loadSchedule(currentWeekStart);
         Swal.fire({
           icon: 'success',
           title: 'Eliminado',
-          text: 'La publicación programada ha sido eliminada.',
-          confirmButtonColor: '#10b981'
+          text: 'La publicación programada fue cancelada correctamente.',
+          timer: 1500,
+          showConfirmButton: false
         });
       } catch (err: any) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: err?.message || 'No se pudo eliminar la publicación.'
-        });
+        Swal.fire({ icon: 'error', text: err?.message || 'No se pudo eliminar el video programado.' });
       }
     }
   };
 
-  const handleOAuthAuthorize = () => {
-    if (!linkingAccountData) return;
-    setLinkSubStep('success');
-  };
-
-  const proceedToStep3 = () => {
-    setLinkStep(3);
-  };
-
-  const handleFinalizeConnection = async () => {
-    if (!linkingAccountData) return;
-    try {
-      const storeMatch = stores.find(s => (s.barrio || s.name) === linkingAccountData.sedeName);
-      await TikTokService.linkAccount({
-        sedeId: storeMatch?.id ? Number(storeMatch.id) : undefined,
-        sedeName: linkingAccountData.sedeName,
-        username: linkingAccountData.username,
-        displayName: linkingAccountData.displayName,
-        accountId: linkingAccountData.accountId,
-        avatarUrl: linkingAccountData.avatarUrl,
-        accessToken: `act_${Date.now()}_tiktok_oauth`
-      });
-
-      await loadAccounts();
-      await loadSummary();
-      await loadSchedule();
-      await loadHistory();
-
-      setIsLinkModalOpen(false);
-      Swal.fire({
-        icon: 'success',
-        title: '¡Cuenta vinculada exitosamente!',
-        text: `La cuenta de TikTok para la sede ${linkingAccountData.sedeName} ha sido vinculada en la base de datos.`,
-        confirmButtonColor: '#10b981'
-      });
-    } catch (err: any) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error al vincular',
-        text: err?.message || 'No se pudo guardar la vinculación en el servidor.',
-        confirmButtonColor: '#ef4444'
-      });
-    }
-  };
-
-  const handleDisconnect = async (accountId: number, sedeName: string) => {
-    const res = await Swal.fire({
-      title: '¿Desconectar cuenta?',
-      text: `Se desvinculará la cuenta de TikTok de la sede ${sedeName}.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Sí, desconectar',
-      cancelButtonText: 'Cancelar'
-    });
-    if (res.isConfirmed) {
-      try {
-        await TikTokService.disconnectAccount(accountId);
-        await loadAccounts();
-        await loadSummary();
-        await loadSchedule();
-        await loadHistory();
-        Swal.fire({ icon: 'success', title: 'Desconectada', text: 'La cuenta ha sido desvinculada.', confirmButtonColor: '#10b981' });
-      } catch {
-        Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo desvincular la cuenta.', confirmButtonColor: '#ef4444' });
-      }
-    }
-  };
-
-  // --- Day Note Save ---
-  const openNoteModal = (dateStr: string, currentNote?: string) => {
-    setNoteTargetDate(dateStr);
-    setNoteContent(currentNote || '');
-    setIsNoteModalOpen(true);
-  };
-
-  const handleSaveNote = async () => {
-    if (!selectedSedeFilter || selectedSedeFilter === 'TODAS') {
-      Swal.fire({ icon: 'warning', title: 'Selecciona una sede', text: 'Para asignar una nota diaria, selecciona una sede específica en el filtro superior.' });
-      return;
-    }
-    try {
-      await TikTokService.saveDayNote({
-        sedeName: selectedSedeFilter,
-        date: noteTargetDate,
-        note: noteContent
-      });
-      setIsNoteModalOpen(false);
-      await loadSchedule();
-      Swal.fire({ icon: 'success', title: 'Nota guardada', timer: 1200, showConfirmButton: false });
-    } catch {
-      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo guardar la nota.' });
-    }
-  };
-
-  // --- Export CSV ---
-  const exportHistoryCSV = () => {
-    if (historyVideos.length === 0) {
-      Swal.fire({ icon: 'info', title: 'Sin publicaciones', text: 'No hay videos en el historial para exportar.' });
-      return;
-    }
-    const headers = ['Video', 'Sede', 'Fecha', 'Visualizaciones', 'Me gusta', 'Comentarios', 'Compartidos'];
-    const rows = historyVideos.map(v => [
-      `"${v.title.replace(/"/g, '""')}"`,
-      `"${v.sedeName}"`,
-      `"${v.publishedAt}"`,
-      v.viewCount,
-      v.likeCount,
-      v.commentCount,
-      v.shareCount
-    ]);
-    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `reporte_tiktok_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Format numbers (e.g. 312480 -> "312.480")
-  const formatNum = (val?: number) => {
-    if (val === undefined || val === null) return '0';
-    return val.toLocaleString('es-CO');
+  // Navegación de semanas en el calendario
+  const handleWeekChange = (offsetDays: number) => {
+    const current = new Date(currentWeekStart);
+    current.setDate(current.getDate() + offsetDays);
+    const newStart = current.toISOString().split('T')[0];
+    setCurrentWeekStart(newStart);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50/60 pb-24">
-      {/* Top Header Bar Matching Screenshots */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-black text-white flex items-center justify-center font-bold shadow-xs">
-              <TikTokLogoIcon className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
-                CONTROL TIKTOK
-              </h1>
-              <p className="text-xs text-gray-500">
-                {activeTab === 'resumen' && 'Supervisión de contenido por sede • Solo lectura'}
-                {activeTab === 'cuentas' && 'Supervisión de cuentas • Solo lectura'}
-                {activeTab === 'programacion' && 'Supervisión de contenido por sede • Solo lectura'}
-                {activeTab === 'historial' && 'Supervisión de contenido por sede • Solo lectura'}
-              </p>
-            </div>
+    <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+      
+      {/* ============================================================ */}
+      {/* HEADER SUPERIOR CON TITULO Y TABS                           */}
+      {/* ============================================================ */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 bg-black text-white rounded-xl flex items-center justify-center shadow-md">
+            <TikTokLogoIcon className="w-6 h-6 text-white" />
           </div>
-
-          <div className="flex items-center gap-3">
-            <div className="px-3.5 py-1.5 bg-gray-100 border border-gray-200 text-gray-700 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-2xs">
-              <Lock className="w-3.5 h-3.5 text-gray-500" />
-              Administrador Global
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">CONTROL TIKTOK</h1>
+              <span className="px-2 py-0.5 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">
+                Oficial OAuth 2.0
+              </span>
             </div>
-            <div className="relative p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 cursor-pointer">
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-700">
-              <User className="w-4 h-4" />
-            </div>
+            <p className="text-xs md:text-sm text-gray-500 font-medium">
+              Gestión de contenido y publicaciones en TikTok
+            </p>
           </div>
         </div>
 
-        {/* 4 Tabs Matching Screenshots */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-1 overflow-x-auto border-t border-gray-100 py-2 scrollbar-none">
-          {[
-            { id: 'resumen', label: 'Resumen', icon: BarChart3 },
-            { id: 'cuentas', label: 'Cuentas vinculadas', icon: LinkIcon },
-            { id: 'programacion', label: 'Programación semanal', icon: Calendar },
-            { id: 'historial', label: 'Historial', icon: Clock }
-          ].map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
-                  isActive
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            );
-          })}
+        <div className="flex items-center gap-3">
+          {/* Badge Administrador Global */}
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg text-xs font-semibold text-gray-700 border border-gray-200">
+            <User className="w-4 h-4 text-gray-500" />
+            <span>Administrador Global</span>
+          </div>
+
+          {/* Botón Configuración de Credenciales */}
+          <button
+            onClick={() => setIsConfigModalOpen(true)}
+            title="Configurar credenciales de TikTok Developers"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-lg text-xs font-semibold shadow-sm transition-colors"
+          >
+            <Settings className="w-4 h-4 text-gray-500" />
+            <span>Credenciales API</span>
+          </button>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 mt-6">
+      {/* TABS DE NAVEGACION (Matching Screenshot 2) */}
+      <div className="flex items-center gap-2 border-b border-gray-200 pb-2 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('resumen')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-bold transition-all whitespace-nowrap ${
+            activeTab === 'resumen'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          <span>Resumen</span>
+        </button>
 
-        {/* ========================================================================= */}
-        {/* TAB 1: CUENTAS VINCULADAS (Images 1 & 3) */}
-        {/* ========================================================================= */}
-        {activeTab === 'cuentas' && (
-          <div className="space-y-6">
-            {/* Header Card */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                    <LinkIcon className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-base font-extrabold text-gray-900">Cuentas de TikTok por sede</h2>
-                    <p className="text-xs text-gray-500">Conecta y administra las cuentas oficiales de cada sede.</p>
-                  </div>
-                </div>
+        <button
+          onClick={() => setActiveTab('mi_cuenta')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-bold transition-all whitespace-nowrap ${
+            activeTab === 'mi_cuenta'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+          }`}
+        >
+          <User className="w-4 h-4" />
+          <span>Mi cuenta</span>
+          {globalAccount?.connected && (
+            <span className="w-2 h-2 rounded-full bg-emerald-300 ring-2 ring-white"></span>
+          )}
+        </button>
 
-                <button
-                  type="button"
-                  onClick={() => openLinkModal()}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
-                >
-                  <Plus className="w-4 h-4" />
-                  Vincular cuenta
-                </button>
+        <button
+          onClick={() => setActiveTab('publicar')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-bold transition-all whitespace-nowrap ${
+            activeTab === 'publicar'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+          }`}
+        >
+          <UploadCloud className="w-4 h-4" />
+          <span>Publicar video</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('programacion')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-bold transition-all whitespace-nowrap ${
+            activeTab === 'programacion'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          <span>Programación semanal</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('historial')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-bold transition-all whitespace-nowrap ${
+            activeTab === 'historial'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+          }`}
+        >
+          <Clock className="w-4 h-4" />
+          <span>Historial</span>
+        </button>
+      </div>
+
+      {/* ============================================================ */}
+      {/* PESTAÑA: MI CUENTA (Matching Screenshot 1)                   */}
+      {/* ============================================================ */}
+      {activeTab === 'mi_cuenta' && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* Banner explicativo con 3 pasos (Matching Image 1) */}
+          <div className="bg-gradient-to-r from-gray-900 via-gray-800 to-black rounded-2xl p-6 text-white shadow-lg">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-5 border-b border-gray-700/60">
+              <div>
+                <h2 className="text-lg md:text-xl font-black tracking-tight text-white flex items-center gap-2">
+                  <span>Conexión de tu cuenta de TikTok (Real)</span>
+                </h2>
+                <p className="text-xs md:text-sm text-gray-300 mt-1">
+                  Conecta tu cuenta oficial de TikTok a JUANDSTORE mediante la autorización oficial de TikTok (OAuth 2.0).
+                </p>
               </div>
-
-              {/* Sedes Table / List */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-gray-50 text-gray-400 uppercase text-[10px] tracking-wider border-y border-gray-100">
-                    <tr>
-                      <th className="py-3 px-4">Sede</th>
-                      <th className="py-3 px-4">Cuenta vinculada</th>
-                      <th className="py-3 px-4">Estado</th>
-                      <th className="py-3 px-4 text-right">Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 text-gray-700">
-                    {accounts.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="py-8 text-center text-gray-400">
-                          No se encontraron sedes configuradas.
-                        </td>
-                      </tr>
-                    ) : (
-                      accounts.map((acc, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50/70 transition-colors">
-                          <td className="py-4 px-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                                <StoreIcon className="w-4 h-4" />
-                              </div>
-                              <span className="font-extrabold text-gray-900 text-sm">
-                                {acc.sedeName}
-                              </span>
-                            </div>
-                          </td>
-
-                          <td className="py-4 px-4">
-                            {acc.connected ? (
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-7 h-7 rounded-full bg-black text-white flex items-center justify-center text-[10px] font-bold shrink-0">
-                                  <TikTokLogoIcon className="w-3.5 h-3.5" />
-                                </div>
-                                <div>
-                                  <strong className="block text-gray-900">{acc.username}</strong>
-                                  <span className="text-[10px] text-gray-400 block">{acc.displayName}</span>
-                                </div>
-                              </div>
-                            ) : (
-                              <span className="text-gray-400 italic text-[11px]">Ninguna cuenta vinculada</span>
-                            )}
-                          </td>
-
-                          <td className="py-4 px-4">
-                            {acc.connected ? (
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                Conectada
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-gray-100 text-gray-600">
-                                <Unlink className="w-3.5 h-3.5 text-gray-400" />
-                                Sin vincular
-                              </span>
-                            )}
-                          </td>
-
-                          <td className="py-4 px-4 text-right">
-                            {acc.connected ? (
-                              <button
-                                type="button"
-                                onClick={() => handleDisconnect(acc.accountId!, acc.sedeName)}
-                                className="px-3 py-1.5 bg-white hover:bg-red-50 border border-gray-200 hover:border-red-200 text-gray-600 hover:text-red-600 text-xs font-semibold rounded-lg shadow-2xs transition-colors cursor-pointer"
-                              >
-                                Desconectar
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => openLinkModal(acc.sedeName)}
-                                className="px-3.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-xs font-bold rounded-lg shadow-2xs flex items-center gap-1.5 ml-auto transition-colors cursor-pointer"
-                              >
-                                <LinkIcon className="w-3.5 h-3.5 text-gray-500" />
-                                Vincular
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/20 border border-emerald-400/40 rounded-full text-emerald-300 text-xs font-semibold whitespace-nowrap">
+                <ShieldCheck className="w-4 h-4" />
+                <span>Proceso oficial y seguro</span>
               </div>
             </div>
 
-            {/* Bottom Banner: Programación futura notice */}
-            <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                  <Calendar className="w-5 h-5" />
+            {/* 3 Pasos Ilustrativos */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-gray-800/80 border border-gray-700/60 rounded-xl p-4 flex items-start gap-3">
+                <div className="w-7 h-7 rounded-full bg-emerald-500 text-black font-black flex items-center justify-center shrink-0 text-sm">
+                  1
                 </div>
                 <div>
-                  <h4 className="text-xs font-extrabold text-gray-900">Programación futura: No disponible mediante API pública</h4>
-                  <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">
-                    TikTok no ofrece actualmente un acceso oficial para consultar automáticamente los videos programados en TikTok Studio.
+                  <h3 className="text-xs md:text-sm font-bold text-white">Inicia la conexión</h3>
+                  <p className="text-xs text-gray-300 mt-1 leading-relaxed">
+                    En JUANDSTORE, ve a Control TikTok &gt; Mi cuenta y haz clic en "Conectar con TikTok".
                   </p>
                 </div>
               </div>
 
-              <a
-                href="https://www.tiktok.com/tiktokstudio"
-                target="_blank"
-                rel="noreferrer"
-                className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-xs font-bold rounded-xl shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
-              >
-                <ExternalLink className="w-3.5 h-3.5 text-gray-500" />
-                Consultar en TikTok Studio
-              </a>
+              <div className="bg-gray-800/80 border border-gray-700/60 rounded-xl p-4 flex items-start gap-3">
+                <div className="w-7 h-7 rounded-full bg-emerald-500 text-black font-black flex items-center justify-center shrink-0 text-sm">
+                  2
+                </div>
+                <div>
+                  <h3 className="text-xs md:text-sm font-bold text-white">Autoriza en TikTok</h3>
+                  <p className="text-xs text-gray-300 mt-1 leading-relaxed">
+                    Serás redirigido a la página oficial de TikTok, inicia sesión y autoriza los permisos solicitados.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-gray-800/80 border border-gray-700/60 rounded-xl p-4 flex items-start gap-3">
+                <div className="w-7 h-7 rounded-full bg-emerald-500 text-black font-black flex items-center justify-center shrink-0 text-sm">
+                  3
+                </div>
+                <div>
+                  <h3 className="text-xs md:text-sm font-bold text-white">Cuenta conectada</h3>
+                  <p className="text-xs text-gray-300 mt-1 leading-relaxed">
+                    Regresarás automáticamente a JUANDSTORE y verás tu cuenta vinculada.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
-        )}
 
-        {/* ========================================================================= */}
-        {/* TAB 2: RESUMEN (Image 4) */}
-        {/* ========================================================================= */}
-        {activeTab === 'resumen' && (
-          <div className="space-y-6">
-            {/* Header + Filters */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-black text-gray-900">Resumen general</h2>
-                <p className="text-xs text-gray-500">Rendimiento de videos publicados en TikTok por sede.</p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                {/* Sede selector */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-semibold text-gray-500">Sede:</span>
-                  <div className="relative">
-                    <select
-                      value={selectedSedeFilter}
-                      onChange={e => setSelectedSedeFilter(e.target.value)}
-                      className="pl-8 pr-4 py-1.5 text-xs font-bold border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                    >
-                      <option value="TODAS">Todas las sedes</option>
-                      {stores.map(s => (
-                        <option key={s.id} value={s.barrio || s.name}>{s.barrio || s.name}</option>
-                      ))}
-                    </select>
-                    <StoreIcon className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5 pointer-events-none" />
-                  </div>
-                </div>
-
-                {/* Period selector */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-semibold text-gray-500">Período de publicación:</span>
-                  <div className="relative">
-                    <select
-                      value={summaryPeriod}
-                      onChange={e => setSummaryPeriod(e.target.value)}
-                      className="pl-8 pr-4 py-1.5 text-xs font-bold border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                    >
-                      <option value="ESTA_SEMANA">Esta semana</option>
-                      <option value="ESTE_MES">Este mes</option>
-                      <option value="ULTIMOS_30_DIAS">Últimos 30 días</option>
-                      <option value="HISTORICO">Todo el histórico</option>
-                    </select>
-                    <Calendar className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5 pointer-events-none" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 5 Metric Cards Matching Image 4 */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-              <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <Play className="w-5 h-5 fill-emerald-600 text-emerald-600" />
-                </div>
+          {/* Estado de la Cuenta: NO CONECTADA (Matching Image 1 Left Screen) */}
+          {!globalAccount?.connected ? (
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 md:p-8">
+              <div className="flex items-center justify-between pb-6 border-b border-gray-100">
                 <div>
-                  <span className="text-xl font-black text-gray-900 block">
-                    {formatNum(summary?.videosPublicados || 0)}
-                  </span>
-                  <span className="text-[11px] text-gray-500 font-semibold block">Videos publicados</span>
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <Eye className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-xl font-black text-gray-900 block">
-                    {formatNum(summary?.visualizacionesAcumuladas || 0)}
-                  </span>
-                  <span className="text-[11px] text-gray-500 font-semibold block">Visualizaciones acumuladas</span>
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <Heart className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-xl font-black text-gray-900 block">
-                    {formatNum(summary?.meGusta || 0)}
-                  </span>
-                  <span className="text-[11px] text-gray-500 font-semibold block">Me gusta</span>
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <MessageCircle className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-xl font-black text-gray-900 block">
-                    {formatNum(summary?.comentarios || 0)}
-                  </span>
-                  <span className="text-[11px] text-gray-500 font-semibold block">Comentarios</span>
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <Share2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-xl font-black text-gray-900 block">
-                    {formatNum(summary?.compartidos || 0)}
-                  </span>
-                  <span className="text-[11px] text-gray-500 font-semibold block">Compartidos</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Visualizations Row (3 Columns: Bar Chart + Donut Chart + Info Card) */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-              {/* Col 1: Visualizaciones por sede (5 cols) */}
-              <div className="lg:col-span-5 bg-white p-5 rounded-2xl border border-gray-200 shadow-2xs flex flex-col justify-between">
-                <div>
-                  <h4 className="text-xs font-extrabold text-gray-900">Visualizaciones por sede</h4>
-                  <p className="text-[11px] text-gray-400">Comparativo de visualizaciones acumuladas en el período.</p>
-                </div>
-
-                <div className="mt-6 space-y-3">
-                  {(!summary?.viewsBySede || summary.viewsBySede.length === 0 || summary.visualizacionesAcumuladas === 0) ? (
-                    <div className="py-10 text-center text-xs text-gray-400">
-                      No hay visualizaciones registradas en este período.
-                    </div>
-                  ) : (
-                    summary.viewsBySede.map((item, idx) => {
-                      const maxViews = Math.max(...summary.viewsBySede.map(i => i.views), 1);
-                      const barPct = Math.round((item.views / maxViews) * 100);
-                      return (
-                        <div key={idx} className="space-y-1">
-                          <div className="flex items-center justify-between text-xs font-semibold">
-                            <span className="text-gray-700">{item.sede}</span>
-                            <span className="text-gray-900 font-bold">{formatNum(item.views)}</span>
-                          </div>
-                          <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
-                            <div
-                              style={{ width: `${Math.max(4, barPct)}%` }}
-                              className="bg-emerald-600 h-full rounded-full transition-all"
-                            ></div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-
-              {/* Col 2: Distribución de visualizaciones Donut (4 cols) */}
-              <div className="lg:col-span-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-2xs flex flex-col justify-between">
-                <div>
-                  <h4 className="text-xs font-extrabold text-gray-900">Distribución de visualizaciones</h4>
-                  <p className="text-[11px] text-gray-400">Porcentaje de visualizaciones por sede.</p>
-                </div>
-
-                <div className="flex items-center gap-4 py-3 my-auto">
-                  <div className="relative w-28 h-28 flex items-center justify-center shrink-0">
-                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                      <circle
-                        cx="18"
-                        cy="18"
-                        r="15.9155"
-                        className="text-gray-100"
-                        strokeWidth="3.8"
-                        stroke="currentColor"
-                        fill="none"
-                      />
-                      {(summary?.visualizacionesAcumuladas || 0) > 0 && (
-                        <circle
-                          cx="18"
-                          cy="18"
-                          r="15.9155"
-                          className="text-emerald-600"
-                          strokeDasharray="75, 100"
-                          strokeWidth="3.8"
-                          stroke="currentColor"
-                          fill="none"
-                        />
-                      )}
-                    </svg>
-                    <div className="absolute flex flex-col items-center">
-                      <span className="text-sm font-black text-gray-900 text-center leading-tight">
-                        {formatNum(summary?.visualizacionesAcumuladas || 0)}
-                      </span>
-                      <span className="text-[8px] text-gray-400 font-bold uppercase">Visualizaciones</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5 text-xs text-gray-700">
-                    {summary?.viewsBySede && summary.viewsBySede.map((item, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <span className={`w-2.5 h-2.5 rounded-full ${
-                          idx === 0 ? 'bg-emerald-700' : idx === 1 ? 'bg-emerald-500' : idx === 2 ? 'bg-emerald-400' : 'bg-emerald-300'
-                        }`}></span>
-                        <span className="truncate max-w-[110px]">{item.sede}: <strong>{item.percentage}%</strong></span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Col 3: Importante card (3 cols) */}
-              <div className="lg:col-span-3 bg-white p-5 rounded-2xl border border-gray-200 shadow-2xs flex flex-col justify-center">
-                <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-2">
-                  <div className="flex items-center gap-2 text-emerald-800 font-extrabold text-xs">
-                    <AlertCircle className="w-4 h-4 text-emerald-600" />
-                    <span>Importante</span>
-                  </div>
-                  <p className="text-[11px] text-emerald-950 leading-relaxed">
-                    Datos ilustrativos • métricas acumuladas actuales de videos publicados en el período; no son vistas generadas durante el período.
+                  <h2 className="text-lg font-black text-gray-900">Mi cuenta de TikTok</h2>
+                  <p className="text-xs md:text-sm text-gray-500 mt-0.5">
+                    Conecta tu cuenta oficial para publicar y gestionar tu contenido.
                   </p>
                 </div>
+                <span className="px-3 py-1 text-xs font-bold rounded-full bg-gray-100 text-gray-600 border border-gray-200 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-gray-400"></span>
+                  Sin conectar
+                </span>
               </div>
-            </div>
 
-            {/* Bottom Table: Últimos videos publicados */}
-            <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-2xs space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-extrabold text-gray-900 flex items-center gap-2">
-                    <Play className="w-4 h-4 text-emerald-600" />
-                    Últimos videos publicados
-                  </h3>
-                  <p className="text-[11px] text-gray-400">Videos de la(s) sede(s) seleccionada(s) en el período.</p>
+              {/* Caja Central de Conexión TikTok */}
+              <div className="py-12 px-4 max-w-md mx-auto text-center flex flex-col items-center">
+                <div className="w-20 h-20 bg-black text-white rounded-3xl flex items-center justify-center shadow-xl mb-5 hover:scale-105 transition-transform">
+                  <TikTokLogoIcon className="w-10 h-10" />
                 </div>
+                
+                <h3 className="text-xl font-black text-gray-900 mb-2">Conecta tu cuenta de TikTok</h3>
+                <p className="text-xs md:text-sm text-gray-500 mb-6 leading-relaxed">
+                  Vincula tu cuenta oficial de forma segura con TikTok Login Kit. No almacenamos contraseñas dentro de JUANDSTORE.
+                </p>
 
                 <button
-                  type="button"
-                  onClick={() => setActiveTab('historial')}
-                  className="text-xs font-bold text-gray-600 hover:text-emerald-700 flex items-center gap-1 cursor-pointer"
+                  onClick={handleConnectWithTikTok}
+                  className="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2.5"
                 >
-                  Ver todos →
+                  <TikTokLogoIcon className="w-5 h-5 text-white" />
+                  <span>Conectar con TikTok</span>
                 </button>
+
+                <p className="text-xs text-gray-400 mt-4 flex items-center justify-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  <span>Serás redirigido a TikTok para iniciar sesión y autorizar los permisos.</span>
+                </p>
+
+                <div className="mt-8 pt-6 border-t border-gray-100 w-full text-center">
+                  <button
+                    onClick={() => setIsConfigModalOpen(true)}
+                    className="text-xs text-gray-500 hover:text-emerald-600 font-semibold inline-flex items-center gap-1 underline underline-offset-2"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                    <span>Configurar Client Key y Secret de TikTok Developers</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Estado de la Cuenta: CONECTADA (Matching Image 1 Right Screen) */
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 md:p-8">
+              <div className="flex items-center justify-between pb-6 border-b border-gray-100">
+                <div>
+                  <h2 className="text-lg font-black text-gray-900">Mi cuenta de TikTok</h2>
+                  <p className="text-xs md:text-sm text-gray-500 mt-0.5">
+                    Cuenta vinculada para publicar y gestionar tu contenido.
+                  </p>
+                </div>
+                <span className="px-3 py-1 text-xs font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5" />
+                  Conectada
+                </span>
               </div>
 
-              {(!summary?.recentVideos || summary.recentVideos.length === 0) ? (
-                <div className="py-12 text-center text-gray-400 text-xs border-2 border-dashed border-gray-100 rounded-xl">
-                  No hay videos publicados registrados para esta consulta.
+              {/* Ficha de Usuario Conectado */}
+              <div className="py-6 max-w-xl mx-auto">
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 space-y-6">
+                  {/* Avatar y Nombre */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      {globalAccount.avatarUrl ? (
+                        <img
+                          src={globalAccount.avatarUrl}
+                          alt={globalAccount.username}
+                          className="w-16 h-16 rounded-full object-cover ring-2 ring-emerald-500 shadow"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-full bg-black text-white flex items-center justify-center text-xl font-black shadow">
+                          <TikTokLogoIcon className="w-8 h-8" />
+                        </div>
+                      )}
+                      <div>
+                        <h3 className="text-lg font-black text-gray-900">
+                          {globalAccount.username || '@tu_cuenta'}
+                        </h3>
+                        <p className="text-xs text-gray-500 font-medium">
+                          {globalAccount.displayName || 'Cuenta de TikTok'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-gray-400">
+                      <MoreVertical className="w-5 h-5" />
+                    </div>
+                  </div>
+
+                  {/* Detalles de la Conexión */}
+                  <div className="space-y-3 pt-4 border-t border-gray-200/80 text-xs text-gray-700">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500 flex items-center gap-1.5 font-medium">
+                        <Calendar className="w-4 h-4 text-gray-400" />
+                        Conectada el:
+                      </span>
+                      <span className="font-bold text-gray-900">
+                        {globalAccount.connectedAt ? new Date(globalAccount.connectedAt).toLocaleDateString('es-CO', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric'
+                        }) : 'Recientemente'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-start justify-between gap-4">
+                      <span className="text-gray-500 flex items-center gap-1.5 font-medium shrink-0">
+                        <ShieldCheck className="w-4 h-4 text-gray-400" />
+                        Permisos:
+                      </span>
+                      <span className="font-semibold text-gray-900 text-right">
+                        {globalAccount.permissions || 'Perfil, carga y publicación de videos'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-gray-500 flex items-center gap-1.5 font-medium">
+                        <Lock className="w-4 h-4 text-gray-400" />
+                        Estado API:
+                      </span>
+                      <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                        globalAccount.canPublishDirectly
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {globalAccount.canPublishDirectly ? '✓ Publicación directa activa' : 'Borradores activos · video.publish en revisión'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Acciones de la cuenta */}
+                  <div className="pt-4 border-t border-gray-200/80 flex flex-col sm:flex-row gap-3">
+                    <button
+                      onClick={handleDisconnect}
+                      className="flex-1 px-4 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Unlink className="w-4 h-4" />
+                      <span>Desconectar cuenta</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('publicar')}
+                      className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-sm transition-colors flex items-center justify-center gap-2"
+                    >
+                      <UploadCloud className="w-4 h-4" />
+                      <span>Publicar un video</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Banner Importante al pie */}
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-xs text-emerald-900 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold">Importante</p>
+              <p className="text-emerald-800 mt-0.5 leading-relaxed">
+                Esta es la forma real y segura de conectar tu cuenta. La publicación de videos depende de los permisos que otorgues y, en algunos casos, de la aprobación de TikTok según sus políticas de Content Posting API.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* PESTAÑA: PUBLICAR VIDEO (Matching Screenshot 2)              */}
+      {/* ============================================================ */}
+      {activeTab === 'publicar' && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* Header de la sección */}
+          <div>
+            <h2 className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
+              <UploadCloud className="w-6 h-6 text-emerald-600" />
+              <span>Publicar video</span>
+            </h2>
+            <p className="text-xs md:text-sm text-gray-500 mt-0.5">
+              Sube y publica tu contenido en TikTok desde JUANDSTORE.
+            </p>
+          </div>
+
+          {/* Grid de 3 Columnas (Matching Screenshot 2) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            {/* ---------------------------------------------------- */}
+            {/* COLUMNA 1 (Izquierda): SUBE TU VIDEO Y PREVIEW       */}
+            {/* ---------------------------------------------------- */}
+            <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                <h3 className="text-sm font-black text-gray-900">Sube tu video</h3>
+                {videoFile && (
+                  <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
+                    {(videoFile.size / (1024 * 1024)).toFixed(1)} MB
+                  </span>
+                )}
+              </div>
+
+              {/* Input oculto de archivo */}
+              <input
+                ref={videoInputRef}
+                type="file"
+                accept="video/mp4,video/quicktime,.mp4,.mov"
+                onChange={handleVideoSelect}
+                className="hidden"
+              />
+
+              {/* Dropzone de subida */}
+              {!videoPreviewUrl ? (
+                <div
+                  onClick={() => videoInputRef.current?.click()}
+                  className="border-2 border-dashed border-gray-300 hover:border-emerald-500 bg-gray-50 hover:bg-emerald-50/20 rounded-2xl p-8 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[260px] group"
+                >
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <UploadCloud className="w-7 h-7" />
+                  </div>
+                  <p className="text-xs font-bold text-gray-800 mb-1">
+                    Arrastra y suelta el archivo aquí o haz clic para seleccionarlo
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-3 px-4 py-2 border border-emerald-500 text-emerald-700 bg-white hover:bg-emerald-50 rounded-lg text-xs font-bold shadow-sm transition-colors"
+                  >
+                    Seleccionar archivo
+                  </button>
+                  <div className="mt-5 text-[11px] text-gray-400 space-y-0.5">
+                    <p>Formatos: MP4, MOV | Peso máximo: 500 MB</p>
+                    <p>Duración recomendada: 5 s - 10 min</p>
+                  </div>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-gray-50 text-gray-400 uppercase text-[10px] tracking-wider border-y border-gray-100">
-                      <tr>
-                        <th className="py-2.5 px-3">Video</th>
-                        <th className="py-2.5 px-3">Sede</th>
-                        <th className="py-2.5 px-3">Fecha de publicación</th>
-                        <th className="py-2.5 px-3">Visualizaciones</th>
-                        <th className="py-2.5 px-3">Me gusta</th>
-                        <th className="py-2.5 px-3">Comentarios</th>
-                        <th className="py-2.5 px-3">Compartidos</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 text-gray-700">
-                      {summary.recentVideos.map((v) => (
-                        <tr key={v.id} className="hover:bg-gray-50/70 transition-colors">
-                          <td className="py-3 px-3">
-                            <div className="flex items-center gap-3">
-                              <div className="relative w-12 h-14 rounded-lg bg-gray-900 overflow-hidden shrink-0">
-                                {v.thumbnailUrl ? (
-                                  <img src={v.thumbnailUrl} alt={v.title} className="w-full h-full object-cover" />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center text-gray-600">
-                                    <Play className="w-5 h-5" />
-                                  </div>
-                                )}
-                                <span className="absolute bottom-1 right-1 bg-black/80 text-white text-[8px] font-bold px-1 rounded">
-                                  {v.duration || '0:24'}
-                                </span>
-                              </div>
-                              <div>
-                                <strong className="block text-gray-900 text-xs">{v.title}</strong>
-                                {v.hashtags && (
-                                  <span className="text-[10px] text-gray-400 block truncate max-w-[200px]">
-                                    {v.hashtags}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </td>
+                /* Video Player Preview con botón papelera (Matching Image 2) */
+                <div className="space-y-3">
+                  <div className="relative rounded-2xl overflow-hidden bg-black aspect-[9/16] max-h-[460px] flex items-center justify-center group shadow-md">
+                    <video
+                      ref={videoPlayerRef}
+                      src={videoPreviewUrl}
+                      controls
+                      playsInline
+                      className="w-full h-full object-contain"
+                    />
 
-                          <td className="py-3 px-3 font-semibold text-gray-800">{v.sedeName}</td>
+                    {/* Botón papelera en esquina superior derecha */}
+                    <button
+                      type="button"
+                      onClick={handleRemoveVideo}
+                      title="Quitar video"
+                      className="absolute top-3 right-3 p-2 bg-black/70 hover:bg-red-600 text-white rounded-full backdrop-blur-sm transition-all shadow-md"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
 
-                          <td className="py-3 px-3 text-gray-500">
-                            {v.publishedAt ? new Date(v.publishedAt).toLocaleDateString('es-CO', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                              hour: 'numeric',
-                              minute: '2-digit'
-                            }) : 'Reciente'}
-                          </td>
-
-                          <td className="py-3 px-3 font-bold text-gray-900">
-                            <span className="flex items-center gap-1">
-                              <Eye className="w-3.5 h-3.5 text-gray-400" />
-                              {formatNum(v.viewCount)}
-                            </span>
-                          </td>
-
-                          <td className="py-3 px-3 text-gray-700">
-                            <span className="flex items-center gap-1">
-                              <Heart className="w-3.5 h-3.5 text-gray-400" />
-                              {formatNum(v.likeCount)}
-                            </span>
-                          </td>
-
-                          <td className="py-3 px-3 text-gray-700">
-                            <span className="flex items-center gap-1">
-                              <MessageCircle className="w-3.5 h-3.5 text-gray-400" />
-                              {formatNum(v.commentCount)}
-                            </span>
-                          </td>
-
-                          <td className="py-3 px-3 text-gray-700">
-                            <span className="flex items-center gap-1">
-                              <Share2 className="w-3.5 h-3.5 text-gray-400" />
-                              {formatNum(v.shareCount)}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className="flex items-center justify-between text-xs text-gray-500 px-1">
+                    <span className="truncate max-w-[200px] font-medium text-gray-700">
+                      {videoFile?.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => videoInputRef.current?.click()}
+                      className="text-emerald-600 font-bold hover:underline"
+                    >
+                      Cambiar video
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
-          </div>
-        )}
 
-        {/* ========================================================================= */}
-        {/* TAB 3: PROGRAMACIÓN SEMANAL - TIKTOK STUDIO (Image 5) */}
-        {/* ========================================================================= */}
-        {activeTab === 'programacion' && (
-          <div className="space-y-6">
-            {/* Header + Filters */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-black text-gray-900">Programación semanal</h2>
-                <p className="text-xs text-gray-500">Consulta la programación de publicaciones por sede en TikTok Studio.</p>
+            {/* ---------------------------------------------------- */}
+            {/* COLUMNA 2 (Centro): DETALLES DEL VIDEO               */}
+            {/* ---------------------------------------------------- */}
+            <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-5">
+              <div className="flex items-center gap-2 pb-3 border-b border-gray-100">
+                <FileText className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-sm font-black text-gray-900">Detalles del video</h3>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                {/* Sede selector */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-semibold text-gray-500">Sede:</span>
-                  <div className="relative">
-                    <select
-                      value={selectedSedeFilter}
-                      onChange={e => setSelectedSedeFilter(e.target.value)}
-                      className="pl-8 pr-4 py-1.5 text-xs font-bold border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                    >
-                      <option value="TODAS">Todas las sedes</option>
-                      {stores.map(s => (
-                        <option key={s.id} value={s.barrio || s.name}>{s.barrio || s.name}</option>
-                      ))}
-                    </select>
-                    <StoreIcon className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5 pointer-events-none" />
-                  </div>
+              {/* Descripción */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-gray-800">
+                    Descripción *
+                  </label>
+                  <span className="text-[11px] text-gray-400 font-medium">
+                    {description.length} / 2.200
+                  </span>
                 </div>
-
-                {/* Semana */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-semibold text-gray-500">Semana:</span>
-                  <div className="relative">
-                    <select
-                      className="pl-8 pr-4 py-1.5 text-xs font-bold border border-gray-300 rounded-xl bg-white"
-                      disabled
-                    >
-                      <option>{schedule?.weekStart ? `${schedule.weekStart} – ${schedule.weekEnd}` : 'Semana actual'}</option>
-                    </select>
-                    <Calendar className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5 pointer-events-none" />
-                  </div>
-                </div>
-
-                {/* View Toggles */}
-                <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200">
-                  <button
-                    type="button"
-                    onClick={() => setScheduleViewMode('semanal')}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-all ${
-                      scheduleViewMode === 'semanal'
-                        ? 'bg-emerald-600 text-white shadow-2xs'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    <Calendar className="w-3.5 h-3.5" />
-                    Vista semanal
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setScheduleViewMode('lista')}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-all ${
-                      scheduleViewMode === 'lista'
-                        ? 'bg-emerald-600 text-white shadow-2xs'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    Vista lista
-                  </button>
-                </div>
-
-                {/* Programar video button */}
-                <button
-                  type="button"
-                  onClick={() => openAddScheduleModal()}
-                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Programar video
-                </button>
-
-                {/* Abrir TikTok Studio button */}
-                <a
-                  href="https://www.tiktok.com/tiktokstudio"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-3.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-xs font-bold rounded-xl shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <ExternalLink className="w-3.5 h-3.5 text-gray-500" />
-                  Abrir TikTok Studio
-                </a>
+                <textarea
+                  rows={4}
+                  maxLength={2200}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Escribe la descripción de tu video para TikTok..."
+                  className="w-full text-xs text-gray-800 bg-gray-50 border border-gray-200 rounded-xl p-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none font-medium leading-relaxed"
+                />
               </div>
-            </div>
 
-            {/* Banner if Sede is not linked */}
-            {!isSedeLinked && (
-              <div className="bg-amber-50/90 border border-amber-200 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
-                <div className="flex items-start sm:items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
-                    <Unlink className="w-5 h-5" />
+              {/* Hashtags */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-800 flex items-center gap-1">
+                  <span># Hashtags</span>
+                </label>
+
+                {/* Chips de Hashtags */}
+                <div className="flex flex-wrap gap-1.5 min-h-[32px]">
+                  {hashtags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 text-gray-800 rounded-lg text-xs font-semibold border border-gray-200"
+                    >
+                      <span>#{tag}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveHashtag(tag)}
+                        className="text-gray-400 hover:text-red-500 font-bold ml-0.5"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+
+                {/* Input para agregar nuevo hashtag */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={hashtagInput}
+                    onChange={(e) => setHashtagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddHashtag();
+                      }
+                    }}
+                    placeholder="Agregar hashtag..."
+                    className="flex-1 text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddHashtag}
+                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-colors"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* Portada del video */}
+              <div className="space-y-2 pt-2 border-t border-gray-100">
+                <label className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                  <Film className="w-3.5 h-3.5 text-gray-500" />
+                  <span>Portada del video</span>
+                </label>
+
+                <div className="flex items-center gap-4">
+                  {/* Thumbnail Preview */}
+                  <div className="w-16 h-20 bg-black rounded-xl overflow-hidden flex items-center justify-center shrink-0 border border-gray-200 shadow-sm">
+                    {coverPreviewUrl ? (
+                      <img src={coverPreviewUrl} alt="Portada" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-white font-black text-xl">J</span>
+                    )}
                   </div>
-                  <div>
-                    <h3 className="text-xs font-black text-amber-900">
-                      {selectedSedeFilter === 'TODAS'
-                        ? 'No hay cuentas de TikTok vinculadas en las sedes'
-                        : `La sede ${selectedSedeFilter} no tiene una cuenta de TikTok vinculada`}
-                    </h3>
-                    <p className="text-[11px] text-amber-700 mt-0.5">
-                      Las programaciones de TikTok Studio solo se sincronizan y visualizan cuando se vincula una cuenta oficial de TikTok para esta sede.
+
+                  <div className="space-y-1.5">
+                    {/* Input oculto de imagen de portada */}
+                    <input
+                      ref={coverInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png"
+                      onChange={handleCoverImageSelect}
+                      className="hidden"
+                    />
+
+                    <div className="flex flex-wrap gap-2">
+                      {videoPreviewUrl && (
+                        <button
+                          type="button"
+                          onClick={handleCaptureFrameAsCover}
+                          className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg text-xs font-bold transition-colors"
+                        >
+                          Capturar fotograma
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => coverInputRef.current?.click()}
+                        className="px-3 py-1.5 border border-emerald-500 text-emerald-700 bg-white hover:bg-emerald-50 rounded-lg text-xs font-bold shadow-sm transition-colors"
+                      >
+                        Seleccionar portada
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-gray-400">
+                      Puedes elegir un fotograma del video o subir una imagen (.jpg / .png)
                     </p>
                   </div>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => openLinkModal(selectedSedeFilter !== 'TODAS' ? selectedSedeFilter : undefined)}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-2xs flex items-center gap-1.5 shrink-0 cursor-pointer transition-all"
-                >
-                  <LinkIcon className="w-3.5 h-3.5" />
-                  {selectedSedeFilter !== 'TODAS' ? `Vincular cuenta de ${selectedSedeFilter}` : 'Vincular cuenta'}
-                </button>
-              </div>
-            )}
-
-            {/* 4 Metric Cards Matching Image 5 */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <Play className="w-5 h-5 fill-emerald-600 text-emerald-600" />
-                </div>
-                <div>
-                  <span className="text-2xl font-black text-gray-900 block">
-                    {isSedeLinked ? (schedule?.videosProgramados || 0) : 0}
-                  </span>
-                  <span className="text-[11px] text-gray-500 font-semibold block">Videos programados</span>
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <Calendar className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-2xl font-black text-gray-900 block">
-                    {isSedeLinked ? (schedule?.diasConContenido || 0) : 0}
-                  </span>
-                  <span className="text-[11px] text-gray-500 font-semibold block">Días con contenido</span>
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <VideoIcon className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-2xl font-black text-gray-900 block">
-                    {isSedeLinked ? (schedule?.promedioDiario?.toLocaleString('es-CO', { minimumFractionDigits: 1 }) || '0,0') : '0,0'}
-                  </span>
-                  <span className="text-[11px] text-gray-500 font-semibold block">Promedio diario</span>
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <Clock className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-2xl font-black text-gray-900 block">
-                    {isSedeLinked ? (schedule?.programacionActiva || 0) : 0}%
-                  </span>
-                  <span className="text-[11px] text-gray-500 font-semibold block">Programación activa</span>
-                </div>
               </div>
             </div>
 
-            {/* Weekly Grid (7 Columns) Matching Image 5 */}
-            {scheduleViewMode === 'semanal' ? (
-              <div className="grid grid-cols-1 md:grid-cols-7 gap-3 items-start overflow-x-auto pb-4">
-                {schedule?.days.map((day, idx) => (
-                  <div key={idx} className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden flex flex-col min-w-[150px]">
-                    {/* Day Column Header */}
-                    <div className="p-3 text-center border-b border-gray-100 bg-gray-50/60">
-                      <strong className="block text-xs font-black text-gray-900">{day.dayName}</strong>
-                      <span className="text-[10px] text-gray-400">{day.dayNumber} nov</span>
-                    </div>
+            {/* ---------------------------------------------------- */}
+            {/* COLUMNA 3 (Derecha): CUENTA, PRIVACIDAD Y CALENDARIO */}
+            {/* ---------------------------------------------------- */}
+            <div className="lg:col-span-4 space-y-4">
+              
+              {/* Card 1: Cuenta de TikTok */}
+              <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <TikTokLogoIcon className="w-4 h-4 text-black" />
+                  <h3 className="text-xs font-black text-gray-900">Cuenta de TikTok</h3>
+                </div>
 
-                    {/* Day Scheduled Videos List */}
-                    <div className="p-2.5 space-y-2.5 flex-1 min-h-[220px]">
-                      {(!isSedeLinked || day.videos.length === 0) ? (
-                        <div className="py-8 text-center text-gray-300 text-[11px] flex flex-col items-center justify-center h-full">
-                          <span>+ Sin más publicaciones programadas</span>
-                        </div>
+                {globalAccount?.connected ? (
+                  <div className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-200">
+                    <div className="flex items-center gap-3">
+                      {globalAccount.avatarUrl ? (
+                        <img
+                          src={globalAccount.avatarUrl}
+                          alt={globalAccount.username}
+                          className="w-9 h-9 rounded-full object-cover ring-1 ring-emerald-500"
+                        />
                       ) : (
-                        day.videos.map((vid) => (
-                          <div key={vid.id} className="p-2 rounded-xl border border-gray-100 bg-gray-50/50 space-y-1.5 shadow-2xs">
-                            <div className="relative w-full h-24 rounded-lg bg-gray-900 overflow-hidden">
-                              {vid.thumbnailUrl ? (
-                                <img src={vid.thumbnailUrl} alt={vid.title} className="w-full h-full object-cover" />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-gray-600">
-                                  <Play className="w-6 h-6" />
-                                </div>
-                              )}
-                              <span className="absolute bottom-1 right-1 bg-black/80 text-white text-[8px] font-bold px-1 rounded">
-                                {vid.duration || '0:24'}
-                              </span>
-                            </div>
-
-                            <div>
-                              <div className="flex items-center gap-1 text-[10px] text-gray-500 font-semibold">
-                                <Clock className="w-3 h-3 text-gray-400" />
-                                {vid.scheduledAt ? new Date(vid.scheduledAt).toLocaleTimeString('es-CO', {
-                                  hour: 'numeric',
-                                  minute: '2-digit'
-                                }) : '10:00 a. m.'}
-                              </div>
-                              <strong className="block text-xs text-gray-900 truncate mt-0.5">{vid.title}</strong>
-                            </div>
-
-                            <div className="flex items-center justify-between pt-1">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-extrabold bg-emerald-100 text-emerald-800">
-                                <Check className="w-3 h-3 text-emerald-600" />
-                                Programado
-                              </span>
-                              <button
-                                type="button"
-                                title="Eliminar publicación programada"
-                                onClick={() => handleDeleteScheduledVideo(vid.id, vid.title)}
-                                className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-
-                      {/* Display note if exists */}
-                      {isSedeLinked && day.note && (
-                        <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-[10px] text-amber-900 font-medium">
-                          📝 {day.note}
+                        <div className="w-9 h-9 rounded-full bg-black text-white font-black text-xs flex items-center justify-center">
+                          J
                         </div>
                       )}
+                      <div>
+                        <p className="text-xs font-bold text-gray-900 leading-none">
+                          {globalAccount.username || '@juandstore'}
+                        </p>
+                        <p className="text-[11px] text-gray-500 mt-1">
+                          {globalAccount.displayName || 'JUANDSTORE'}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full flex items-center gap-1">
+                      <Check className="w-3 h-3" />
+                      Conectada
+                    </span>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between">
+                    <div className="text-xs text-amber-800 font-semibold">
+                      Sin cuenta vinculada
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('mi_cuenta')}
+                      className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold"
+                    >
+                      Conectar
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Card 2: Configuración de publicación */}
+              <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm space-y-3.5">
+                <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+                  <Settings className="w-4 h-4 text-gray-700" />
+                  <h3 className="text-xs font-black text-gray-900">Configuración de publicación</h3>
+                </div>
+
+                {/* Privacidad */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-gray-400" />
+                    Privacidad
+                  </span>
+                  <select
+                    value={privacyLevel}
+                    onChange={(e: any) => setPrivacyLevel(e.target.value)}
+                    className="text-xs font-semibold bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value="PUBLIC_TO_EVERYONE">🌐 Público</option>
+                    <option value="MUTUAL_FOLLOW_FRIENDS">👥 Amigos</option>
+                    <option value="SELF_ONLY">🔒 Solo yo</option>
+                  </select>
+                </div>
+
+                {/* Permitir comentarios */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-700 font-medium flex items-center gap-1.5">
+                    <MessageCircle className="w-3.5 h-3.5 text-gray-400" />
+                    Permitir comentarios
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={allowComments}
+                    onChange={(e) => setAllowComments(e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
+                  />
+                </div>
+
+                {/* Permitir dúos */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-700 font-medium flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-gray-400" />
+                    Permitir dúos
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={allowDuet}
+                    onChange={(e) => setAllowDuet(e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
+                  />
+                </div>
+
+                {/* Permitir pegado (Stitch) */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-700 font-medium flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-gray-400" />
+                    Permitir pegado (Stitch)
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={allowStitch}
+                    onChange={(e) => setAllowStitch(e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* Card 3: ¿Cuándo quieres publicar? */}
+              <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm space-y-3">
+                <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+                  <Calendar className="w-4 h-4 text-gray-700" />
+                  <h3 className="text-xs font-black text-gray-900">¿Cuándo quieres publicar?</h3>
+                </div>
+
+                {/* Opción 1: Publicar ahora */}
+                <label
+                  onClick={() => setPublishMode('now')}
+                  className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                    publishMode === 'now'
+                      ? 'border-emerald-500 bg-emerald-50/30'
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="publishMode"
+                    checked={publishMode === 'now'}
+                    onChange={() => setPublishMode('now')}
+                    className="mt-0.5 text-emerald-600 accent-emerald-600"
+                  />
+                  <div>
+                    <p className="text-xs font-bold text-gray-900">Publicar ahora</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Se publicará inmediatamente en TikTok
+                    </p>
+                  </div>
+                </label>
+
+                {/* Opción 2: Programar publicación */}
+                <label
+                  onClick={() => setPublishMode('schedule')}
+                  className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                    publishMode === 'schedule'
+                      ? 'border-emerald-500 bg-emerald-50/30'
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="publishMode"
+                    checked={publishMode === 'schedule'}
+                    onChange={() => setPublishMode('schedule')}
+                    className="mt-0.5 text-emerald-600 accent-emerald-600"
+                  />
+                  <div className="flex-1">
+                    <p className="text-xs font-bold text-gray-900">Programar publicación</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Elige una fecha y hora para publicarlo
+                    </p>
+
+                    {publishMode === 'schedule' && (
+                      <div className="mt-3 grid grid-cols-2 gap-2 pt-2 border-t border-emerald-100">
+                        <div>
+                          <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">
+                            Fecha
+                          </label>
+                          <input
+                            type="date"
+                            value={scheduleDate}
+                            onChange={(e) => setScheduleDate(e.target.value)}
+                            className="w-full text-xs bg-white border border-gray-200 rounded-lg p-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">
+                            Hora
+                          </label>
+                          <input
+                            type="time"
+                            value={scheduleTime}
+                            onChange={(e) => setScheduleTime(e.target.value)}
+                            className="w-full text-xs bg-white border border-gray-200 rounded-lg p-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </label>
+              </div>
+
+            </div>
+          </div>
+
+          {/* ============================================================ */}
+          {/* BARRA DE ACCIONES INFERIOR (Matching Screenshot 2)           */}
+          {/* ============================================================ */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="text-xs text-gray-500 flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>
+                {publishMode === 'schedule'
+                  ? 'El servidor de JUANDSTORE ejecutará la publicación a la fecha y hora seleccionada.'
+                  : 'Publicación oficial mediante TikTok Content Posting API v2.'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+              {/* Botón Guardar Borrador */}
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => handleSubmitPublish(true)}
+                className="px-5 py-2.5 border border-gray-300 hover:bg-gray-100 text-gray-700 font-bold rounded-xl text-xs transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
+              >
+                <Save className="w-4 h-4 text-gray-500" />
+                <span>Guardar borrador</span>
+              </button>
+
+              {/* Botón Publicar en TikTok / Programar */}
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => handleSubmitPublish(false)}
+                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50"
+              >
+                {publishMode === 'schedule' ? (
+                  <>
+                    <Calendar className="w-4 h-4 text-white" />
+                    <span>Programar publicación</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4 text-white" />
+                    <span>Publicar en TikTok</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* PESTAÑA: PROGRAMACION SEMANAL (Calendario Lunes - Domingo)   */}
+      {/* ============================================================ */}
+      {activeTab === 'programacion' && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* Barra de Navegación de Semanas */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-black text-gray-900">Programación semanal</h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Semana: {schedule?.weekStart || currentWeekStart} al {schedule?.weekEnd || ''}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleWeekChange(-7)}
+                className="p-2 border border-gray-200 hover:bg-gray-50 rounded-xl text-gray-700 text-xs font-bold transition-colors flex items-center gap-1"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span>Semana anterior</span>
+              </button>
+
+              <button
+                onClick={() => setCurrentWeekStart(new Date().toISOString().split('T')[0])}
+                className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-gray-700 text-xs font-bold transition-colors"
+              >
+                Hoy
+              </button>
+
+              <button
+                onClick={() => handleWeekChange(7)}
+                className="p-2 border border-gray-200 hover:bg-gray-50 rounded-xl text-gray-700 text-xs font-bold transition-colors flex items-center gap-1"
+              >
+                <span>Semana siguiente</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => setActiveTab('publicar')}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Programar video</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Tarjetas KPI de Programación */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+              <p className="text-xs font-bold text-gray-500 uppercase">Videos programados</p>
+              <p className="text-2xl font-black text-gray-900 mt-1">{schedule?.videosProgramados || 0}</p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+              <p className="text-xs font-bold text-gray-500 uppercase">Días con contenido</p>
+              <p className="text-2xl font-black text-emerald-600 mt-1">{schedule?.diasConContenido || 0} / 7</p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+              <p className="text-xs font-bold text-gray-500 uppercase">Promedio diario</p>
+              <p className="text-2xl font-black text-gray-900 mt-1">{schedule?.promedioDiario || 0}</p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+              <p className="text-xs font-bold text-gray-500 uppercase">Actividad semanal</p>
+              <p className="text-2xl font-black text-blue-600 mt-1">{schedule?.programacionActiva || 0}%</p>
+            </div>
+          </div>
+
+          {/* Grilla Semanal: Lunes a Domingo */}
+          <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+            {schedule?.days?.map((day) => (
+              <div
+                key={day.date}
+                className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm min-h-[220px] flex flex-col justify-between"
+              >
+                <div>
+                  {/* Encabezado del día */}
+                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-100">
+                    <span className="text-xs font-black text-gray-900 uppercase">
+                      {day.dayName}
+                    </span>
+                    <span className="text-xs font-bold text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">
+                      {day.dayNumber}
+                    </span>
+                  </div>
+
+                  {/* Lista de videos programados para ese día */}
+                  <div className="space-y-2">
+                    {day.videos?.length === 0 ? (
+                      <p className="text-[11px] text-gray-400 italic text-center py-6">
+                        Sin publicaciones
+                      </p>
+                    ) : (
+                      day.videos?.map((vid) => (
+                        <div
+                          key={vid.id}
+                          className="bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg p-2.5 transition-colors group relative"
+                        >
+                          <div className="flex items-start justify-between gap-1 mb-1">
+                            <p className="text-xs font-bold text-gray-800 line-clamp-2 leading-tight">
+                              {vid.title}
+                            </p>
+                            <button
+                              onClick={() => handleDeleteScheduled(vid.id)}
+                              title="Cancelar video"
+                              className="text-gray-400 hover:text-red-500 transition-colors p-0.5 shrink-0"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          <div className="flex items-center justify-between text-[10px] text-gray-500 mt-2">
+                            <span className="font-semibold text-gray-600">
+                              {new Date(vid.scheduledAt).toLocaleTimeString('es-CO', {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded font-bold ${
+                              vid.status === 'PUBLICADO'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : vid.status === 'ERROR'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {vid.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Botón rápido programar en este día */}
+                <button
+                  onClick={() => {
+                    setScheduleDate(day.date);
+                    setPublishMode('schedule');
+                    setActiveTab('publicar');
+                  }}
+                  className="w-full mt-3 py-1 text-[11px] font-bold text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded border border-dashed border-gray-200 transition-colors"
+                >
+                  + Programar
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* PESTAÑA: HISTORIAL                                           */}
+      {/* ============================================================ */}
+      {activeTab === 'historial' && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* Tarjetas de Métricas Acumuladas */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Eye className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase">Visualizaciones</p>
+                <p className="text-xl font-black text-gray-900 mt-0.5">{historyMetrics.views.toLocaleString()}</p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center">
+                <Heart className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase">Me gusta</p>
+                <p className="text-xl font-black text-gray-900 mt-0.5">{historyMetrics.likes.toLocaleString()}</p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <MessageCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase">Comentarios</p>
+                <p className="text-xl font-black text-gray-900 mt-0.5">{historyMetrics.comments.toLocaleString()}</p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                <Share2 className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase">Compartidos</p>
+                <p className="text-xl font-black text-gray-900 mt-0.5">{historyMetrics.shares.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Filtros de Búsqueda */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="relative w-full sm:w-80">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                placeholder="Buscar por título o hashtag..."
+                className="w-full pl-9 pr-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={loadHistory}
+                className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Actualizar</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Tabla / Tarjetas de Videos Publicados */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            {historyVideos.length === 0 ? (
+              <div className="py-16 text-center text-gray-400 text-xs font-medium">
+                No hay videos registrados en el historial. Publica un video desde JUANDSTORE para verlo aquí.
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {historyVideos.map((vid) => (
+                  <div
+                    key={vid.id}
+                    className="p-4 hover:bg-gray-50/80 transition-colors flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                  >
+                    <div className="flex items-center gap-4">
+                      {/* Portada */}
+                      <div className="w-14 h-18 bg-black rounded-lg overflow-hidden flex items-center justify-center shrink-0 border border-gray-200">
+                        {vid.thumbnailUrl ? (
+                          <img src={vid.thumbnailUrl} alt={vid.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <TikTokLogoIcon className="w-6 h-6 text-white" />
+                        )}
+                      </div>
+
+                      <div className="space-y-1">
+                        <h4 className="text-xs md:text-sm font-bold text-gray-900 line-clamp-1">
+                          {vid.title}
+                        </h4>
+                        <p className="text-[11px] text-gray-500 line-clamp-1">
+                          {vid.description}
+                        </p>
+                        <div className="flex items-center gap-3 text-[11px] text-gray-400 pt-0.5">
+                          <span>
+                            {vid.publishedAt ? new Date(vid.publishedAt).toLocaleDateString('es-CO', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric'
+                            }) : 'Reciente'}
+                          </span>
+                          <span>•</span>
+                          <span>Duración: {vid.duration || '0:30'}</span>
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Day actions */}
-                    <div className="p-2 border-t border-gray-100 bg-white space-y-1">
-                      <button
-                        type="button"
-                        disabled={!isSedeLinked}
-                        onClick={() => openAddScheduleModal(day.date)}
-                        className={`w-full py-1 text-center text-[11px] rounded-lg transition-colors font-bold ${
-                          isSedeLinked
-                            ? 'text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 cursor-pointer'
-                            : 'text-gray-300 cursor-not-allowed'
-                        }`}
-                      >
-                        + Programar
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!isSedeLinked}
-                        onClick={() => {
-                          if (!isSedeLinked) {
-                            Swal.fire({
-                              icon: 'warning',
-                              title: 'Sede sin vincular',
-                              text: 'Debes vincular una cuenta oficial de TikTok en esta sede antes de asignar notas de programación.',
-                              confirmButtonColor: '#10b981'
-                            });
-                            return;
-                          }
-                          openNoteModal(day.date, day.note);
-                        }}
-                        className={`w-full py-1 text-center text-[11px] rounded-lg transition-colors font-semibold ${
-                          isSedeLinked
-                            ? 'text-gray-500 hover:text-emerald-700 hover:bg-gray-50 cursor-pointer'
-                            : 'text-gray-300 cursor-not-allowed'
-                        }`}
-                      >
-                        + Nota
-                      </button>
+                    {/* Métricas del Video */}
+                    <div className="flex items-center gap-6 text-xs text-gray-600 w-full sm:w-auto justify-between sm:justify-end">
+                      <div className="flex items-center gap-1.5" title="Visualizaciones">
+                        <Eye className="w-4 h-4 text-gray-400" />
+                        <span className="font-bold">{(vid.viewCount || 0).toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5" title="Me gusta">
+                        <Heart className="w-4 h-4 text-red-500" />
+                        <span className="font-bold">{(vid.likeCount || 0).toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5" title="Comentarios">
+                        <MessageCircle className="w-4 h-4 text-emerald-500" />
+                        <span className="font-bold">{(vid.commentCount || 0).toLocaleString()}</span>
+                      </div>
+                      {vid.videoUrl && (
+                        <a
+                          href={vid.videoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-[11px] font-bold text-gray-700 flex items-center gap-1"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span>Ver</span>
+                        </a>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* PESTAÑA: RESUMEN                                             */}
+      {/* ============================================================ */}
+      {activeTab === 'resumen' && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* Métricas Principales */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+              <p className="text-xs font-bold text-gray-500 uppercase">Videos publicados</p>
+              <p className="text-3xl font-black text-gray-900 mt-2">{summary?.videosPublicados || 0}</p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+              <p className="text-xs font-bold text-gray-500 uppercase">Visualizaciones totales</p>
+              <p className="text-3xl font-black text-blue-600 mt-2">{(summary?.visualizacionesAcumuladas || 0).toLocaleString()}</p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+              <p className="text-xs font-bold text-gray-500 uppercase">Me gusta totales</p>
+              <p className="text-3xl font-black text-red-500 mt-2">{(summary?.meGusta || 0).toLocaleString()}</p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+              <p className="text-xs font-bold text-gray-500 uppercase">Comentarios totales</p>
+              <p className="text-3xl font-black text-emerald-600 mt-2">{(summary?.comentarios || 0).toLocaleString()}</p>
+            </div>
+          </div>
+
+          {/* Videos Recientes */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <h3 className="text-sm font-black text-gray-900">Últimas publicaciones</h3>
+              <button
+                onClick={() => setActiveTab('historial')}
+                className="text-xs text-emerald-600 font-bold hover:underline"
+              >
+                Ver historial completo →
+              </button>
+            </div>
+
+            {summary?.recentVideos?.length === 0 ? (
+              <p className="text-xs text-gray-400 py-6 text-center">
+                Aún no hay videos registrados en TikTok.
+              </p>
             ) : (
-              /* List View */
-              <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-2xs">
-                <h4 className="text-sm font-extrabold text-gray-900 mb-3">Lista de publicaciones programadas</h4>
-                {!isSedeLinked ? (
-                  <p className="text-xs text-amber-700 py-8 text-center bg-amber-50 rounded-xl">
-                    Esta sede no tiene cuenta de TikTok vinculada. Conecta una cuenta en &quot;Cuentas vinculadas&quot; para consultar la programación.
-                  </p>
-                ) : schedule?.days.every(d => d.videos.length === 0) ? (
-                  <p className="text-xs text-gray-400 py-8 text-center">No hay publicaciones programadas en TikTok Studio para esta semana.</p>
-                ) : (
-                  <div className="divide-y divide-gray-100 text-xs">
-                    {schedule?.days.flatMap(d => d.videos).map(v => (
-                      <div key={v.id} className="py-3 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-gray-900 overflow-hidden shrink-0">
-                            {v.thumbnailUrl ? (
-                              <img src={v.thumbnailUrl} alt={v.title} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-gray-600">
-                                <Play className="w-4 h-4" />
-                              </div>
-                            )}
-                          </div>
-                          <div>
-                            <strong className="block text-gray-900">{v.title}</strong>
-                            <span className="text-[10px] text-gray-400">{v.sedeName} • {v.scheduledAt}</span>
-                          </div>
-                        </div>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                          Programado
-                        </span>
+              <div className="space-y-3">
+                {summary?.recentVideos?.map((vid) => (
+                  <div
+                    key={vid.id}
+                    className="flex items-center justify-between p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-black text-white flex items-center justify-center font-bold text-xs">
+                        J
                       </div>
-                    ))}
+                      <div>
+                        <p className="text-xs font-bold text-gray-900 line-clamp-1">{vid.title}</p>
+                        <p className="text-[11px] text-gray-500">
+                          {vid.publishedAt ? new Date(vid.publishedAt).toLocaleDateString() : 'Reciente'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs font-semibold text-gray-600">
+                      <span>{(vid.viewCount || 0).toLocaleString()} vistas</span>
+                      <span className="text-red-500 font-bold">♥ {(vid.likeCount || 0).toLocaleString()}</span>
+                    </div>
                   </div>
-                )}
+                ))}
               </div>
             )}
-
-            {/* Bottom Banner with Refresh Sync */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
-              <div className="flex items-center gap-2.5 text-xs text-gray-600">
-                <AlertCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>
-                  <strong>Importante:</strong> La programación se obtiene de TikTok Studio. Los cambios pueden tardar algunos minutos en actualizarse en el sistema.
-                </span>
-              </div>
-
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    await TikTokService.syncScheduled(selectedSedeFilter);
-                    await loadSchedule();
-                    Swal.fire({ icon: 'success', title: 'Programación actualizada', timer: 1200, showConfirmButton: false });
-                  } catch {
-                    Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo sincronizar la programación.' });
-                  }
-                }}
-                className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-xs font-bold rounded-xl shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
-              >
-                <RefreshCw className="w-3.5 h-3.5 text-gray-600" />
-                Actualizar programación
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ========================================================================= */}
-        {/* TAB 4: HISTORIAL (Image 6) */}
-        {/* ========================================================================= */}
-        {activeTab === 'historial' && (
-          <div className="space-y-6">
-            {/* Header + Export */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-black text-gray-900">Historial de publicaciones</h2>
-                <p className="text-xs text-gray-500">Consulta el registro de videos publicados por sede.</p>
-              </div>
-
-              <button
-                type="button"
-                onClick={exportHistoryCSV}
-                className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-xs font-bold rounded-xl shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5 text-gray-600" />
-                Exportar reporte
-              </button>
-            </div>
-
-            {/* Filter Bar Matching Image 6 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs">
-              {/* Sede */}
-              <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1">Sede</label>
-                <div className="relative">
-                  <select
-                    value={selectedSedeFilter}
-                    onChange={e => setSelectedSedeFilter(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-300 rounded-lg bg-white"
-                  >
-                    <option value="TODAS">Todas las sedes</option>
-                    {stores.map(s => (
-                      <option key={s.id} value={s.barrio || s.name}>{s.barrio || s.name}</option>
-                    ))}
-                  </select>
-                  <StoreIcon className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5 pointer-events-none" />
-                </div>
-              </div>
-
-              {/* Rango de fechas */}
-              <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1">Rango de fechas</label>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <input
-                    type="date"
-                    value={historyDateFrom}
-                    onChange={e => setHistoryDateFrom(e.target.value)}
-                    className="px-2 py-1 text-[11px] border border-gray-300 rounded-lg"
-                    title="Desde"
-                  />
-                  <input
-                    type="date"
-                    value={historyDateTo}
-                    onChange={e => setHistoryDateTo(e.target.value)}
-                    className="px-2 py-1 text-[11px] border border-gray-300 rounded-lg"
-                    title="Hasta"
-                  />
-                </div>
-              </div>
-
-              {/* Tipo de contenido */}
-              <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1">Tipo de contenido</label>
-                <div className="relative">
-                  <select
-                    value={historyContentType}
-                    onChange={e => setHistoryContentType(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-300 rounded-lg bg-white"
-                  >
-                    <option value="TODOS">Todos</option>
-                    <option value="Video">Video</option>
-                    <option value="Short">Short</option>
-                    <option value="Carousel">Carousel</option>
-                  </select>
-                  <Play className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5 pointer-events-none" />
-                </div>
-              </div>
-
-              {/* Search */}
-              <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1">Búsqueda</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Buscar video, descripción o hashtag..."
-                    value={historySearch}
-                    onChange={e => setHistorySearch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  />
-                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5 pointer-events-none" />
-                </div>
-              </div>
-            </div>
-
-            {/* 5 Metric Cards Matching Image 6 */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-              <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <Play className="w-5 h-5 fill-emerald-600 text-emerald-600" />
-                </div>
-                <div>
-                  <span className="text-xl font-black text-gray-900 block">{formatNum(historyTotal)}</span>
-                  <span className="text-[11px] text-gray-500 font-semibold block">Videos publicados</span>
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <Eye className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-xl font-black text-gray-900 block">{formatNum(historyMetrics.views)}</span>
-                  <span className="text-[11px] text-gray-500 font-semibold block">Visualizaciones</span>
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <Heart className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-xl font-black text-gray-900 block">{formatNum(historyMetrics.likes)}</span>
-                  <span className="text-[11px] text-gray-500 font-semibold block">Me gusta</span>
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <MessageCircle className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-xl font-black text-gray-900 block">{formatNum(historyMetrics.comments)}</span>
-                  <span className="text-[11px] text-gray-500 font-semibold block">Comentarios</span>
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <Share2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-xl font-black text-gray-900 block">{formatNum(historyMetrics.shares)}</span>
-                  <span className="text-[11px] text-gray-500 font-semibold block">Compartidos</span>
-                </div>
-              </div>
-            </div>
-
-            {/* History Table Matching Image 6 */}
-            <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-2xs space-y-4">
-              {historyVideos.length === 0 ? (
-                <div className="py-16 text-center text-gray-400 text-xs border-2 border-dashed border-gray-100 rounded-xl space-y-2">
-                  <Play className="w-10 h-10 text-gray-300 mx-auto" />
-                  <p className="font-bold text-gray-700 text-sm">No se encontraron publicaciones</p>
-                  <p className="text-gray-400 max-w-sm mx-auto">
-                    Los videos publicados en las cuentas conectadas de TikTok aparecerán aquí de forma automática.
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-gray-50 text-gray-400 uppercase text-[10px] tracking-wider border-y border-gray-100">
-                      <tr>
-                        <th className="py-3 px-3">Video</th>
-                        <th className="py-3 px-3">Sede</th>
-                        <th className="py-3 px-3">Fecha y hora de publicación ↓</th>
-                        <th className="py-3 px-3">Visualizaciones</th>
-                        <th className="py-3 px-3">Me gusta</th>
-                        <th className="py-3 px-3">Comentarios</th>
-                        <th className="py-3 px-3">Compartidos</th>
-                        <th className="py-3 px-3 text-right">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 text-gray-700">
-                      {historyVideos.map((v) => (
-                        <tr key={v.id} className="hover:bg-gray-50/70 transition-colors">
-                          <td className="py-3.5 px-3">
-                            <div className="flex items-center gap-3">
-                              <div className="relative w-12 h-14 rounded-lg bg-gray-900 overflow-hidden shrink-0">
-                                {v.thumbnailUrl ? (
-                                  <img src={v.thumbnailUrl} alt={v.title} className="w-full h-full object-cover" />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center text-gray-600">
-                                    <Play className="w-5 h-5" />
-                                  </div>
-                                )}
-                                <span className="absolute bottom-1 right-1 bg-black/80 text-white text-[8px] font-bold px-1 rounded">
-                                  {v.duration || '0:24'}
-                                </span>
-                              </div>
-                              <div>
-                                <strong className="block text-gray-900 text-xs">{v.title}</strong>
-                                {v.hashtags && (
-                                  <span className="text-[10px] text-emerald-700 block truncate max-w-[220px]">
-                                    {v.hashtags}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-
-                          <td className="py-3.5 px-3">
-                            <span className="flex items-center gap-1.5 font-bold text-gray-800">
-                              <StoreIcon className="w-3.5 h-3.5 text-emerald-600" />
-                              {v.sedeName}
-                            </span>
-                          </td>
-
-                          <td className="py-3.5 px-3 text-gray-600">
-                            {v.publishedAt ? new Date(v.publishedAt).toLocaleDateString('es-CO', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                              hour: 'numeric',
-                              minute: '2-digit'
-                            }) : 'Reciente'}
-                          </td>
-
-                          <td className="py-3.5 px-3 font-bold text-gray-900">
-                            <span className="flex items-center gap-1">
-                              <Eye className="w-3.5 h-3.5 text-gray-400" />
-                              {formatNum(v.viewCount)}
-                            </span>
-                          </td>
-
-                          <td className="py-3.5 px-3 text-gray-700">
-                            <span className="flex items-center gap-1">
-                              <Heart className="w-3.5 h-3.5 text-gray-400" />
-                              {formatNum(v.likeCount)}
-                            </span>
-                          </td>
-
-                          <td className="py-3.5 px-3 text-gray-700">
-                            <span className="flex items-center gap-1">
-                              <MessageCircle className="w-3.5 h-3.5 text-gray-400" />
-                              {formatNum(v.commentCount)}
-                            </span>
-                          </td>
-
-                          <td className="py-3.5 px-3 text-gray-700">
-                            <span className="flex items-center gap-1">
-                              <Share2 className="w-3.5 h-3.5 text-gray-400" />
-                              {formatNum(v.shareCount)}
-                            </span>
-                          </td>
-
-                          <td className="py-3.5 px-3 text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                type="button"
-                                onClick={() => setPreviewVideo(v)}
-                                className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                                title="Ver video"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (v.videoUrl) {
-                                    window.open(v.videoUrl, '_blank');
-                                  } else {
-                                    Swal.fire({
-                                      icon: 'info',
-                                      title: v.title,
-                                      text: `Sede: ${v.sedeName} • Vistas: ${formatNum(v.viewCount)} • Likes: ${formatNum(v.likeCount)}`
-                                    });
-                                  }
-                                }}
-                                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg cursor-pointer"
-                                title="Opciones"
-                              >
-                                <MoreVertical className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* Pagination */}
-              {historyTotal > 0 && (
-                <div className="flex items-center justify-between pt-3 border-t border-gray-100 text-xs text-gray-500">
-                  <span>
-                    Mostrando {historyVideos.length > 0 ? historyPage * 5 + 1 : 0} – {Math.min((historyPage + 1) * 5, historyTotal)} de {historyTotal} publicaciones
-                  </span>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      disabled={historyPage === 0}
-                      onClick={() => setHistoryPage(prev => Math.max(0, prev - 1))}
-                      className="p-1 rounded-md border border-gray-200 text-gray-500 disabled:opacity-40 cursor-pointer"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <span className="px-2 py-0.5 rounded bg-emerald-600 text-white font-bold">
-                      {historyPage + 1}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={(historyPage + 1) * 5 >= historyTotal}
-                      onClick={() => setHistoryPage(prev => prev + 1)}
-                      className="p-1 rounded-md border border-gray-200 text-gray-500 disabled:opacity-40 cursor-pointer"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 3-STEP TIKTOK OAUTH MODAL (Matching Images 1, 2, 3) */}
-      {/* ========================================================================= */}
-      {isLinkModalOpen && (
-        <div className="fixed inset-0 z-[120] bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-gray-100 my-auto animate-in fade-in zoom-in-95 duration-200">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-black text-white flex items-center justify-center font-bold">
-                  <TikTokLogoIcon className="w-4 h-4 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-extrabold text-gray-900">Vincular cuenta de TikTok</h3>
-                  <p className="text-[11px] text-gray-400">Conecta una cuenta oficial para consultar su información.</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsLinkModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Stepper (3 Steps) */}
-            <div className="px-6 py-3 bg-gray-50/80 border-b border-gray-100">
-              <div className="flex items-center justify-between text-xs">
-                {/* Step 1 */}
-                <div className="flex flex-col items-center">
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold transition-all ${
-                    linkStep > 1
-                      ? 'bg-emerald-600 text-white'
-                      : linkStep === 1
-                      ? 'bg-emerald-600 text-white ring-4 ring-emerald-100'
-                      : 'bg-gray-200 text-gray-500'
-                  }`}>
-                    {linkStep > 1 ? <Check className="w-3.5 h-3.5" /> : '1'}
-                  </div>
-                  <span className={`text-[10px] mt-1 font-semibold ${
-                    linkStep === 1 ? 'text-emerald-700' : 'text-gray-400'
-                  }`}>
-                    Seleccionar sede
-                  </span>
-                </div>
-
-                <div className="flex-1 h-0.5 bg-gray-200 mx-2 -mt-3"></div>
-
-                {/* Step 2 */}
-                <div className="flex flex-col items-center">
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold transition-all ${
-                    linkStep > 2
-                      ? 'bg-emerald-600 text-white'
-                      : linkStep === 2
-                      ? 'bg-emerald-600 text-white ring-4 ring-emerald-100'
-                      : 'bg-gray-200 text-gray-500'
-                  }`}>
-                    {linkStep > 2 ? <Check className="w-3.5 h-3.5" /> : '2'}
-                  </div>
-                  <span className={`text-[10px] mt-1 font-semibold ${
-                    linkStep === 2 ? 'text-emerald-700' : 'text-gray-400'
-                  }`}>
-                    Autorizar en TikTok
-                  </span>
-                </div>
-
-                <div className="flex-1 h-0.5 bg-gray-200 mx-2 -mt-3"></div>
-
-                {/* Step 3 */}
-                <div className="flex flex-col items-center">
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold transition-all ${
-                    linkStep === 3
-                      ? 'bg-emerald-600 text-white ring-4 ring-emerald-100'
-                      : 'bg-gray-200 text-gray-500'
-                  }`}>
-                    {linkStep === 3 ? '3' : '3'}
-                  </div>
-                  <span className={`text-[10px] mt-1 font-semibold ${
-                    linkStep === 3 ? 'text-emerald-700' : 'text-gray-400'
-                  }`}>
-                    Confirmación
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6">
-              {/* STEP 1: Seleccionar sede (Matching Image 1) */}
-              {linkStep === 1 && (
-                <div className="space-y-5 text-xs">
-                  <div>
-                    <h4 className="font-extrabold text-sm text-gray-900">1. Seleccionar sede</h4>
-                    <p className="text-gray-500 text-[11px] mt-0.5">Elige la sede a la que se vinculará la cuenta de TikTok.</p>
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-gray-700 mb-1.5">Sede *</label>
-                    <div className="relative">
-                      <select
-                        value={selectedLinkSede}
-                        onChange={e => setSelectedLinkSede(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-xl bg-white font-bold text-gray-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                      >
-                        {stores.map(s => (
-                          <option key={s.id} value={s.barrio || s.name}>
-                            {s.barrio || s.name} ({s.name})
-                          </option>
-                        ))}
-                      </select>
-                      <StoreIcon className="w-4 h-4 text-emerald-600 absolute left-3 top-3 pointer-events-none" />
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl flex items-start gap-2.5">
-                    <AlertCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <p className="text-[11px] text-emerald-950 leading-relaxed">
-                      TikTok solicitará autorización para consultar el perfil y los videos públicos. Esta conexión <strong>NO permite leer videos futuros programados en TikTok Studio</strong>.
-                    </p>
-                  </div>
-
-                  <div className="pt-2 flex items-center justify-end gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => setIsLinkModalOpen(false)}
-                      className="px-4 py-2 text-xs font-semibold text-gray-600 hover:text-gray-900 cursor-pointer"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={proceedToStep2}
-                      className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-2 cursor-pointer transition-colors"
-                    >
-                      <TikTokLogoIcon className="w-4 h-4 text-white" />
-                      Continuar con TikTok
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 2: Autorizar en TikTok (Matching Image 2) */}
-              {linkStep === 2 && (
-                <div className="space-y-4">
-                  {/* Sub-step A: TikTok OAuth 2.0 Authorization & Direct Linking (No Passwords) */}
-                  {linkSubStep === 'login' && (
-                    <div className="max-w-md mx-auto p-5 border border-gray-200 rounded-2xl bg-white space-y-4 text-center">
-                      <div className="flex items-center justify-center gap-2 text-gray-900 font-black text-xl">
-                        <TikTokLogoIcon className="w-6 h-6 text-black" />
-                        <span>TikTok OAuth 2.0</span>
-                      </div>
-                      <div>
-                        <h4 className="font-extrabold text-sm text-gray-900">
-                          Vincular sede: <span className="text-emerald-700 font-black">{selectedLinkSede}</span>
-                        </h4>
-                        <p className="text-[11px] text-gray-500 mt-1">
-                          Conexión oficial por OAuth 2.0. Cada sede administra su propia cuenta de TikTok sin solicitar contraseñas.
-                        </p>
-                      </div>
-
-                      {/* Mode 1: Official OAuth 2.0 if configured */}
-                      {oauthConfig?.configured ? (
-                        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2.5 text-left">
-                          <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                            <span>Aplicación TikTok Developers conectada</span>
-                          </div>
-                          <p className="text-[11px] text-emerald-950 leading-relaxed">
-                            Se abrirá la ventana de inicio de sesión oficial de TikTok para autorizar los permisos de perfil y videos.
-                          </p>
-                          <button
-                            type="button"
-                            onClick={handleStartOfficialOAuth}
-                            className="w-full py-2.5 bg-[#fe2c55] hover:bg-[#e0264b] text-white font-bold text-xs rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
-                          >
-                            <TikTokLogoIcon className="w-4 h-4 text-white" />
-                            Autorizar en TikTok (OAuth 2.0 Oficial)
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-left space-y-2">
-                          <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
-                            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                            <span>Configuración de TikTok Developers</span>
-                          </div>
-                          <p className="text-[11px] text-amber-800 leading-relaxed">
-                            Para iniciar el flujo OAuth 2.0 automático con TikTok Login Kit, agrega estas variables en tu servidor:
-                          </p>
-                          <div className="bg-white p-2.5 rounded-lg text-[10px] font-mono text-gray-800 space-y-0.5 border border-amber-200">
-                            <div><strong>TIKTOK_CLIENT_KEY</strong> = Client Key de tu App</div>
-                            <div><strong>TIKTOK_CLIENT_SECRET</strong> = Client Secret</div>
-                            <div><strong>TIKTOK_REDIRECT_URI</strong> = {oauthConfig?.redirectUri || 'http://localhost:3000/admin/tiktok/callback'}</div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Mode 2: Direct Account Verification (Always available, verified with TikTok live API) */}
-                      <div className="pt-3 border-t border-gray-100 text-left space-y-2">
-                        <label className="block text-xs font-bold text-gray-800">
-                          Vinculación por cuenta oficial de TikTok (Verificación en vivo)
-                        </label>
-                        <p className="text-[11px] text-gray-500 leading-relaxed">
-                          Ingresa el usuario oficial de la sede. El sistema valida su existencia directamente contra la API oficial de TikTok:
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            placeholder="Ej. @juand.store"
-                            value={customUsername}
-                            onChange={e => setCustomUsername(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter') handleVerifyAndLinkByHandle(); }}
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleVerifyAndLinkByHandle}
-                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition-colors cursor-pointer shrink-0"
-                          >
-                            Verificar y vincular
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 flex items-center justify-between text-xs border-t border-gray-100">
-                        <button
-                          type="button"
-                          onClick={() => setLinkStep(1)}
-                          className="text-gray-500 hover:text-gray-700 font-semibold cursor-pointer"
-                        >
-                          ← Cambiar de sede
-                        </button>
-                        <a
-                          href="https://www.tiktok.com/login"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-gray-500 hover:text-gray-700 flex items-center gap-1 font-semibold"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5 text-gray-500" />
-                          tiktok.com
-                        </a>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Sub-step B: TikTok Permission Authorization (Screen 2 of Image 2) */}
-                  {linkSubStep === 'authorize' && (
-                    <div className="max-w-sm mx-auto p-4 border border-gray-200 rounded-2xl bg-white space-y-4 text-center">
-                      <div className="flex items-center justify-between text-xs text-gray-500 pb-2 border-b border-gray-100">
-                        <div className="flex items-center gap-1 font-bold text-gray-900">
-                          <TikTokLogoIcon className="w-4 h-4" />
-                          <span>{linkingAccountData?.username || customUsername || 'TikTok'}</span>
-                        </div>
-                        <div className="w-6 h-6 rounded-full bg-black text-white text-[9px] flex items-center justify-center font-bold">
-                          {customUsername ? customUsername.replace('@', '').substring(0, 2).toUpperCase() : 'JD'}
-                        </div>
-                      </div>
-
-                      {/* Dual logos */}
-                      <div className="flex items-center justify-center gap-3 py-2">
-                        <div className="w-10 h-10 rounded-xl bg-black text-white flex items-center justify-center">
-                          <TikTokLogoIcon className="w-5 h-5" />
-                        </div>
-                        <span className="text-gray-400 font-bold">⇄</span>
-                        <div className="w-10 h-10 rounded-xl bg-black text-white flex items-center justify-center text-[10px] font-black">
-                          JUAN'D
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 className="font-extrabold text-sm text-gray-900">
-                          Autorizar a Control TikTok – JUAND'STORE
-                        </h4>
-                        <p className="text-[10px] text-gray-500 mt-1">
-                          Control TikTok – JUAND'STORE solicita permiso para acceder a la siguiente información de tu cuenta verificada de TikTok <strong>{linkingAccountData?.username}</strong>:
-                        </p>
-                      </div>
-
-                      {/* Verified Badge from TikTok */}
-                      <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-left space-y-0.5">
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Cuenta real verificada en TikTok</span>
-                        </div>
-                        <p className="text-[10px] text-emerald-800">
-                          Perfil: <strong>{linkingAccountData?.displayName}</strong> ({linkingAccountData?.username})
-                        </p>
-                      </div>
-
-                      <div className="space-y-2 text-left text-xs bg-gray-50 p-3 rounded-xl border border-gray-100">
-                        <div className="flex items-start gap-2.5">
-                          <User className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
-                          <div>
-                            <strong className="block text-gray-900 text-[11px]">Leer información básica del perfil</strong>
-                            <p className="text-[10px] text-gray-500">Nombre de usuario, foto de perfil y ID de la cuenta.</p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-start gap-2.5 pt-2 border-t border-gray-200/60">
-                          <VideoIcon className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
-                          <div>
-                            <strong className="block text-gray-900 text-[11px]">Leer tus videos públicos</strong>
-                            <p className="text-[10px] text-gray-500">Consultar las publicaciones ya realizadas en TikTok.</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <p className="text-[9px] text-gray-400 leading-tight">
-                        Al autorizar, aceptas la Política de privacidad y los Términos de servicio de Control TikTok - JUAND'STORE.
-                      </p>
-
-                      <div className="flex items-center justify-end gap-2 pt-2">
-                        <button
-                          type="button"
-                          onClick={() => setLinkSubStep('login')}
-                          className="px-4 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
-                        >
-                          Cancelar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleOAuthAuthorize}
-                          className="px-6 py-2 bg-[#fe2c55] hover:bg-[#e0264b] text-white font-bold text-xs rounded-lg shadow-sm transition-colors cursor-pointer"
-                        >
-                          Autorizar
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Sub-step C: Success Screen inside TikTok (Screen 3 of Image 2) */}
-                  {linkSubStep === 'success' && (
-                    <div className="max-w-sm mx-auto p-6 border border-gray-200 rounded-2xl bg-white space-y-4 text-center">
-                      <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
-                        <Check className="w-8 h-8" />
-                      </div>
-
-                      <div>
-                        <h4 className="font-extrabold text-base text-gray-900">¡Cuenta vinculada!</h4>
-                        <p className="text-xs text-gray-500 mt-1">
-                          La cuenta de TikTok se conectó correctamente con la sede {linkingAccountData?.sedeName}.
-                        </p>
-                      </div>
-
-                      <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <TikTokLogoIcon className="w-4 h-4 text-black" />
-                          <div className="text-left">
-                            <strong className="block text-xs text-gray-900">{linkingAccountData?.username}</strong>
-                            <span className="text-[10px] text-gray-400">{linkingAccountData?.displayName}</span>
-                          </div>
-                        </div>
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800">
-                          ✓ Conectada
-                        </span>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={proceedToStep3}
-                        className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition-colors cursor-pointer"
-                      >
-                        Volver a Cuentas vinculadas
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* STEP 3: Confirmación (Matching Image 3) */}
-              {linkStep === 3 && linkingAccountData && (
-                <div className="space-y-4 text-xs">
-                  {/* Green Banner */}
-                  <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2.5">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="font-extrabold text-xs text-emerald-950">¡Conexión autorizada!</h4>
-                      <p className="text-[11px] text-emerald-900 mt-0.5">
-                        La cuenta de TikTok se vinculó correctamente con la sede seleccionada.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Account Card */}
-                  <div className="p-4 rounded-xl border border-gray-200 bg-white shadow-2xs space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <div className="w-11 h-11 rounded-xl bg-black text-white flex items-center justify-center font-bold text-xs">
-                            JD
-                          </div>
-                          <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-black text-white flex items-center justify-center text-[8px]">
-                            <TikTokLogoIcon className="w-2.5 h-2.5" />
-                          </span>
-                        </div>
-                        <div>
-                          <strong className="block text-xs font-black text-gray-900">{linkingAccountData.username}</strong>
-                          <span className="text-[11px] text-gray-500 block">{linkingAccountData.displayName}</span>
-                          <span className="text-[10px] text-gray-400">ID de cuenta: {linkingAccountData.accountId}</span>
-                        </div>
-                      </div>
-
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                        <Check className="w-3 h-3 text-emerald-600" />
-                        Conectada
-                      </span>
-                    </div>
-
-                    <div className="pt-2 border-t border-gray-100 space-y-1.5 text-[11px]">
-                      <div className="flex items-center justify-between text-gray-600">
-                        <span className="text-gray-400 flex items-center gap-1">
-                          <StoreIcon className="w-3 h-3" /> Sede:
-                        </span>
-                        <strong className="text-gray-900">{linkingAccountData.sedeName}</strong>
-                      </div>
-                      <div className="flex items-center justify-between text-gray-600">
-                        <span className="text-gray-400 flex items-center gap-1">
-                          <Calendar className="w-3 h-3" /> Fecha de vinculación:
-                        </span>
-                        <strong className="text-gray-900">{linkingAccountData.connectedAt}</strong>
-                      </div>
-                      <div className="flex items-center justify-between text-gray-600">
-                        <span className="text-gray-400 flex items-center gap-1">
-                          <FileText className="w-3 h-3" /> Permisos otorgados:
-                        </span>
-                        <strong className="text-gray-900">Lectura de perfil y videos públicos</strong>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 flex items-center justify-end gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => setIsLinkModalOpen(false)}
-                      className="px-4 py-2 text-xs font-semibold text-gray-600 hover:text-gray-900 cursor-pointer"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleFinalizeConnection}
-                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm cursor-pointer transition-colors"
-                    >
-                      Finalizar
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL: AGREGAR NOTA DIARIA EN PROGRAMACIÓN */}
-      {/* ========================================================================= */}
-      {isNoteModalOpen && (
-        <div className="fixed inset-0 z-[130] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
-                📝 Nota de programación
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsNoteModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4 text-xs">
-              <div>
-                <span className="text-gray-400 block text-[11px]">Sede:</span>
-                <strong className="text-gray-900 text-sm">{selectedSedeFilter}</strong>
-              </div>
-              <div>
-                <span className="text-gray-400 block text-[11px]">Fecha seleccionada:</span>
-                <strong className="text-gray-900">{noteTargetDate}</strong>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-gray-700 mb-1">Nota / Instrucciones de publicación</label>
-                <textarea
-                  rows={3}
-                  placeholder="Ej. Publicar video de nueva colección a las 10:00 a. m. y conjunto exclusivo a las 6:00 p. m...."
-                  value={noteContent}
-                  onChange={e => setNoteContent(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsNoteModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold text-gray-600 hover:text-gray-900 cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveNote}
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm cursor-pointer"
-                >
-                  Guardar nota
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* MODAL: PROGRAMAR NUEVO VIDEO / PUBLICACIÓN EN LA BASE DE DATOS */}
-      {/* ========================================================================= */}
-      {isAddScheduleModalOpen && (
-        <div className="fixed inset-0 z-[130] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-200 my-auto">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      {/* ============================================================ */}
+      {/* MODAL: CONFIGURACION DE CREDENCIALES TIKTOK DEVELOPERS       */}
+      {/* ============================================================ */}
+      {isConfigModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                  <Plus className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-extrabold text-gray-900">Programar publicación de TikTok</h3>
-                  <p className="text-[11px] text-gray-400">Planifica videos en el calendario de supervisión de la sede.</p>
-                </div>
+                <Settings className="w-5 h-5 text-gray-800" />
+                <h3 className="text-sm md:text-base font-black text-gray-900">
+                  Credenciales de TikTok Developers
+                </h3>
               </div>
               <button
-                type="button"
-                onClick={() => setIsAddScheduleModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 cursor-pointer p-1 rounded-lg hover:bg-gray-100"
+                onClick={() => setIsConfigModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateScheduledVideo} className="p-6 space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">Sede *</label>
-                  <select
-                    value={newSchedule.sedeName}
-                    onChange={e => setNewSchedule({ ...newSchedule, sedeName: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white font-bold text-gray-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                    required
-                  >
-                    {stores.map(s => (
-                      <option key={s.id} value={s.barrio || s.name}>
-                        {s.barrio || s.name} ({s.name})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Ingresa el <b>Client Key</b> y <b>Client Secret</b> obtenidos desde tu consola en{' '}
+              <a
+                href="https://developers.tiktok.com"
+                target="_blank"
+                rel="noreferrer"
+                className="text-emerald-600 font-bold hover:underline"
+              >
+                developers.tiktok.com
+              </a>.
+            </p>
 
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">Fecha y hora programada *</label>
-                  <input
-                    type="datetime-local"
-                    value={newSchedule.scheduledAt}
-                    onChange={e => setNewSchedule({ ...newSchedule, scheduledAt: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl text-gray-800 font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-gray-700 mb-1">Título de la publicación / Campaña *</label>
+            <form onSubmit={handleSaveConfig} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-800">
+                  TikTok Client Key (App ID) *
+                </label>
                 <input
                   type="text"
-                  placeholder="Ej. Nueva colección 🔥, Jeans premium, Polos básicos..."
-                  value={newSchedule.title}
-                  onChange={e => setNewSchedule({ ...newSchedule, title: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   required
+                  value={inputClientKey}
+                  onChange={(e) => setInputClientKey(e.target.value)}
+                  placeholder="e.g. sbawl... o aw7g..."
+                  className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl p-2.5 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">Tema / Categoría</label>
-                  <input
-                    type="text"
-                    placeholder="Ej. Ropa Masculina, Calzado, Gorras..."
-                    value={newSchedule.topic}
-                    onChange={e => setNewSchedule({ ...newSchedule, topic: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">Duración estimada</label>
-                  <input
-                    type="text"
-                    placeholder="Ej. 0:24, 0:30, 0:18"
-                    value={newSchedule.duration}
-                    onChange={e => setNewSchedule({ ...newSchedule, duration: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-gray-700 mb-1">URL de miniatura / Portada (Opcional)</label>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-800">
+                  TikTok Client Secret *
+                </label>
                 <input
-                  type="url"
-                  placeholder="https://..."
-                  value={newSchedule.thumbnailUrl}
-                  onChange={e => setNewSchedule({ ...newSchedule, thumbnailUrl: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  type="password"
+                  required
+                  value={inputClientSecret}
+                  onChange={(e) => setInputClientSecret(e.target.value)}
+                  placeholder="••••••••••••••••••••••••"
+                  className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl p-2.5 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
                 />
               </div>
 
-              <div>
-                <label className="block font-bold text-gray-700 mb-1">Notas internas / Hashtags</label>
-                <textarea
-                  rows={2}
-                  placeholder="Ej. #NuevaColeccion #ModaHombre #JuandStore - Verificar alistamiento de prendas en tienda"
-                  value={newSchedule.notes}
-                  onChange={e => setNewSchedule({ ...newSchedule, notes: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-800">
+                  Redirect URI registrada en tu app de TikTok
+                </label>
+                <input
+                  type="text"
+                  value={inputRedirectUri}
+                  onChange={(e) => setInputRedirectUri(e.target.value)}
+                  placeholder="http://localhost:3000/admin/tiktok/callback"
+                  className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl p-2.5 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
                 />
+                <p className="text-[11px] text-gray-400">
+                  Asegúrate de registrar exactamente esta misma URL en las Redirect URIs de Login Kit en developers.tiktok.com.
+                </p>
               </div>
 
-              <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-[11px] text-emerald-950 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span>
-                  Esta publicación se registrará en el calendario de supervisión de la sede y se actualizará automáticamente en los reportes semanales.
-                </span>
+              <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 text-[11px] text-gray-600 space-y-1">
+                <p className="font-bold text-gray-800">Permisos requeridos en TikTok Developers:</p>
+                <p>• <code>user.info.basic</code>: Perfil oficial del usuario</p>
+                <p>• <code>video.list</code>: Historial de videos públicos</p>
+                <p>• <code>video.publish</code>: Publicación directa de videos</p>
+                <p>• <code>video.upload</code>: Carga de borradores al inbox</p>
               </div>
 
-              <div className="pt-2 flex items-center justify-end gap-2.5">
+              <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
                 <button
                   type="button"
-                  onClick={() => setIsAddScheduleModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold text-gray-600 hover:text-gray-900 cursor-pointer"
+                  onClick={() => setIsConfigModalOpen(false)}
+                  className="px-4 py-2 border border-gray-200 text-gray-600 rounded-xl text-xs font-bold hover:bg-gray-50"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm cursor-pointer transition-colors flex items-center gap-1.5"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors"
                 >
-                  <Check className="w-4 h-4" />
-                  Guardar publicación
+                  Guardar credenciales
                 </button>
               </div>
             </form>
@@ -2449,79 +1985,6 @@ export default function TikTokAdmin() {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL: PREVIEW DE VIDEO */}
-      {/* ========================================================================= */}
-      {previewVideo && (
-        <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between bg-black text-white">
-              <span className="text-xs font-extrabold flex items-center gap-1.5">
-                <TikTokLogoIcon className="w-4 h-4" /> {previewVideo.title}
-              </span>
-              <button
-                type="button"
-                onClick={() => setPreviewVideo(null)}
-                className="text-gray-400 hover:text-white cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-4 space-y-3 text-xs">
-              <div className="relative w-full h-64 bg-gray-900 rounded-xl overflow-hidden flex items-center justify-center">
-                {previewVideo.thumbnailUrl ? (
-                  <img src={previewVideo.thumbnailUrl} alt={previewVideo.title} className="w-full h-full object-cover" />
-                ) : (
-                  <Play className="w-12 h-12 text-white/50" />
-                )}
-                <span className="absolute bottom-2 right-2 bg-black/80 text-white text-xs font-bold px-2 py-0.5 rounded">
-                  {previewVideo.duration || '0:24'}
-                </span>
-              </div>
-
-              <div>
-                <strong className="block text-sm text-gray-900">{previewVideo.title}</strong>
-                <p className="text-[11px] text-gray-500 mt-1">{previewVideo.description || 'Publicación oficial en TikTok.'}</p>
-                {previewVideo.hashtags && (
-                  <p className="text-[11px] text-emerald-700 font-bold mt-1">{previewVideo.hashtags}</p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-4 gap-2 pt-2 border-t border-gray-100 text-center">
-                <div className="p-2 bg-gray-50 rounded-lg">
-                  <span className="text-[10px] text-gray-400 block">Vistas</span>
-                  <strong className="text-xs text-gray-900">{formatNum(previewVideo.viewCount)}</strong>
-                </div>
-                <div className="p-2 bg-gray-50 rounded-lg">
-                  <span className="text-[10px] text-gray-400 block">Likes</span>
-                  <strong className="text-xs text-gray-900">{formatNum(previewVideo.likeCount)}</strong>
-                </div>
-                <div className="p-2 bg-gray-50 rounded-lg">
-                  <span className="text-[10px] text-gray-400 block">Comentarios</span>
-                  <strong className="text-xs text-gray-900">{formatNum(previewVideo.commentCount)}</strong>
-                </div>
-                <div className="p-2 bg-gray-50 rounded-lg">
-                  <span className="text-[10px] text-gray-400 block">Shares</span>
-                  <strong className="text-xs text-gray-900">{formatNum(previewVideo.shareCount)}</strong>
-                </div>
-              </div>
-
-              {previewVideo.videoUrl && (
-                <a
-                  href={previewVideo.videoUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full py-2 bg-black hover:bg-gray-800 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-colors"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  Abrir en TikTok
-                </a>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
