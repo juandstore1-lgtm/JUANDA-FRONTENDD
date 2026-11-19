@@ -107,7 +107,7 @@ export default function TikTokAdmin() {
   } | null>(null);
   const [inputClientKey, setInputClientKey] = useState('');
   const [inputClientSecret, setInputClientSecret] = useState('');
-  const [inputRedirectUri, setInputRedirectUri] = useState('http://localhost:3000/admin/tiktok/callback');
+  const [inputRedirectUri, setInputRedirectUri] = useState('https://www.juandstore.com/admin/tiktok/callback');
 
   // --- Formulario de Publicación de Video (Pantalla 2) ---
   const [videoFile, setVideoFile] = useState<File | null>(null);
