@@ -112,6 +112,7 @@ export default function TikTokAdmin() {
   // Filtros de historial y resumen
   const [historySearch, setHistorySearch] = useState('');
   const [historyPeriod, setHistoryPeriod] = useState<string>('TODO');
+  const [historyPerformance, setHistoryPerformance] = useState<'TODOS' | 'VIRAL' | 'ALTO_ENGAGEMENT' | 'CON_COMENTARIOS' | 'BAJO_RENDIMIENTO'>('TODOS');
   const [historyDateFrom, setHistoryDateFrom] = useState('');
   const [historyDateTo, setHistoryDateTo] = useState('');
   const [historySpecificDate, setHistorySpecificDate] = useState('');
@@ -119,6 +120,8 @@ export default function TikTokAdmin() {
 
   // Estados para Dashboard Analítico Avanzado
   const [analyticsPeriod, setAnalyticsPeriod] = useState<string>('TODO');
+  const [analyticsPerformance, setAnalyticsPerformance] = useState<'TODOS' | 'VIRAL' | 'ALTO_ENGAGEMENT' | 'CON_COMENTARIOS' | 'BAJO_RENDIMIENTO'>('TODOS');
+  const [showAlertsBanner, setShowAlertsBanner] = useState(true);
   const [analyticsStartDate, setAnalyticsStartDate] = useState<string>('');
   const [analyticsEndDate, setAnalyticsEndDate] = useState<string>('');
   const [analyticsSpecificDate, setAnalyticsSpecificDate] = useState<string>('');
@@ -481,7 +484,26 @@ export default function TikTokAdmin() {
   };
 
   const displayVideos = useMemo(() => {
-    const list = [...(analyticsData?.videos || [])];
+    let list = [...(analyticsData?.videos || [])];
+
+    // Filtro de desempeño en Dashboard Analítico
+    if (analyticsPerformance !== 'TODOS') {
+      list = list.filter(v => {
+        const views = v.viewCount || 0;
+        const likes = v.likeCount || 0;
+        const comments = v.commentCount || 0;
+        const shares = v.shareCount || 0;
+        const interactions = likes + comments + shares;
+        const engRate = views > 0 ? (interactions / views) : 0;
+
+        if (analyticsPerformance === 'VIRAL') return views >= 500;
+        if (analyticsPerformance === 'ALTO_ENGAGEMENT') return engRate >= 0.035 || likes >= 15;
+        if (analyticsPerformance === 'CON_COMENTARIOS') return comments > 0;
+        if (analyticsPerformance === 'BAJO_RENDIMIENTO') return views < 100;
+        return true;
+      });
+    }
+
     if (periodVideoSort === 'vistas') {
       return list.sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0));
     }
@@ -493,7 +515,7 @@ export default function TikTokAdmin() {
       const d2 = new Date(a.publishedAt ? a.publishedAt.replace(' ', 'T') : 0).getTime();
       return d1 - d2;
     });
-  }, [analyticsData?.videos, periodVideoSort]);
+  }, [analyticsData?.videos, periodVideoSort, analyticsPerformance]);
 
   // Paginador de 15 videos (5 filas de 3 columnas) en Dashboard Analítico
   const ANALYTICS_PAGE_SIZE = 15;
@@ -587,6 +609,24 @@ export default function TikTokAdmin() {
       });
     }
 
+    // 3. Filtro de desempeño en Historial
+    if (historyPerformance !== 'TODOS') {
+      list = list.filter(v => {
+        const views = v.viewCount || 0;
+        const likes = v.likeCount || 0;
+        const comments = v.commentCount || 0;
+        const shares = v.shareCount || 0;
+        const interactions = likes + comments + shares;
+        const engRate = views > 0 ? (interactions / views) : 0;
+
+        if (historyPerformance === 'VIRAL') return views >= 500;
+        if (historyPerformance === 'ALTO_ENGAGEMENT') return engRate >= 0.035 || likes >= 15;
+        if (historyPerformance === 'CON_COMENTARIOS') return comments > 0;
+        if (historyPerformance === 'BAJO_RENDIMIENTO') return views < 100;
+        return true;
+      });
+    }
+
     // Ordenar de más reciente a más antiguo
     list.sort((a, b) => {
       const d1 = new Date(b.publishedAt ? b.publishedAt.trim().replace(' ', 'T') : 0).getTime();
@@ -595,7 +635,7 @@ export default function TikTokAdmin() {
     });
 
     return list;
-  }, [historyVideos, historySearch, historyPeriod, historyDateFrom, historyDateTo, historySpecificDate]);
+  }, [historyVideos, historySearch, historyPeriod, historyPerformance, historyDateFrom, historyDateTo, historySpecificDate]);
 
   const computedHistoryMetrics = useMemo(() => {
     return {
@@ -613,6 +653,112 @@ export default function TikTokAdmin() {
     const start = historyPage * HISTORY_PAGE_SIZE;
     return filteredHistoryVideos.slice(start, start + HISTORY_PAGE_SIZE);
   }, [filteredHistoryVideos, historyPage]);
+
+  // Alertas Inteligentes calculadas a partir de métricas reales de TikTok
+  const smartAlerts = useMemo(() => {
+    if (!historyVideos || historyVideos.length === 0) return [];
+    const alerts: Array<{
+      id: string;
+      type: 'viral' | 'comments' | 'engagement' | 'streak';
+      title: string;
+      message: string;
+      badge: string;
+      badgeColor: string;
+      icon: any;
+      videoUrl?: string;
+      videoTitle?: string;
+    }> = [];
+
+    // 1. Video récord de reproducciones (Viral)
+    const topVideo = [...historyVideos].sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0))[0];
+    if (topVideo && (topVideo.viewCount || 0) > 0) {
+      alerts.push({
+        id: 'top_viral',
+        type: 'viral',
+        title: '🔥 Video récord de reproducciones',
+        message: `"${topVideo.title && topVideo.title.trim() ? topVideo.title : 'Publicación de TikTok'}" lidera con ${(topVideo.viewCount || 0).toLocaleString()} visualizaciones y ${(topVideo.likeCount || 0).toLocaleString()} likes.`,
+        badge: 'Top Viral',
+        badgeColor: 'bg-red-100 text-red-800 border-red-200',
+        icon: Flame,
+        videoUrl: topVideo.videoUrl,
+        videoTitle: topVideo.title
+      });
+    }
+
+    // 2. Videos con comentarios activos (Oportunidad de ventas directa)
+    const commentedVideos = historyVideos.filter(v => (v.commentCount || 0) > 0);
+    const totalComments = commentedVideos.reduce((acc, v) => acc + (v.commentCount || 0), 0);
+    if (totalComments > 0) {
+      alerts.push({
+        id: 'client_comments',
+        type: 'comments',
+        title: '💬 Preguntas y comentarios de clientes',
+        message: `Hay ${totalComments} comentarios en tus publicaciones. Responder rápido en TikTok aumenta las visitas a juandstore.com y las ventas por WhatsApp.`,
+        badge: `${totalComments} comentarios`,
+        badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+        icon: MessageCircle,
+        videoUrl: commentedVideos[0]?.videoUrl,
+        videoTitle: commentedVideos[0]?.title
+      });
+    }
+
+    // 3. Contenido con alto nivel de engagement
+    const highEngagementVideo = [...historyVideos]
+      .filter(v => (v.viewCount || 0) >= 30)
+      .sort((a, b) => {
+        const engA = ((a.likeCount || 0) + (a.commentCount || 0)) / Math.max(1, a.viewCount || 1);
+        const engB = ((b.likeCount || 0) + (b.commentCount || 0)) / Math.max(1, b.viewCount || 1);
+        return engB - engA;
+      })[0];
+    if (highEngagementVideo) {
+      const engRate = Math.round((((highEngagementVideo.likeCount || 0) + (highEngagementVideo.commentCount || 0)) / Math.max(1, highEngagementVideo.viewCount || 1)) * 1000) / 10;
+      alerts.push({
+        id: 'high_engagement',
+        type: 'engagement',
+        title: '⭐ Contenido de Alta Conversión',
+        message: `"${highEngagementVideo.title && highEngagementVideo.title.trim() ? highEngagementVideo.title : 'Video de TikTok'}" tiene ${engRate}% de interacción. Este tipo de prendas conecta con tu público.`,
+        badge: `${engRate}% Engagement`,
+        badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
+        icon: Award,
+        videoUrl: highEngagementVideo.videoUrl,
+        videoTitle: highEngagementVideo.title
+      });
+    }
+
+    // 4. Racha de publicación y recomendación algorítmica
+    const sortedByDate = [...historyVideos].sort((a, b) => {
+      const d1 = new Date(b.publishedAt ? b.publishedAt.trim().replace(' ', 'T') : 0).getTime();
+      const d2 = new Date(a.publishedAt ? a.publishedAt.trim().replace(' ', 'T') : 0).getTime();
+      return d1 - d2;
+    });
+    const latestVideo = sortedByDate[0];
+    if (latestVideo && latestVideo.publishedAt) {
+      const daysSince = Math.floor((Date.now() - new Date(latestVideo.publishedAt.trim().replace(' ', 'T')).getTime()) / (1000 * 60 * 60 * 24));
+      if (daysSince <= 0) {
+        alerts.push({
+          id: 'streak_active',
+          type: 'streak',
+          title: '⚡ ¡Racha de contenido activa!',
+          message: 'Has publicado contenido en TikTok hoy. La constancia diaria mantiene tu cuenta impulsada en el feed "Para Ti".',
+          badge: 'Al día',
+          badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
+          icon: TrendingUp
+        });
+      } else {
+        alerts.push({
+          id: 'streak_warn',
+          type: 'streak',
+          title: '📅 Recordatorio de constancia algorítmica',
+          message: `Llevas ${daysSince} ${daysSince === 1 ? 'día' : 'días'} sin publicar un nuevo video. Publicar entre 4 y 7 videos por semana maximiza tu alcance orgánico en Cali y Colombia.`,
+          badge: `${daysSince}d sin publicar`,
+          badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
+          icon: Clock
+        });
+      }
+    }
+
+    return alerts;
+  }, [historyVideos]);
 
   const loadAccount = async () => {
     try {
@@ -1209,6 +1355,27 @@ export default function TikTokAdmin() {
             <span>Administrador Global</span>
           </div>
 
+          {/* Botón Centro de Alertas Inteligentes */}
+          <button
+            onClick={() => setShowAlertsBanner(!showAlertsBanner)}
+            title="Ver centro de alertas y recomendaciones de TikTok"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all border ${
+              showAlertsBanner 
+                ? 'bg-amber-500 text-white border-amber-600 ring-2 ring-amber-400/20' 
+                : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
+            }`}
+          >
+            <Bell className={`w-4 h-4 ${showAlertsBanner ? 'text-white' : 'text-amber-500'}`} />
+            <span>Alertas</span>
+            {smartAlerts.length > 0 && (
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                showAlertsBanner ? 'bg-white text-amber-700' : 'bg-red-500 text-white'
+              }`}>
+                {smartAlerts.length}
+              </span>
+            )}
+          </button>
+
           {/* Botón Configuración de Credenciales */}
           <button
             onClick={() => setIsConfigModalOpen(true)}
@@ -1220,6 +1387,80 @@ export default function TikTokAdmin() {
           </button>
         </div>
       </div>
+
+      {/* ============================================================ */}
+      {/* BANNER / CENTRO DE ALERTAS Y RECOMENDACIONES INTELIGENTES    */}
+      {/* ============================================================ */}
+      {showAlertsBanner && smartAlerts.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-50 via-white to-amber-50/40 border border-amber-200 rounded-2xl p-4 md:p-5 shadow-sm space-y-3 animate-fadeIn">
+          <div className="flex items-center justify-between pb-3 border-b border-amber-200/60">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                <Bell className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-xs md:text-sm font-black text-gray-900 tracking-tight flex items-center gap-2">
+                  <span>Centro de Alertas & Estrategia de TikTok</span>
+                  <span className="px-2 py-0.2 text-[10px] font-black rounded-full bg-amber-200 text-amber-900">
+                    {smartAlerts.length} {smartAlerts.length === 1 ? 'alerta' : 'alertas'}
+                  </span>
+                </h3>
+                <p className="text-[11px] text-gray-600">
+                  Monitoreo de viralidad, comentarios de clientes y optimización del algoritmo para JUANDSTORE.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowAlertsBanner(false)}
+              className="text-xs text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-amber-100/50 transition-colors"
+              title="Ocultar alertas"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+            {smartAlerts.map((al) => {
+              const Icon = al.icon;
+              return (
+                <div
+                  key={al.id}
+                  className="bg-white rounded-xl border border-gray-200 p-3.5 shadow-2xs hover:shadow-sm hover:border-amber-300 transition-all flex flex-col justify-between space-y-2.5"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className={`px-2 py-0.5 text-[10px] font-black rounded-md border ${al.badgeColor}`}>
+                        {al.badge}
+                      </span>
+                      <Icon className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <h4 className="text-xs font-bold text-gray-900 leading-snug">
+                      {al.title}
+                    </h4>
+                    <p className="text-[11px] text-gray-600 leading-relaxed">
+                      {al.message}
+                    </p>
+                  </div>
+
+                  {al.videoUrl && (
+                    <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
+                      <a
+                        href={al.videoUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                      >
+                        <span>Ver publicación</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* TABS DE NAVEGACION */}
       <div className="flex items-center gap-2 border-b border-gray-200 pb-2 overflow-x-auto">
@@ -2347,6 +2588,39 @@ export default function TikTokAdmin() {
               </div>
             )}
 
+            {/* Selector de Nivel de Desempeño */}
+            <div className="pt-3 border-t border-gray-100 flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-bold text-gray-500 mr-1 flex items-center gap-1">
+                <Flame className="w-3.5 h-3.5 text-amber-500" />
+                Desempeño:
+              </span>
+              {[
+                { id: 'TODOS', label: 'Todos los niveles' },
+                { id: 'VIRAL', label: '🔥 Virales (+500)' },
+                { id: 'ALTO_ENGAGEMENT', label: '⭐ Alto Engagement (>3.5%)' },
+                { id: 'CON_COMENTARIOS', label: '💬 Con comentarios' },
+                { id: 'BAJO_RENDIMIENTO', label: '📉 Oportunidad de mejora (<100)' },
+              ].map((pill) => {
+                const isSelected = historyPerformance === pill.id;
+                return (
+                  <button
+                    key={pill.id}
+                    onClick={() => {
+                      setHistoryPerformance(pill.id as any);
+                      setHistoryPage(0);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                      isSelected
+                        ? 'bg-amber-500 text-white shadow-sm ring-2 ring-amber-500/20'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                    }`}
+                  >
+                    {pill.label}
+                  </button>
+                );
+              })}
+            </div>
+
             {/* Buscador de texto en Historial */}
             <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-3">
               <div className="relative w-full sm:w-96">
@@ -2381,11 +2655,12 @@ export default function TikTokAdmin() {
             {filteredHistoryVideos.length === 0 ? (
               <div className="py-16 text-center text-gray-400 text-xs font-medium space-y-2">
                 <Film className="w-10 h-10 text-gray-300 mx-auto" />
-                <p className="font-bold text-gray-600">No hay videos para el período o búsqueda seleccionada.</p>
-                <p className="text-gray-400">Prueba cambiando el filtro temporal o limpiando el buscador.</p>
+                <p className="font-bold text-gray-600">No hay videos para el período, nivel de desempeño o búsqueda seleccionada.</p>
+                <p className="text-gray-400">Prueba cambiando el filtro temporal o restableciendo los criterios.</p>
                 <button
                   onClick={() => {
                     setHistoryPeriod('TODO');
+                    setHistoryPerformance('TODOS');
                     setHistorySearch('');
                     setHistoryDateFrom('');
                     setHistoryDateTo('');
@@ -2415,9 +2690,34 @@ export default function TikTokAdmin() {
                       </div>
 
                       <div className="space-y-1">
-                        <h4 className="text-xs md:text-sm font-bold text-gray-900 line-clamp-1">
-                          {vid.title && vid.title.trim() ? vid.title : 'Publicación de TikTok'}
-                        </h4>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-xs md:text-sm font-bold text-gray-900 line-clamp-1">
+                            {vid.title && vid.title.trim() ? vid.title : 'Publicación de TikTok'}
+                          </h4>
+                          {(vid.viewCount || 0) >= 500 && (
+                            <span className="px-1.5 py-0.2 text-[10px] font-black rounded bg-red-100 text-red-700 border border-red-200 flex items-center gap-0.5">
+                              <Flame className="w-2.5 h-2.5 text-red-600" />
+                              Viral
+                            </span>
+                          )}
+                          {(vid.viewCount || 0) < 500 && ((vid.likeCount || 0) + (vid.commentCount || 0)) / Math.max(1, (vid.viewCount || 0)) >= 0.035 && (
+                            <span className="px-1.5 py-0.2 text-[10px] font-black rounded bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-0.5">
+                              <Award className="w-2.5 h-2.5 text-amber-600" />
+                              Engagement
+                            </span>
+                          )}
+                          {(vid.commentCount || 0) > 0 && (
+                            <span className="px-1.5 py-0.2 text-[10px] font-black rounded bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-0.5">
+                              <MessageCircle className="w-2.5 h-2.5 text-emerald-600" />
+                              {vid.commentCount} {vid.commentCount === 1 ? 'comentario' : 'comentarios'}
+                            </span>
+                          )}
+                          {(vid.viewCount || 0) < 100 && (
+                            <span className="px-1.5 py-0.2 text-[10px] font-black rounded bg-gray-100 text-gray-600 border border-gray-200">
+                              Bajo alcance
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[11px] text-gray-500 line-clamp-1">
                           {vid.description && vid.description.trim() ? vid.description : 'Publicación oficial en cuenta de TikTok'}
                         </p>
@@ -2896,15 +3196,49 @@ export default function TikTokAdmin() {
               </div>
             </div>
 
+            {/* Selector de Nivel de Desempeño en Dashboard */}
+            <div className="flex items-center gap-1.5 flex-wrap pt-2 border-t border-gray-100">
+              <span className="text-[11px] font-bold text-gray-500 mr-1 flex items-center gap-1">
+                <Flame className="w-3.5 h-3.5 text-amber-500" />
+                Desempeño:
+              </span>
+              {[
+                { id: 'TODOS', label: 'Todos' },
+                { id: 'VIRAL', label: '🔥 Virales (+500)' },
+                { id: 'ALTO_ENGAGEMENT', label: '⭐ Alto Engagement (>3.5%)' },
+                { id: 'CON_COMENTARIOS', label: '💬 Con comentarios' },
+                { id: 'BAJO_RENDIMIENTO', label: '📉 Oportunidad de mejora (<100)' },
+              ].map((pill) => {
+                const isSelected = analyticsPerformance === pill.id;
+                return (
+                  <button
+                    key={pill.id}
+                    onClick={() => {
+                      setAnalyticsPerformance(pill.id as any);
+                      setAnalyticsVideosPage(0);
+                    }}
+                    className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
+                      isSelected
+                        ? 'bg-amber-500 text-white shadow-sm ring-2 ring-amber-500/20'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                    }`}
+                  >
+                    {pill.label}
+                  </button>
+                );
+              })}
+            </div>
+
             {displayVideos.length === 0 ? (
               <div className="py-12 text-center space-y-3">
                 <Film className="w-10 h-10 text-gray-300 mx-auto" />
                 <p className="text-xs font-bold text-gray-500">
-                  No se encontraron videos publicados en este período específico.
+                  No se encontraron videos publicados en este período o nivel de desempeño específico.
                 </p>
                 <button
                   onClick={() => {
                     setAnalyticsPeriod('TODO');
+                    setAnalyticsPerformance('TODOS');
                     loadAnalytics('TODO', '', '', '');
                   }}
                   className="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg text-xs font-bold transition-colors inline-block"
@@ -2923,9 +3257,34 @@ export default function TikTokAdmin() {
                     >
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <span className="px-2.5 py-0.5 text-[11px] font-black rounded-full border bg-emerald-50 text-emerald-800 border-emerald-200">
-                            #{itemIndex}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-2.5 py-0.5 text-[11px] font-black rounded-full border bg-emerald-50 text-emerald-800 border-emerald-200">
+                              #{itemIndex}
+                            </span>
+                            {(vid.viewCount || 0) >= 500 && (
+                              <span className="px-1.5 py-0.2 text-[10px] font-black rounded bg-red-100 text-red-700 border border-red-200 flex items-center gap-0.5">
+                                <Flame className="w-2.5 h-2.5 text-red-600" />
+                                Viral
+                              </span>
+                            )}
+                            {(vid.viewCount || 0) < 500 && ((vid.likeCount || 0) + (vid.commentCount || 0)) / Math.max(1, (vid.viewCount || 0)) >= 0.035 && (
+                              <span className="px-1.5 py-0.2 text-[10px] font-black rounded bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-0.5">
+                                <Award className="w-2.5 h-2.5 text-amber-600" />
+                                Engagement
+                              </span>
+                            )}
+                            {(vid.commentCount || 0) > 0 && (
+                              <span className="px-1.5 py-0.2 text-[10px] font-black rounded bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-0.5">
+                                <MessageCircle className="w-2.5 h-2.5 text-emerald-600" />
+                                {vid.commentCount}
+                              </span>
+                            )}
+                            {(vid.viewCount || 0) < 100 && (
+                              <span className="px-1.5 py-0.2 text-[10px] font-black rounded bg-gray-100 text-gray-600 border border-gray-200">
+                                Bajo alcance
+                              </span>
+                            )}
+                          </div>
                           <span className="text-[11px] font-bold text-gray-500">
                             {vid.publishedAt
                               ? new Date(vid.publishedAt.replace(' ', 'T')).toLocaleDateString('es-CO', {
