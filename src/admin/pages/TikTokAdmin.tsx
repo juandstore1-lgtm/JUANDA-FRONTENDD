@@ -133,8 +133,8 @@ export default function TikTokAdmin() {
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const [coverTimestampMs, setCoverTimestampMs] = useState<number>(1000);
 
-  // Opciones de publicación
-  const [privacyLevel, setPrivacyLevel] = useState<'PUBLIC_TO_EVERYONE' | 'MUTUAL_FOLLOW_FRIENDS' | 'SELF_ONLY'>('PUBLIC_TO_EVERYONE');
+  // Opciones de publicación (En Sandbox TikTok solo permite SELF_ONLY)
+  const [privacyLevel, setPrivacyLevel] = useState<'PUBLIC_TO_EVERYONE' | 'MUTUAL_FOLLOW_FRIENDS' | 'SELF_ONLY'>('SELF_ONLY');
   const [allowComments, setAllowComments] = useState(true);
   const [allowDuet, setAllowDuet] = useState(true);
   const [allowStitch, setAllowStitch] = useState(true);
@@ -616,20 +616,58 @@ export default function TikTokAdmin() {
       setActiveTab('historial');
     } catch (err: any) {
       // Manejo estricto de errores de la API oficial de TikTok
-      Swal.fire({
-        icon: 'error',
-        title: 'TikTok rechazó la publicación',
-        html: `
-          <div class="text-left text-sm space-y-3">
-            <p class="text-red-600 font-medium">${err?.message || 'Error desconocido al comunicar con TikTok.'}</p>
-            <div class="bg-amber-50 border border-amber-200 p-3 rounded text-xs text-amber-800">
-              <b>Nota de la integración oficial:</b><br/>
-              Si TikTok indica que el permiso <code>video.publish</code> no está autorizado, tu app de TikTok Developers debe recibir aprobación para publicación directa o tu cuenta debe estar registrada como Tester en la consola de TikTok Developers.
+      const rawError = err?.message || '';
+      const isUnauditedRestriction = rawError.includes('unaudited_client_can_only_post_to_private_accounts');
+
+      if (isUnauditedRestriction) {
+        setPrivacyLevel('SELF_ONLY');
+        Swal.fire({
+          icon: 'warning',
+          title: 'Restricción de TikTok en modo Sandbox',
+          html: `
+            <div class="text-left text-xs space-y-3">
+              <p class="text-gray-800 font-medium leading-relaxed">
+                TikTok rechazó la publicación porque la aplicación está en modo <b>Sandbox / Desarrollo (sin auditar)</b>.
+              </p>
+              <div class="bg-amber-50 border border-amber-300 p-3 rounded-lg text-amber-900 space-y-2">
+                <p class="font-bold text-amber-900 flex items-center gap-1.5">
+                  📌 Pasos obligatorios de TikTok para publicar en Sandbox:
+                </p>
+                <ol class="list-decimal pl-4 space-y-1.5 text-gray-800">
+                  <li>
+                    <b>Configura tu cuenta como privada en TikTok:</b><br/>
+                    Abre la app de TikTok en tu celular con la cuenta <span class="font-mono font-bold text-gray-900">@juandstore</span>, ve a <i>Perfil &gt; Ajustes y privacidad &gt; Privacidad</i> y <b>activa "Cuenta privada"</b>.
+                  </li>
+                  <li>
+                    <b>Usa Privacidad "Solo yo" o "Guardar borrador":</b><br/>
+                    En la barra lateral de este panel, mantén la Privacidad en <b>"🔒 Solo yo"</b> o haz clic en el botón <b>"Guardar borrador"</b>.
+                  </li>
+                </ol>
+              </div>
+              <p class="text-gray-500 text-[11px] leading-tight">
+                ℹ️ <i>Esta regla de seguridad la exige TikTok a todas las apps que aún no pasan su auditoría oficial. Una vez que TikTok apruebe la app para producción, podrás publicar videos públicos para todo el mundo sin cambiar la cuenta a privada.</i>
+              </p>
             </div>
-          </div>
-        `,
-        confirmButtonColor: '#ef4444'
-      });
+          `,
+          confirmButtonText: 'Entendido, pondré la cuenta privada para probar',
+          confirmButtonColor: '#059669'
+        });
+      } else {
+        Swal.fire({
+          icon: 'error',
+          title: 'TikTok rechazó la publicación',
+          html: `
+            <div class="text-left text-sm space-y-3">
+              <p class="text-red-600 font-medium">${rawError || 'Error desconocido al comunicar con TikTok.'}</p>
+              <div class="bg-amber-50 border border-amber-200 p-3 rounded text-xs text-amber-800">
+                <b>Nota de la integración oficial:</b><br/>
+                Si TikTok indica que el permiso <code>video.publish</code> no está autorizado, tu app de TikTok Developers debe recibir aprobación para publicación directa o tu cuenta debe estar registrada como Tester en la consola de TikTok Developers.
+              </div>
+            </div>
+          `,
+          confirmButtonColor: '#ef4444'
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -1317,20 +1355,27 @@ export default function TikTokAdmin() {
                 </div>
 
                 {/* Privacidad */}
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                    <Lock className="w-3.5 h-3.5 text-gray-400" />
-                    Privacidad
-                  </span>
-                  <select
-                    value={privacyLevel}
-                    onChange={(e: any) => setPrivacyLevel(e.target.value)}
-                    className="text-xs font-semibold bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  >
-                    <option value="PUBLIC_TO_EVERYONE">🌐 Público</option>
-                    <option value="MUTUAL_FOLLOW_FRIENDS">👥 Amigos</option>
-                    <option value="SELF_ONLY">🔒 Solo yo</option>
-                  </select>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-gray-400" />
+                      Privacidad
+                    </span>
+                    <select
+                      value={privacyLevel}
+                      onChange={(e: any) => setPrivacyLevel(e.target.value)}
+                      className="text-xs font-semibold bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    >
+                      <option value="SELF_ONLY">🔒 Solo yo (Sandbox)</option>
+                      <option value="PUBLIC_TO_EVERYONE">🌐 Público (Auditado)</option>
+                      <option value="MUTUAL_FOLLOW_FRIENDS">👥 Amigos (Auditado)</option>
+                    </select>
+                  </div>
+                  {privacyLevel !== 'SELF_ONLY' && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 text-[11px] text-amber-800 leading-tight">
+                      ⚠️ <b>Modo Sandbox:</b> TikTok rechazará videos públicos hasta que la app complete la auditoría oficial. Usa <b>Solo yo</b> o pulsa <b>Guardar borrador</b>.
+                    </div>
+                  )}
                 </div>
 
                 {/* Permitir comentarios */}
