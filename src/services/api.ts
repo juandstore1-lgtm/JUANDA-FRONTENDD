@@ -1217,6 +1217,60 @@ export const TikTokService = {
       headers: getHeaders()
     });
     return await handleResponse(res);
+  },
+
+  getAnalytics: async (params?: {
+    period?: string;
+    startDate?: string;
+    endDate?: string;
+    specificDate?: string;
+  }): Promise<{
+    isLinked: boolean;
+    accountUsername: string;
+    accountDisplayName: string;
+    totalAllVideos: number;
+    totalPeriodVideos: number;
+    totalViews: number;
+    totalLikes: number;
+    totalComments: number;
+    totalShares: number;
+    engagementRate: number;
+    avgViewsPerVideo: number;
+    avgLikesPerVideo: number;
+    filterFrom: string;
+    filterTo: string;
+    topViralVideos: import('../types').TikTokVideo[];
+    mostViralWeek: {
+      weekStart?: string;
+      weekEnd?: string;
+      label?: string;
+      totalViews?: number;
+      totalLikes?: number;
+      videoCount?: number;
+    };
+    mostViralMonth: {
+      yearMonth?: string;
+      monthName?: string;
+      totalViews?: number;
+      totalLikes?: number;
+      videoCount?: number;
+    };
+    timeline: Array<{
+      date: string;
+      videos: number;
+      views: number;
+      likes: number;
+      comments: number;
+    }>;
+    videos: import('../types').TikTokVideo[];
+  }> => {
+    const query = new URLSearchParams();
+    if (params?.period) query.append('period', params.period);
+    if (params?.startDate) query.append('startDate', params.startDate);
+    if (params?.endDate) query.append('endDate', params.endDate);
+    if (params?.specificDate) query.append('specificDate', params.specificDate);
+    const res = await fetch(`${API_URL}/tiktok/admin/analytics?${query.toString()}`, { headers: getHeaders() });
+    return await handleResponse(res);
   }
 };
 
