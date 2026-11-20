@@ -56,9 +56,9 @@ export default function AuditAdmin() {
   // Navigation Tabs: 'general' | 'movements' | 'store_activity' | 'daily_tracking' | 'alerts' | 'change_history'
   const [activeTab, setActiveTab] = useState<'general' | 'movements' | 'store_activity' | 'daily_tracking' | 'alerts' | 'change_history'>('general');
 
-  // Filters State - Default to '7days' to reflect all recent movements from the database
+  // Filters State - Default to 'today' to immediately reflect today's movements from the database
   const [selectedSupervisorId, setSelectedSupervisorId] = useState<string>('all');
-  const [dateRangeMode, setDateRangeMode] = useState<'today' | 'yesterday' | '7days' | '30days' | 'all' | 'specific_date' | 'custom'>('7days');
+  const [dateRangeMode, setDateRangeMode] = useState<'today' | 'yesterday' | '7days' | '30days' | 'all' | 'specific_date' | 'custom'>('today');
   const [selectedSpecificDate, setSelectedSpecificDate] = useState<string>('');
   const [customStartDate, setCustomStartDate] = useState<string>('');
   const [customEndDate, setCustomEndDate] = useState<string>('');
@@ -478,11 +478,11 @@ export default function AuditAdmin() {
         return false;
       }
 
-      // 3. User verification: only real user accounts (never automated system changes)
-      const isSystem = !log.userName || 
-        log.userName.toUpperCase().includes('SYSTEM') || 
-        log.userName.toUpperCase().includes('SISTEMA') ||
-        (log.userRole && log.userRole.toUpperCase().includes('SYSTEM'));
+      // 3. User verification: exclude explicit system accounts if any
+      const isSystem = Boolean(
+        (log.userName && (log.userName.toUpperCase().includes('SYSTEM') || log.userName.toUpperCase().includes('SISTEMA'))) ||
+        (log.userRole && log.userRole.toUpperCase().includes('SYSTEM'))
+      );
       if (isSystem) {
         return false;
       }
@@ -492,12 +492,7 @@ export default function AuditAdmin() {
 
       const parsed = parseLogProduct(log);
 
-      // 4. If it's an UPDATE, must have genuine user modifications (si no hay ediciones no deben de aparecer)
-      if (log.actionType === 'UPDATE' && !parsed.hasRealEdition) {
-        return false;
-      }
-
-      // 5. STRICT FILTER BY USER (SUPERVISIÓN INDIVIDUAL DE CADA USUARIO)
+      // 4. STRICT FILTER BY USER (SUPERVISIÓN INDIVIDUAL DE CADA USUARIO - EXACTO A BASE DE DATOS)
       if (selectedSupervisorId !== 'all') {
         const targetOption = supervisorOptions.find(o => o.id === selectedSupervisorId);
         const targetUser = users.find(u => String(u.id) === selectedSupervisorId);
@@ -506,16 +501,20 @@ export default function AuditAdmin() {
         const targetName = (targetOption?.userName || targetUser?.name || '').toLowerCase().trim();
         const targetEmail = (targetUser?.email || '').toLowerCase().trim();
 
-        const matchesId = log.userId && Number(log.userId) === targetId;
-        const matchesName = targetName && log.userName && log.userName.toLowerCase().trim() === targetName;
-        const matchesEmail = targetEmail && log.userEmail && log.userEmail.toLowerCase().trim() === targetEmail;
+        const logUserId = log.userId ? Number(log.userId) : null;
+        const logUserName = (log.userName || '').toLowerCase().trim();
+        const logUserEmail = (log.userEmail || '').toLowerCase().trim();
+
+        const matchesId = logUserId !== null && logUserId === targetId;
+        const matchesName = Boolean(targetName && logUserName && (logUserName === targetName || logUserName.includes(targetName) || targetName.includes(logUserName)));
+        const matchesEmail = Boolean(targetEmail && logUserEmail && (logUserEmail === targetEmail || logUserEmail.includes(targetEmail) || targetEmail.includes(logUserEmail)));
 
         if (!matchesId && !matchesName && !matchesEmail) {
           return false;
         }
       }
 
-      // 6. Search term
+      // 5. Search term
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase();
         const matchesProduct = parsed.name.toLowerCase().includes(term);
@@ -571,7 +570,7 @@ export default function AuditAdmin() {
     return baseCatalogLogs.filter(l => l.actionType === selectedMovementAction);
   }, [baseCatalogLogs, selectedMovementAction]);
 
-  // Base logs for Historial de Cambios (strictly real user editions only)
+  // Base logs for Historial de Cambios (all real user editions recorded in DB)
   const historyBaseLogs = useMemo(() => {
     return auditLogs.filter(log => {
       // Must be strictly UPDATE (productos editados)
@@ -582,24 +581,19 @@ export default function AuditAdmin() {
         return false;
       }
 
-      // Strictly real users (exclude system background)
-      const isSystem = !log.userName || 
-        log.userName.toUpperCase().includes('SYSTEM') || 
-        log.userName.toUpperCase().includes('SISTEMA') ||
-        (log.userRole && log.userRole.toUpperCase().includes('SYSTEM'));
+      // Strictly exclude system background accounts if any
+      const isSystem = Boolean(
+        (log.userName && (log.userName.toUpperCase().includes('SYSTEM') || log.userName.toUpperCase().includes('SISTEMA'))) ||
+        (log.userRole && log.userRole.toUpperCase().includes('SYSTEM'))
+      );
       if (isSystem) {
-        return false;
-      }
-
-      const parsed = parseLogProduct(log);
-
-      // CRITICAL: Must have real editions (si no hay ediciones no deben de aparecer)
-      if (!parsed.hasRealEdition) {
         return false;
       }
 
       const logDate = parseDateSafe(log.createdAt);
       if (!isDateInRange(logDate)) return false;
+
+      const parsed = parseLogProduct(log);
 
       // Sede filter
       if (historySelectedStore !== 'all') {
@@ -610,14 +604,29 @@ export default function AuditAdmin() {
 
       // User filter
       if (historySelectedUser !== 'all') {
-        const matchesUser = (log.userId && String(log.userId) === historySelectedUser) ||
-          (log.userName && log.userName.toLowerCase().trim() === historySelectedUser.toLowerCase().trim());
-        if (!matchesUser) return false;
+        const targetOption = supervisorOptions.find(o => o.id === historySelectedUser);
+        const targetUser = users.find(u => String(u.id) === historySelectedUser);
+
+        const targetId = Number(historySelectedUser);
+        const targetName = (targetOption?.userName || targetUser?.name || '').toLowerCase().trim();
+        const targetEmail = (targetUser?.email || '').toLowerCase().trim();
+
+        const logUserId = log.userId ? Number(log.userId) : null;
+        const logUserName = (log.userName || '').toLowerCase().trim();
+        const logUserEmail = (log.userEmail || '').toLowerCase().trim();
+
+        const matchesId = logUserId !== null && logUserId === targetId;
+        const matchesName = Boolean(targetName && logUserName && (logUserName === targetName || logUserName.includes(targetName) || targetName.includes(logUserName)));
+        const matchesEmail = Boolean(targetEmail && logUserEmail && (logUserEmail === targetEmail || logUserEmail.includes(targetEmail) || targetEmail.includes(logUserEmail)));
+
+        if (!matchesId && !matchesName && !matchesEmail) {
+          return false;
+        }
       }
 
       return true;
     });
-  }, [auditLogs, dateRangeMode, selectedSpecificDate, customStartDate, customEndDate, historySelectedStore, historySelectedUser, products, stores, users]);
+  }, [auditLogs, dateRangeMode, selectedSpecificDate, customStartDate, customEndDate, historySelectedStore, historySelectedUser, supervisorOptions, products, stores, users]);
 
   // Real KPIs for Historial de Cambios (reflecting real edit counts from genuine user actions)
   const historyKpis = useMemo(() => {
@@ -721,12 +730,11 @@ export default function AuditAdmin() {
     const prevLogs = auditLogs.filter(log => {
       if (log.actionType !== 'CREATE' && log.actionType !== 'UPDATE' && log.actionType !== 'DELETE') return false;
       if (log.entityType && log.entityType !== 'PRODUCT') return false;
-      const isSystem = !log.userName || 
-        log.userName.toUpperCase().includes('SYSTEM') || 
-        log.userName.toUpperCase().includes('SISTEMA') ||
-        (log.userRole && log.userRole.toUpperCase().includes('SYSTEM'));
+      const isSystem = Boolean(
+        (log.userName && (log.userName.toUpperCase().includes('SYSTEM') || log.userName.toUpperCase().includes('SISTEMA'))) ||
+        (log.userRole && log.userRole.toUpperCase().includes('SYSTEM'))
+      );
       if (isSystem) return false;
-      if (log.actionType === 'UPDATE' && !parseLogProduct(log).hasRealEdition) return false;
       const d = parseDateSafe(log.createdAt);
       return d >= prevStart && d < prevEnd;
     });
@@ -774,16 +782,20 @@ export default function AuditAdmin() {
         if (log.actionType !== 'CREATE' && log.actionType !== 'UPDATE' && log.actionType !== 'DELETE') return false;
         if (log.entityType && log.entityType !== 'PRODUCT') return false;
 
-        const isSystem = !log.userName || 
-          log.userName.toUpperCase().includes('SYSTEM') || 
-          log.userName.toUpperCase().includes('SISTEMA') ||
-          (log.userRole && log.userRole.toUpperCase().includes('SYSTEM'));
+        const isSystem = Boolean(
+          (log.userName && (log.userName.toUpperCase().includes('SYSTEM') || log.userName.toUpperCase().includes('SISTEMA'))) ||
+          (log.userRole && log.userRole.toUpperCase().includes('SYSTEM'))
+        );
         if (isSystem) return false;
 
-        if (log.actionType === 'UPDATE' && !parseLogProduct(log).hasRealEdition) return false;
-
         const matchesUserId = uId !== null && log.userId && Number(log.userId) === uId;
-        const matchesUserName = managerName && log.userName && log.userName.toLowerCase().trim() === managerName.toLowerCase().trim();
+        const matchesUserName = Boolean(
+          managerName && log.userName && (
+            log.userName.toLowerCase().trim() === managerName.toLowerCase().trim() ||
+            log.userName.toLowerCase().trim().includes(managerName.toLowerCase().trim()) ||
+            managerName.toLowerCase().trim().includes(log.userName.toLowerCase().trim())
+          )
+        );
         return matchesUserId || matchesUserName;
       });
 
@@ -1161,26 +1173,38 @@ export default function AuditAdmin() {
       if (log.actionType !== 'CREATE' && log.actionType !== 'UPDATE' && log.actionType !== 'DELETE') return false;
       if (log.entityType && log.entityType !== 'PRODUCT') return false;
 
-      const isSystem = !log.userName || 
-        log.userName.toUpperCase().includes('SYSTEM') || 
-        log.userName.toUpperCase().includes('SISTEMA') ||
-        (log.userRole && log.userRole.toUpperCase().includes('SYSTEM'));
+      const isSystem = Boolean(
+        (log.userName && (log.userName.toUpperCase().includes('SYSTEM') || log.userName.toUpperCase().includes('SISTEMA'))) ||
+        (log.userRole && log.userRole.toUpperCase().includes('SYSTEM'))
+      );
       if (isSystem) return false;
-
-      if (log.actionType === 'UPDATE' && !parseLogProduct(log).hasRealEdition) return false;
 
       const d = parseDateSafe(log.createdAt);
       const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       if (dateStr !== selectedCalendarDayStr) return false;
       if (selectedSupervisorId !== 'all') {
         const targetOption = supervisorOptions.find(o => o.id === selectedSupervisorId);
-        const matchesId = log.userId && String(log.userId) === selectedSupervisorId;
-        const matchesName = targetOption && log.userName && log.userName.toLowerCase().trim() === targetOption.userName.toLowerCase().trim();
-        return matchesId || matchesName;
+        const targetUser = users.find(u => String(u.id) === selectedSupervisorId);
+
+        const targetId = Number(selectedSupervisorId);
+        const targetName = (targetOption?.userName || targetUser?.name || '').toLowerCase().trim();
+        const targetEmail = (targetUser?.email || '').toLowerCase().trim();
+
+        const logUserId = log.userId ? Number(log.userId) : null;
+        const logUserName = (log.userName || '').toLowerCase().trim();
+        const logUserEmail = (log.userEmail || '').toLowerCase().trim();
+
+        const matchesId = logUserId !== null && logUserId === targetId;
+        const matchesName = Boolean(targetName && logUserName && (logUserName === targetName || logUserName.includes(targetName) || targetName.includes(logUserName)));
+        const matchesEmail = Boolean(targetEmail && logUserEmail && (logUserEmail === targetEmail || logUserEmail.includes(targetEmail) || targetEmail.includes(logUserEmail)));
+
+        if (!matchesId && !matchesName && !matchesEmail) {
+          return false;
+        }
       }
       return true;
     });
-  }, [auditLogs, selectedCalendarDayStr, selectedSupervisorId, supervisorOptions]);
+  }, [auditLogs, selectedCalendarDayStr, selectedSupervisorId, supervisorOptions, users]);
 
   // Selected calendar day summary metrics
   const selectedDayMetrics = useMemo(() => {
