@@ -31,7 +31,9 @@ export default function TikTokCallback() {
   useEffect(() => {
     if (executedRef.current) return;
 
-    const code = searchParams.get('code');
+    // Extraer código preservando caracteres exactos (evitar que useSearchParams reemplace + por espacios)
+    const codeMatch = window.location.search.match(/[?&]code=([^&]+)/);
+    const code = codeMatch ? decodeURIComponent(codeMatch[1]) : searchParams.get('code');
     const state = searchParams.get('state');
     const error = searchParams.get('error');
     const errorDesc = searchParams.get('error_description');
