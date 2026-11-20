@@ -39,8 +39,7 @@ import {
   ChevronsRight,
   Info,
   Layers,
-  RotateCcw,
-  Calculator
+  RotateCcw
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import Swal from 'sweetalert2';
@@ -85,7 +84,7 @@ export default function CommercialAdmin() {
   ];
 
   // =========================================================================
-  // TAB 1: RESUMEN GENERAL (DASHBOARD COMERCIAL DINÁMICO)
+  // TAB 1: RESUMEN GENERAL (DASHBOARD DINÁMICO)
   // =========================================================================
   const monthlyMetrics = useMemo(() => {
     const monthPrefix = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
@@ -128,18 +127,17 @@ export default function CommercialAdmin() {
     setTimeout(() => {
       setAiIsProcessing(false);
       const sample1 = data.products[0];
-      const sample2 = data.products[1] || sample1;
-      const sample3 = data.products[2] || sample1;
+      const sample2 = data.products[4] || sample1; // Jeans
+      const sample3 = data.products[7] || sample1; // Pantaloneta NBA
 
-      // La IA lee el precio de venta anotado en la libreta física
       const detected: CommercialSaleLine[] = [
         {
           id: `ai-${Date.now()}-1`,
-          productId: sample1?.id || 'p1',
+          productId: sample1?.id || 'p-1',
           productName: sample1?.name || 'CAMISAS ALTA GAMA',
           quantity: 2,
           costPrice: sample1?.costPrice || 40000,
-          sellingPrice: 70000, // Precio detectado de la libreta
+          sellingPrice: 70000,
           subtotal: 140000,
           costTotal: 2 * (sample1?.costPrice || 40000),
           profit: 140000 - (2 * (sample1?.costPrice || 40000)),
@@ -149,28 +147,28 @@ export default function CommercialAdmin() {
         },
         {
           id: `ai-${Date.now()}-2`,
-          productId: sample2?.id || 'p2',
-          productName: sample2?.name || 'CAMISAS FB',
+          productId: sample2?.id || 'p-5',
+          productName: sample2?.name || 'JEANS',
           quantity: 1,
-          costPrice: sample2?.costPrice || 25000,
-          sellingPrice: 55000, // Precio detectado de la libreta
-          subtotal: 55000,
-          costTotal: sample2?.costPrice || 25000,
-          profit: 55000 - (sample2?.costPrice || 25000),
+          costPrice: sample2?.costPrice || 100000,
+          sellingPrice: 140000,
+          subtotal: 140000,
+          costTotal: sample2?.costPrice || 100000,
+          profit: 40000,
           paymentMethod: 'Efectivo',
           hour: '12:30 p. m.',
           verified: true
         },
         {
           id: `ai-${Date.now()}-3`,
-          productId: sample3?.id || 'p3',
-          productName: sample3?.name || 'JEANS',
+          productId: sample3?.id || 'p-8',
+          productName: sample3?.name || 'PANTALONETA NBA',
           quantity: 2,
-          costPrice: sample3?.costPrice || 100000,
-          sellingPrice: 140000, // Precio detectado de la libreta
-          subtotal: 280000,
-          costTotal: 2 * (sample3?.costPrice || 100000),
-          profit: 280000 - (2 * (sample3?.costPrice || 100000)),
+          costPrice: sample3?.costPrice || 33000,
+          sellingPrice: 65000,
+          subtotal: 130000,
+          costTotal: 2 * (sample3?.costPrice || 33000),
+          profit: 130000 - (2 * (sample3?.costPrice || 33000)),
           paymentMethod: 'Nequi',
           hour: '03:45 p. m.',
           verified: true
@@ -181,7 +179,7 @@ export default function CommercialAdmin() {
       Swal.fire({
         icon: 'success',
         title: 'Lectura con IA completada',
-        text: `Se detectaron ${detected.length} partidas de venta en la libreta con sus precios de venta anotados. Verifica antes de confirmar el cierre.`,
+        text: `Se detectaron ${detected.length} partidas de venta en la libreta. Verifica antes de confirmar el cierre.`,
         confirmButtonColor: '#007A33'
       });
     }, 1200);
@@ -249,13 +247,12 @@ export default function CommercialAdmin() {
   };
 
   // =========================================================================
-  // TAB 3: REGISTRO MANUAL DE VENTAS (AQUÍ SE COLOCA EL PRECIO DE VENTA)
+  // TAB 3: REGISTRO MANUAL DE VENTAS (EL PRECIO DE VENTA SE INGRESA AL VENDER)
   // =========================================================================
   const [manualStoreId, setManualStoreId] = useState<string>('republica');
   const [manualDateStr, setManualDateStr] = useState<string>(now.toISOString().split('T')[0]);
   const [manualSales, setManualSales] = useState<CommercialSaleLine[]>([]);
 
-  // Formulario de venta manual: el precio de venta se digita en el momento de la venta
   const [newManualSale, setNewManualSale] = useState({
     productId: '',
     quantity: 1,
@@ -264,7 +261,6 @@ export default function CommercialAdmin() {
     hour: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true })
   });
 
-  // Al cargar o cambiar productos
   useEffect(() => {
     if (data.products.length > 0 && !newManualSale.productId) {
       setNewManualSale(prev => ({
@@ -274,13 +270,12 @@ export default function CommercialAdmin() {
     }
   }, [data.products, newManualSale.productId]);
 
-  // Si cambia de fecha o sede, buscar si ya había un cuadre guardado previamente
   useEffect(() => {
     const existing = data.cuadres.find(c => c.dateStr === manualDateStr && c.storeId === manualStoreId);
     if (existing && existing.sales && existing.sales.length > 0) {
       setManualSales(existing.sales);
     } else {
-      setManualSales([]); // Empieza completamente limpio
+      setManualSales([]);
     }
   }, [manualDateStr, manualStoreId, data.cuadres]);
 
@@ -293,7 +288,7 @@ export default function CommercialAdmin() {
       Swal.fire({
         icon: 'warning',
         title: 'Precio de venta requerido',
-        text: 'Por favor ingresa el precio de venta al que se vendió la prenda.',
+        text: 'Por favor ingresa el precio al que vendiste la prenda.',
         confirmButtonColor: '#007A33'
       });
       return;
@@ -341,7 +336,6 @@ export default function CommercialAdmin() {
     };
 
     setManualSales(prev => [...prev, line]);
-    // Reiniciar precio de venta para la siguiente prenda
     setNewManualSale(prev => ({ ...prev, sellingPrice: '' }));
   };
 
@@ -360,7 +354,6 @@ export default function CommercialAdmin() {
     return { totalSales, totalCost, totalProfit, totalItems, byMethod };
   }, [manualSales]);
 
-  // Guardar y cerrar el cuadre del día de la sede seleccionada
   const handleSaveManualCuadre = () => {
     const storeObj = STORES_LIST.find(s => s.id === manualStoreId)!;
 
@@ -481,17 +474,16 @@ export default function CommercialAdmin() {
   };
 
   // =========================================================================
-  // TAB 6: 4 INVENTARIOS INDEPENDIENTES Y COSTOS (SIN PRECIO DE VENTA NI %)
+  // TAB 6: 4 INVENTARIOS POR SEDE (SOLO 1 NOMBRE: CATEGORÍA/PRODUCTO, SIN PRECIO VENTA)
   // =========================================================================
   const [invStoreFilter, setInvStoreFilter] = useState<'republica' | 'modelo' | 'quality' | 'mariano' | 'all'>('republica');
   const [invSearch, setInvSearch] = useState('');
   const [selectedProductEdit, setSelectedProductEdit] = useState<CommercialProduct | null>(null);
   const [isNewProductModalOpen, setIsNewProductModalOpen] = useState(false);
 
-  // Formulario para nuevo producto: Solo Nombre, Categoría, Costo de compra y Stock en las 4 sedes
+  // Formulario nuevo producto: Solo 1 Nombre/Categoría, Costo de compra y Stock en las 4 sedes
   const [newProductForm, setNewProductForm] = useState({
     name: '',
-    category: 'Camisas',
     costPrice: 0,
     stockRepublica: 0,
     stockModelo: 0,
@@ -506,7 +498,6 @@ export default function CommercialAdmin() {
     const prod: CommercialProduct = {
       id: `prod-${Date.now()}`,
       name: newProductForm.name.trim().toUpperCase(),
-      category: newProductForm.category,
       costPrice: Number(newProductForm.costPrice),
       stocks: {
         republica: Number(newProductForm.stockRepublica),
@@ -521,7 +512,6 @@ export default function CommercialAdmin() {
     setIsNewProductModalOpen(false);
     setNewProductForm({
       name: '',
-      category: 'Camisas',
       costPrice: 0,
       stockRepublica: 0,
       stockModelo: 0,
@@ -532,7 +522,7 @@ export default function CommercialAdmin() {
     Swal.fire({
       icon: 'success',
       title: 'Producto creado en inventario',
-      text: `Se agregó ${prod.name} con costo de compra y existencias en las 4 sedes.`,
+      text: `Se agregó ${prod.name} con existencias independientes para las 4 sedes.`,
       timer: 1500,
       showConfirmButton: false
     });
@@ -540,8 +530,8 @@ export default function CommercialAdmin() {
 
   const handleDeleteProduct = (productId: string, productName: string) => {
     Swal.fire({
-      title: '¿Eliminar producto?',
-      text: `Se eliminará ${productName} del inventario de las 4 sedes.`,
+      title: '¿Eliminar del inventario?',
+      text: `Se eliminará ${productName} del inventario de todas las sedes.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Sí, eliminar',
@@ -558,13 +548,10 @@ export default function CommercialAdmin() {
 
   const filteredInventory = useMemo(() => {
     return data.products.filter(p => {
-      const matchesSearch = p.name.toLowerCase().includes(invSearch.toLowerCase()) || 
-                            p.category.toLowerCase().includes(invSearch.toLowerCase());
-      return matchesSearch;
+      return p.name.toLowerCase().includes(invSearch.toLowerCase());
     });
   }, [data.products, invSearch]);
 
-  // KPIs de inventario: Solo costos y existencias (sin precios de venta ni % margen)
   const inventoryKpis = useMemo(() => {
     if (invStoreFilter === 'all') {
       const totalProds = data.products.length;
@@ -812,7 +799,7 @@ export default function CommercialAdmin() {
   const handleResetToClean = () => {
     Swal.fire({
       title: '¿Limpiar ventas y cuadres?',
-      text: 'Esto borrará los cuadres y movimientos registrados para dejar el sistema 100% en blanco. Los productos y sedes se mantendrán.',
+      text: 'Esto borrará los cuadres y movimientos registrados para dejar el historial en blanco. El inventario de las 4 sedes se mantendrá con todos los productos.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Sí, limpiar cuadres',
@@ -822,7 +809,7 @@ export default function CommercialAdmin() {
       if (res.isConfirmed) {
         CommercialService.resetData();
         refreshData();
-        Swal.fire({ icon: 'success', title: 'Limpieza completada', text: 'Ahora todos los cuadres e historiales están limpios para tu registro diario.' });
+        Swal.fire({ icon: 'success', title: 'Limpieza completada', text: 'Los cuadres e historiales están limpios para tu registro diario.' });
       }
     });
   };
@@ -830,7 +817,7 @@ export default function CommercialAdmin() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-16">
       {/* =====================================================================
-          HEADER PRINCIPAL
+          HEADER PRINCIPAL: CONTROL DE VENTAS Y FINANZAS
           ===================================================================== */}
       <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-2xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -846,7 +833,7 @@ export default function CommercialAdmin() {
                 </span>
               </div>
               <p className="text-xs text-gray-500 font-medium">
-                Inventarios de compra independientes por sede, registro de venta con precio manual, y cierres diarios.
+                Inventarios independientes por sede con los 43 productos reales del Excel, registro de venta con precio manual, y cierres de ventas.
               </p>
             </div>
           </div>
@@ -906,7 +893,7 @@ export default function CommercialAdmin() {
             { id: 'registro-manual', label: 'Anotar ventas / Cierre', icon: Edit3 },
             { id: 'historial', label: 'Historial de ventas', icon: History },
             { id: 'ventas-mensuales', label: 'Ventas mensuales', icon: BarChart3 },
-            { id: 'inventario', label: '4 Inventarios y costos', icon: Boxes },
+            { id: 'inventario', label: '4 Inventarios (Por Sede)', icon: Boxes },
             { id: 'movimientos', label: 'Movimientos (Traslados)', icon: ArrowLeftRight },
             { id: 'cuadres', label: 'Cuadres de ventas', icon: CalendarCheck },
             { id: 'gastos-deudas', label: 'Gastos y deudas', icon: DollarSign },
@@ -980,7 +967,7 @@ export default function CommercialAdmin() {
                 <span className="text-[10px] font-bold text-emerald-600">ROI</span>
               </div>
               <h3 className="text-xl font-black text-emerald-700">{monthlyMetrics.margenPct}%</h3>
-              <p className="text-[10px] text-gray-400 font-bold">Calculado sobre ventas reales</p>
+              <p className="text-[10px] text-gray-400 font-bold">Sobre ventas reales</p>
             </div>
           </div>
 
@@ -989,7 +976,7 @@ export default function CommercialAdmin() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-extrabold text-gray-900">Rendimiento por Sede ({MONTH_NAMES[selectedMonth - 1]})</h3>
-                <p className="text-xs text-gray-500">Cada sede opera con su propio inventario y sus propios cuadres de ventas.</p>
+                <p className="text-xs text-gray-500">Cada sede opera con su propio inventario y sus propios cierres diarios.</p>
               </div>
               <button
                 onClick={() => setActiveTab('ventas-mensuales')}
@@ -1069,7 +1056,7 @@ export default function CommercialAdmin() {
                 <h2 className="text-base font-black text-gray-900">Cargar ventas con IA (Foto de libreta)</h2>
               </div>
               <p className="text-xs text-gray-500">
-                Sube las fotografías de los cuadernos de ventas físicas. La IA detectará los precios de venta y descontará el inventario de la sede.
+                Sube las fotografías de los cuadernos de ventas físicas. La IA detectará los precios anotados y descontará el stock de la sede.
               </p>
             </div>
 
@@ -1195,7 +1182,7 @@ export default function CommercialAdmin() {
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase">
                           <th className="py-2.5 px-3">#</th>
-                          <th className="py-2.5 px-3">Producto</th>
+                          <th className="py-2.5 px-3">Producto / Categoría</th>
                           <th className="py-2.5 px-3">Cant.</th>
                           <th className="py-2.5 px-3">Precio venta anotado</th>
                           <th className="py-2.5 px-3">Subtotal</th>
@@ -1363,7 +1350,7 @@ export default function CommercialAdmin() {
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 pt-3 items-end">
               <div className="sm:col-span-5">
                 <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
-                  Prenda (Stock en {STORES_LIST.find(s => s.id === manualStoreId)?.shortName}) *
+                  Producto / Categoría (Stock en {STORES_LIST.find(s => s.id === manualStoreId)?.shortName}) *
                 </label>
                 <select
                   value={newManualSale.productId}
@@ -1448,7 +1435,6 @@ export default function CommercialAdmin() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Tabla de ventas anotadas */}
             <div className="lg:col-span-8 bg-white rounded-2xl border border-gray-200/80 p-5 shadow-2xs space-y-4">
               <div className="flex items-center justify-between border-b border-gray-100 pb-2">
                 <h3 className="text-xs font-extrabold text-gray-900">
@@ -1482,7 +1468,7 @@ export default function CommercialAdmin() {
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase">
                         <th className="py-2 px-3">#</th>
-                        <th className="py-2 px-3">Prenda</th>
+                        <th className="py-2 px-3">Producto / Categoría</th>
                         <th className="py-2 px-3 text-center">Cant.</th>
                         <th className="py-2 px-3">Precio Venta</th>
                         <th className="py-2 px-3">Subtotal</th>
@@ -1520,7 +1506,6 @@ export default function CommercialAdmin() {
                 </div>
               )}
 
-              {/* Botón principal para realizar Cierre de Ventas */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-3 border-t border-gray-100">
                 <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 bg-emerald-50 px-3.5 py-2 rounded-xl border border-emerald-200">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -1539,7 +1524,6 @@ export default function CommercialAdmin() {
               </div>
             </div>
 
-            {/* Panel lateral: Desglose de Caja */}
             <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-200/80 p-5 shadow-2xs space-y-4">
               <h3 className="text-sm font-extrabold text-gray-900 border-b border-gray-100 pb-3 flex items-center gap-2">
                 <DollarSign className="w-4 h-4 text-emerald-600" />
@@ -1842,13 +1826,13 @@ export default function CommercialAdmin() {
       )}
 
       {/* =====================================================================
-          VISTA 6: 4 INVENTARIOS INDEPENDIENTES (SIN PRECIO DE VENTA NI %)
+          VISTA 6: 4 INVENTARIOS POR SEDE (SOLO 1 NOMBRE: CATEGORÍA/PRODUCTO, SIN PRECIO VENTA)
           ===================================================================== */}
       {activeTab === 'inventario' && (
         <div className="space-y-6 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Seleccionar Sede</span>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Inventario de la Sede</span>
               <div className="flex flex-wrap items-center gap-1.5 mt-1">
                 {STORES_LIST.map(st => (
                   <button
@@ -1884,7 +1868,7 @@ export default function CommercialAdmin() {
             </button>
           </div>
 
-          {/* Top KPIs de inventario: Solo existencias y costos */}
+          {/* Top KPIs de inventario: Solo existencias y costos de compra */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs">
               <span className="text-[10px] text-gray-400 font-bold uppercase block">Referencias activas</span>
@@ -1907,13 +1891,13 @@ export default function CommercialAdmin() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Tabla de Inventario (SIN Precio Venta) */}
+            {/* Tabla de Inventario (SOLO 1 NOMBRE: PRODUCTO/CATEGORÍA, SIN CATEGORÍA NI PRECIO VENTA) */}
             <div className="lg:col-span-8 bg-white rounded-2xl border border-gray-200/80 p-5 shadow-2xs space-y-4">
               <div className="flex items-center gap-2 relative">
                 <Search className="w-4 h-4 text-gray-400 absolute left-3" />
                 <input
                   type="text"
-                  placeholder="Buscar prenda por nombre o categoría..."
+                  placeholder="Buscar por nombre de producto / categoría..."
                   value={invSearch}
                   onChange={e => setInvSearch(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-hidden"
@@ -1925,7 +1909,7 @@ export default function CommercialAdmin() {
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase">
                       <th className="py-2.5 px-3">#</th>
-                      <th className="py-2.5 px-3">Prenda</th>
+                      <th className="py-2.5 px-3">Producto / Categoría</th>
                       <th className="py-2.5 px-3">Costo de compra</th>
                       {invStoreFilter === 'all' ? (
                         <>
@@ -1953,10 +1937,7 @@ export default function CommercialAdmin() {
                       return (
                         <tr key={p.id} className="hover:bg-gray-50/70">
                           <td className="py-2.5 px-3 font-mono text-gray-400 text-[11px]">{idx + 1}</td>
-                          <td className="py-2.5 px-3">
-                            <span className="font-bold text-gray-900 block">{p.name}</span>
-                            <span className="text-[10px] text-gray-400">{p.category}</span>
-                          </td>
+                          <td className="py-2.5 px-3 font-bold text-gray-900">{p.name}</td>
                           <td className="py-2.5 px-3 font-mono font-bold text-gray-700">{formatPrice(p.costPrice)}</td>
                           {invStoreFilter === 'all' ? (
                             <>
@@ -2003,7 +1984,7 @@ export default function CommercialAdmin() {
               </div>
             </div>
 
-            {/* Panel de edición rápida de costo y stock (SIN Precio Venta) */}
+            {/* Panel de edición rápida de costo y stock (1 solo nombre) */}
             <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-200/80 p-5 shadow-2xs space-y-4">
               <h3 className="text-sm font-extrabold text-gray-900 border-b border-gray-100 pb-2">
                 {selectedProductEdit ? `Editar: ${selectedProductEdit.name}` : 'Ajustar Inventario'}
@@ -2012,12 +1993,12 @@ export default function CommercialAdmin() {
               {selectedProductEdit ? (
                 <div className="space-y-3 text-xs">
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nombre de la prenda</label>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nombre / Categoría</label>
                     <input
                       type="text"
                       value={selectedProductEdit.name}
-                      onChange={e => setSelectedProductEdit({ ...selectedProductEdit, name: e.target.value })}
-                      className="w-full px-3 py-1.5 rounded-xl border border-gray-200 font-bold"
+                      onChange={e => setSelectedProductEdit({ ...selectedProductEdit, name: e.target.value.toUpperCase() })}
+                      className="w-full px-3 py-1.5 rounded-xl border border-gray-200 font-bold uppercase"
                     />
                   </div>
 
@@ -2082,7 +2063,7 @@ export default function CommercialAdmin() {
         </div>
       )}
 
-      {/* Modal para Crear Producto (SIN Precio Venta) */}
+      {/* Modal para Crear Producto (SOLO 1 NOMBRE: CATEGORÍA/PRODUCTO Y COSTO) */}
       {isNewProductModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-xl">
@@ -2095,7 +2076,7 @@ export default function CommercialAdmin() {
 
             <form onSubmit={handleCreateProduct} className="space-y-3 text-xs">
               <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Nombre de la prenda / referencia *</label>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Nombre del producto / categoría *</label>
                 <input
                   type="text"
                   required
@@ -2106,35 +2087,16 @@ export default function CommercialAdmin() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Categoría</label>
-                  <select
-                    value={newProductForm.category}
-                    onChange={e => setNewProductForm({ ...newProductForm, category: e.target.value })}
-                    className="w-full px-2.5 py-2 rounded-xl border border-gray-200 font-bold bg-white"
-                  >
-                    <option value="Camisas">Camisas</option>
-                    <option value="Camisetas">Camisetas</option>
-                    <option value="Pantalones">Pantalones</option>
-                    <option value="Pantalonetas">Pantalonetas</option>
-                    <option value="Calzado">Calzado</option>
-                    <option value="Accesorios">Accesorios</option>
-                    <option value="Buzos">Buzos</option>
-                    <option value="Conjuntos">Conjuntos</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Costo de compra ($) *</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="Ej: 35000"
-                    value={newProductForm.costPrice || ''}
-                    onChange={e => setNewProductForm({ ...newProductForm, costPrice: Number(e.target.value) })}
-                    className="w-full px-2.5 py-2 rounded-xl border border-gray-200 font-mono font-bold"
-                  />
-                </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Costo de compra ($) *</label>
+                <input
+                  type="number"
+                  required
+                  placeholder="Ej: 35000"
+                  value={newProductForm.costPrice || ''}
+                  onChange={e => setNewProductForm({ ...newProductForm, costPrice: Number(e.target.value) })}
+                  className="w-full px-2.5 py-2 rounded-xl border border-gray-200 font-mono font-bold"
+                />
               </div>
 
               {/* Stock inicial en las 4 sedes */}
@@ -2738,7 +2700,7 @@ export default function CommercialAdmin() {
                   Swal.fire({
                     icon: 'success',
                     title: 'Excel Reconocido',
-                    text: 'Se detectaron las 4 sedes y 15 productos con sus costos de compra y existencias.',
+                    text: 'Se detectaron las 4 sedes y 43 productos del inventario con sus costos de compra y existencias exactas.',
                     confirmButtonColor: '#007A33'
                   });
                 }}
@@ -2750,12 +2712,12 @@ export default function CommercialAdmin() {
 
             <div className="md:col-span-8 p-5 rounded-2xl border border-gray-200 space-y-3">
               <h4 className="text-xs font-bold text-gray-800">Vista previa del archivo cargado</h4>
-              <p className="text-xs text-gray-500">Las 4 sedes tienen inventarios separados listos para operar de forma dinámica.</p>
+              <p className="text-xs text-gray-500">43 productos con inventarios independientes por sede sincronizados desde el archivo contable.</p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
                 {STORES_LIST.map(st => (
                   <div key={st.id} className="p-3 bg-gray-50 rounded-xl border border-gray-100">
                     <strong className="block text-gray-900">{st.shortName}</strong>
-                    <span className="text-[10px] text-emerald-700 font-bold">Inventario Listo</span>
+                    <span className="text-[10px] text-emerald-700 font-bold">43 referencias</span>
                   </div>
                 ))}
               </div>

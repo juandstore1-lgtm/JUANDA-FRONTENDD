@@ -1,9 +1,8 @@
 // Service for Control Comercial (Ventas, Finanzas, Inventario, Costos y Cuadres)
 export interface CommercialProduct {
   id: string;
-  name: string;
-  category: string;
-  costPrice: number; // Costo de compra únicamente
+  name: string; // 1 solo nombre (Categoría / Producto)
+  costPrice: number; // Costo de compra
   stocks: { [storeKey: string]: number }; // republica | modelo | quality | mariano
 }
 
@@ -13,7 +12,7 @@ export interface CommercialSaleLine {
   productName: string;
   quantity: number;
   costPrice: number;
-  sellingPrice: number; // Se define ÚNICAMENTE al registrar la venta
+  sellingPrice: number; // Se coloca ÚNICAMENTE al registrar la venta
   subtotal: number;
   costTotal: number;
   profit: number;
@@ -113,24 +112,52 @@ export const PAYMENT_METHODS = [
   { id: 'Addi', label: 'Addi', color: '#2563eb', bg: 'bg-indigo-50 text-indigo-700 border-indigo-200' }
 ];
 
-// Catálogo base de inventario: Solo Nombre, Categoría, Costo de compra y Stock en las 4 sedes.
-// NO CONTIENE PRECIO DE VENTA NI % DE VENTA.
+// TODOS LOS PRODUCTOS EXTRAÍDOS DIRECTAMENTE DEL EXCEL Sistema_Contable_2.0_(5).xlsx
+// Con 1 solo nombre (Categoría/Producto), su costo de compra y sus existencias reales por sede.
 const INITIAL_PRODUCTS: CommercialProduct[] = [
-  { id: 'p1', name: 'CAMISAS ALTA GAMA', category: 'Camisas', costPrice: 40000, stocks: { republica: 45, modelo: 38, quality: 50, mariano: 42 } },
-  { id: 'p2', name: 'CAMISAS FB', category: 'Camisas', costPrice: 25000, stocks: { republica: 16, modelo: 11, quality: 20, mariano: 22 } },
-  { id: 'p3', name: 'JEANS', category: 'Pantalones', costPrice: 100000, stocks: { republica: 18, modelo: 18, quality: 20, mariano: 20 } },
-  { id: 'p4', name: 'PETOS', category: 'Camisetas', costPrice: 35000, stocks: { republica: 27, modelo: 24, quality: 30, mariano: 28 } },
-  { id: 'p5', name: 'PANTALONETA NBA', category: 'Pantalonetas', costPrice: 33000, stocks: { republica: 21, modelo: 19, quality: 25, mariano: 22 } },
-  { id: 'p6', name: 'PANTALONETA 1.1', category: 'Pantalonetas', costPrice: 32000, stocks: { republica: 24, modelo: 20, quality: 28, mariano: 25 } },
-  { id: 'p7', name: 'ESQUELETO FB', category: 'Camisetas', costPrice: 30000, stocks: { republica: 18, modelo: 15, quality: 22, mariano: 19 } },
-  { id: 'p8', name: 'ZAPATILLAS / TENIS', category: 'Calzado', costPrice: 80000, stocks: { republica: 16, modelo: 14, quality: 18, mariano: 15 } },
-  { id: 'p9', name: 'GORRAS', category: 'Accesorios', costPrice: 25000, stocks: { republica: 40, modelo: 35, quality: 45, mariano: 38 } },
-  { id: 'p10', name: 'MEDIAS (CAJA)', category: 'Accesorios', costPrice: 15000, stocks: { republica: 60, modelo: 55, quality: 70, mariano: 65 } },
-  { id: 'p11', name: 'MOCHOS', category: 'Pantalones', costPrice: 95000, stocks: { republica: 14, modelo: 12, quality: 16, mariano: 15 } },
-  { id: 'p12', name: 'PAVAS', category: 'Accesorios', costPrice: 25000, stocks: { republica: 33, modelo: 28, quality: 35, mariano: 30 } },
-  { id: 'p13', name: 'CONJUNTO IMPERMEABLE', category: 'Conjuntos', costPrice: 110000, stocks: { republica: 12, modelo: 10, quality: 15, mariano: 12 } },
-  { id: 'p14', name: 'BUZO 1.1', category: 'Buzos', costPrice: 65000, stocks: { republica: 20, modelo: 18, quality: 22, mariano: 20 } },
-  { id: 'p15', name: 'SUDADERA', category: 'Pantalones', costPrice: 55000, stocks: { republica: 15, modelo: 14, quality: 18, mariano: 16 } }
+  { id: "p-1", name: "CAMISAS ALTA GAMA", costPrice: 40000, stocks: { republica: 149, modelo: 194, quality: 181, mariano: 196 } },
+  { id: "p-2", name: "CAMISAS FB", costPrice: 25000, stocks: { republica: 0, modelo: 0, quality: 0, mariano: 0 } },
+  { id: "p-3", name: "PETOS", costPrice: 35000, stocks: { republica: 0, modelo: 0, quality: 0, mariano: 0 } },
+  { id: "p-4", name: "ESQUELETO FB", costPrice: 30000, stocks: { republica: 0, modelo: 7, quality: 0, mariano: 0 } },
+  { id: "p-5", name: "JEANS", costPrice: 100000, stocks: { republica: 43, modelo: 45, quality: 47, mariano: 49 } },
+  { id: "p-6", name: "MOCHOS", costPrice: 90000, stocks: { republica: 35, modelo: 40, quality: 25, mariano: 7 } },
+  { id: "p-7", name: "PAVAS", costPrice: 25000, stocks: { republica: 0, modelo: 0, quality: 0, mariano: 0 } },
+  { id: "p-8", name: "PANTALONETA NBA", costPrice: 33000, stocks: { republica: 43, modelo: 23, quality: 38, mariano: 21 } },
+  { id: "p-9", name: "PANTALONETA 1.1", costPrice: 42000, stocks: { republica: 16, modelo: 10, quality: 38, mariano: 0 } },
+  { id: "p-10", name: "MEDIAS", costPrice: 2250, stocks: { republica: 0, modelo: 0, quality: 78, mariano: 45 } },
+  { id: "p-11", name: "SUDADERAS", costPrice: 40000, stocks: { republica: 33, modelo: 33, quality: 19, mariano: 36 } },
+  { id: "p-12", name: "CHANCLAS", costPrice: 40000, stocks: { republica: 7, modelo: 5, quality: 12, mariano: 0 } },
+  { id: "p-13", name: "ZAPATILLAS", costPrice: 80000, stocks: { republica: 51, modelo: 48, quality: 45, mariano: 18 } },
+  { id: "p-14", name: "GORRAS", costPrice: 25000, stocks: { republica: 45, modelo: 52, quality: 54, mariano: 63 } },
+  { id: "p-15", name: "RELOJS", costPrice: 50000, stocks: { republica: 11, modelo: 10, quality: 8, mariano: 9 } },
+  { id: "p-16", name: "BOXER", costPrice: 12000, stocks: { republica: 41, modelo: 58, quality: 45, mariano: 37 } },
+  { id: "p-17", name: "SACOS 1.1", costPrice: 85000, stocks: { republica: 3, modelo: 6, quality: 7, mariano: 6 } },
+  { id: "p-18", name: "SACOS SIN CAPUCHA 1.1", costPrice: 60000, stocks: { republica: 1, modelo: 2, quality: 2, mariano: 0 } },
+  { id: "p-19", name: "BILLETERAS", costPrice: 25000, stocks: { republica: 5, modelo: 5, quality: 9, mariano: 10 } },
+  { id: "p-20", name: "POLOS", costPrice: 38000, stocks: { republica: 45, modelo: 55, quality: 27, mariano: 17 } },
+  { id: "p-21", name: "JOGGER", costPrice: 80000, stocks: { republica: 0, modelo: 0, quality: 0, mariano: 0 } },
+  { id: "p-22", name: "CANGUROS", costPrice: 35000, stocks: { republica: 4, modelo: 3, quality: 1, mariano: 5 } },
+  { id: "p-23", name: "LOCIONES", costPrice: 35000, stocks: { republica: 10, modelo: 8, quality: 5, mariano: 10 } },
+  { id: "p-24", name: "CONJUNTO SACO Y SUD ALGODON FB", costPrice: 75000, stocks: { republica: 0, modelo: 0, quality: 0, mariano: 0 } },
+  { id: "p-25", name: "CONJUNTO SACO Y SUD ALGODON 1.1", costPrice: 105000, stocks: { republica: 3, modelo: 0, quality: 0, mariano: 0 } },
+  { id: "p-26", name: "CONJUNTO IMPERMEABLE", costPrice: 95000, stocks: { republica: 0, modelo: 0, quality: 0, mariano: 12 } },
+  { id: "p-27", name: "CONJUNTOS TIPO ORIGINAL 1.1", costPrice: 90000, stocks: { republica: 6, modelo: 18, quality: 10, mariano: 16 } },
+  { id: "p-28", name: "CORREAS", costPrice: 20000, stocks: { republica: 8, modelo: 10, quality: 7, mariano: 13 } },
+  { id: "p-29", name: "CARRIEL 1.1", costPrice: 50000, stocks: { republica: 4, modelo: 4, quality: 4, mariano: 7 } },
+  { id: "p-30", name: "CAMISA DE LA SELECCION COLOMBIA", costPrice: 32000, stocks: { republica: 0, modelo: 0, quality: 21, mariano: 0 } },
+  { id: "p-31", name: "CHAQUETAS", costPrice: 60000, stocks: { republica: 0, modelo: 1, quality: 0, mariano: 0 } },
+  { id: "p-32", name: "CAMISA DEPORTIVAS", costPrice: 30000, stocks: { republica: 0, modelo: 0, quality: 0, mariano: 0 } },
+  { id: "p-33", name: "GAFAS GRANDES", costPrice: 25000, stocks: { republica: 2, modelo: 2, quality: 2, mariano: 0 } },
+  { id: "p-34", name: "GAFAS PEQUEÑAS", costPrice: 20000, stocks: { republica: 2, modelo: 5, quality: 3, mariano: 9 } },
+  { id: "p-35", name: "MALETIN 1.1", costPrice: 35000, stocks: { republica: 3, modelo: 3, quality: 5, mariano: 0 } },
+  { id: "p-36", name: "MALETIN FB", costPrice: 20000, stocks: { republica: 1, modelo: 0, quality: 0, mariano: 0 } },
+  { id: "p-37", name: "ESQUELETO DEPORTIVO", costPrice: 25000, stocks: { republica: 0, modelo: 0, quality: 0, mariano: 0 } },
+  { id: "p-38", name: "PANTALONETA DEPORTIVA", costPrice: 33000, stocks: { republica: 8, modelo: 13, quality: 4, mariano: 0 } },
+  { id: "p-39", name: "CHANCLAS MIND", costPrice: 75000, stocks: { republica: 0, modelo: 0, quality: 0, mariano: 3 } },
+  { id: "p-40", name: "GORRAS ORIGINALES", costPrice: 95000, stocks: { republica: 0, modelo: 0, quality: 0, mariano: 0 } },
+  { id: "p-41", name: "SACOS FB", costPrice: 35000, stocks: { republica: 5, modelo: 9, quality: 6, mariano: 0 } },
+  { id: "p-42", name: "CAMISA PROMOCION", costPrice: 12000, stocks: { republica: 148, modelo: 0, quality: 0, mariano: 0 } },
+  { id: "p-43", name: "MEDIAS CAJA", costPrice: 28000, stocks: { republica: 0, modelo: 0, quality: 0, mariano: 0 } }
 ];
 
 // Gastos fijos reales del negocio
@@ -167,7 +194,7 @@ const INITIAL_DEBTS: CommercialDebt[] = [
 ];
 
 export class CommercialService {
-  private static STORAGE_KEY = 'juand_commercial_system_v4';
+  private static STORAGE_KEY = 'juand_commercial_system_v5';
 
   // Obtener datos maestros comerciales
   public static getData(): {
@@ -187,8 +214,8 @@ export class CommercialService {
             STORES_LIST.forEach(s => {
               if (typeof p.stocks[s.id] !== 'number') p.stocks[s.id] = 0;
             });
-            // Eliminar sellingPrice si venía de versiones viejas
             delete p.sellingPrice;
+            delete p.category;
           });
         }
         return parsed;
@@ -339,7 +366,7 @@ export class CommercialService {
     return true;
   }
 
-  // Crear o editar producto (solo nombre, categoría, costo y stock en las 4 sedes)
+  // Crear o editar producto (solo nombre único de categoría/producto, costo y stock en las 4 sedes)
   public static saveProduct(product: CommercialProduct): boolean {
     const data = this.getData();
     if (!product.stocks) {
