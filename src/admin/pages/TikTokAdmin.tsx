@@ -111,8 +111,10 @@ export default function TikTokAdmin() {
 
   // Filtros de historial y resumen
   const [historySearch, setHistorySearch] = useState('');
+  const [historyPeriod, setHistoryPeriod] = useState<string>('TODO');
   const [historyDateFrom, setHistoryDateFrom] = useState('');
   const [historyDateTo, setHistoryDateTo] = useState('');
+  const [historySpecificDate, setHistorySpecificDate] = useState('');
   const [historyPage, setHistoryPage] = useState(0);
 
   // Estados para Dashboard Analítico Avanzado
@@ -222,7 +224,7 @@ export default function TikTokAdmin() {
     }
     if (activeTab === 'programacion') loadSchedule(currentWeekStart);
     if (activeTab === 'historial') loadHistory();
-  }, [activeTab, currentWeekStart, historySearch, historyDateFrom, historyDateTo, historyPage, analyticsPeriod]);
+  }, [activeTab, currentWeekStart, analyticsPeriod]);
 
   const loadInitialData = async () => {
     try {
@@ -491,6 +493,117 @@ export default function TikTokAdmin() {
     });
   }, [analyticsData?.videos, periodVideoSort]);
 
+  const filteredHistoryVideos = useMemo(() => {
+    let list = [...historyVideos];
+
+    // 1. Filtro de búsqueda por texto
+    if (historySearch && historySearch.trim()) {
+      const q = historySearch.toLowerCase().trim();
+      list = list.filter(v => 
+        (v.title && v.title.toLowerCase().includes(q)) ||
+        (v.description && v.description.toLowerCase().includes(q)) ||
+        (v.hashtags && v.hashtags.toLowerCase().includes(q))
+      );
+    }
+
+    // 2. Filtro temporal
+    const now = new Date();
+    let from = new Date(2020, 0, 1);
+    let to = new Date();
+    to.setDate(to.getDate() + 2);
+
+    if (historyPeriod === 'FECHA_ESPECIFICA' && historySpecificDate) {
+      from = new Date(historySpecificDate + 'T00:00:00');
+      to = new Date(historySpecificDate + 'T23:59:59');
+    } else if (historyPeriod === 'RANGO') {
+      if (historyDateFrom) {
+        from = new Date(historyDateFrom + 'T00:00:00');
+      }
+      if (historyDateTo) {
+        to = new Date(historyDateTo + 'T23:59:59');
+      } else {
+        to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+      }
+    } else {
+      switch (historyPeriod.toUpperCase()) {
+        case 'HOY':
+        case 'DIARIO':
+          from = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+          to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+          break;
+        case 'ESTA_SEMANA':
+        case 'SEMANAL': {
+          const day = now.getDay();
+          const diff = (day === 0 ? -6 : 1) - day;
+          from = new Date(now);
+          from.setDate(now.getDate() + diff);
+          from.setHours(0, 0, 0, 0);
+          to = new Date(from);
+          to.setDate(from.getDate() + 6);
+          to.setHours(23, 59, 59, 999);
+          break;
+        }
+        case 'ESTE_MES':
+        case 'MENSUAL':
+          from = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+          to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+          break;
+        case 'ULTIMOS_30_DIAS':
+          from = new Date();
+          from.setDate(now.getDate() - 30);
+          from.setHours(0, 0, 0, 0);
+          to = new Date();
+          to.setHours(23, 59, 59, 999);
+          break;
+        case 'TODO':
+        default:
+          from = new Date(2020, 0, 1);
+          to = new Date(now.getFullYear() + 2, 11, 31, 23, 59, 59);
+          break;
+      }
+    }
+
+    if (historyPeriod !== 'TODO') {
+      list = list.filter(v => {
+        if (!v.publishedAt) return false;
+        const d = new Date(v.publishedAt.trim().replace(' ', 'T'));
+        if (historyPeriod === 'HOY' || historyPeriod === 'DIARIO') {
+          const isSameDay = d.getFullYear() === now.getFullYear() &&
+                            d.getMonth() === now.getMonth() &&
+                            d.getDate() === now.getDate();
+          if (isSameDay) return true;
+        }
+        return d >= from && d <= to;
+      });
+    }
+
+    // Ordenar de más reciente a más antiguo
+    list.sort((a, b) => {
+      const d1 = new Date(b.publishedAt ? b.publishedAt.trim().replace(' ', 'T') : 0).getTime();
+      const d2 = new Date(a.publishedAt ? a.publishedAt.trim().replace(' ', 'T') : 0).getTime();
+      return d1 - d2;
+    });
+
+    return list;
+  }, [historyVideos, historySearch, historyPeriod, historyDateFrom, historyDateTo, historySpecificDate]);
+
+  const computedHistoryMetrics = useMemo(() => {
+    return {
+      views: filteredHistoryVideos.reduce((sum, v) => sum + (v.viewCount || 0), 0),
+      likes: filteredHistoryVideos.reduce((sum, v) => sum + (v.likeCount || 0), 0),
+      comments: filteredHistoryVideos.reduce((sum, v) => sum + (v.commentCount || 0), 0),
+      shares: filteredHistoryVideos.reduce((sum, v) => sum + (v.shareCount || 0), 0)
+    };
+  }, [filteredHistoryVideos]);
+
+  // Paginador de 20 filas por página para el historial
+  const HISTORY_PAGE_SIZE = 20;
+  const totalHistoryPages = Math.max(1, Math.ceil(filteredHistoryVideos.length / HISTORY_PAGE_SIZE));
+  const paginatedHistoryVideos = useMemo(() => {
+    const start = historyPage * HISTORY_PAGE_SIZE;
+    return filteredHistoryVideos.slice(start, start + HISTORY_PAGE_SIZE);
+  }, [filteredHistoryVideos, historyPage]);
+
   const loadAccount = async () => {
     try {
       const acc = await TikTokService.getGlobalAccount();
@@ -535,14 +648,11 @@ export default function TikTokAdmin() {
     try {
       const res = await TikTokService.getHistory({
         sede: 'GLOBAL',
-        dateFrom: historyDateFrom,
-        dateTo: historyDateTo,
-        search: historySearch,
-        page: historyPage,
-        size: 100
+        page: 0,
+        size: 500
       });
       setHistoryVideos(res.videos || []);
-      setHistoryTotal(res.totalVideos || 0);
+      setHistoryTotal(res.videos ? res.videos.length : (res.totalVideos || 0));
       setHistoryMetrics({
         views: res.totalViews || 0,
         likes: res.totalLikes || 0,
@@ -1125,8 +1235,10 @@ export default function TikTokAdmin() {
         >
           <Film className="w-4 h-4" />
           <span>Historial de Videos</span>
-          <span className="px-1.5 py-0.5 text-[11px] font-black rounded-full bg-gray-200 text-gray-800">
-            {historyTotal > 0 ? historyTotal : (analyticsData?.totalAllVideos || historyVideos.length || 0)}
+          <span className={`px-1.5 py-0.5 text-[11px] font-black rounded-full ${
+            activeTab === 'historial' ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-800'
+          }`}>
+            {historyVideos.length > 0 ? historyVideos.length : (historyTotal > 0 && historyTotal !== 300 ? historyTotal : 0)}
           </span>
         </button>
 
@@ -2039,7 +2151,7 @@ export default function TikTokAdmin() {
       {/* ============================================================ */}
       {activeTab === 'historial' && (
         <div className="space-y-6 animate-fadeIn">
-          {/* Tarjetas de Métricas Acumuladas */}
+          {/* Tarjetas de Métricas Acumuladas Dinámicas según Filtro */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -2047,7 +2159,7 @@ export default function TikTokAdmin() {
               </div>
               <div>
                 <p className="text-xs font-bold text-gray-500 uppercase">Visualizaciones</p>
-                <p className="text-xl font-black text-gray-900 mt-0.5">{historyMetrics.views.toLocaleString()}</p>
+                <p className="text-xl font-black text-gray-900 mt-0.5">{computedHistoryMetrics.views.toLocaleString()}</p>
               </div>
             </div>
 
@@ -2057,7 +2169,7 @@ export default function TikTokAdmin() {
               </div>
               <div>
                 <p className="text-xs font-bold text-gray-500 uppercase">Me gusta</p>
-                <p className="text-xl font-black text-gray-900 mt-0.5">{historyMetrics.likes.toLocaleString()}</p>
+                <p className="text-xl font-black text-gray-900 mt-0.5">{computedHistoryMetrics.likes.toLocaleString()}</p>
               </div>
             </div>
 
@@ -2067,7 +2179,7 @@ export default function TikTokAdmin() {
               </div>
               <div>
                 <p className="text-xs font-bold text-gray-500 uppercase">Comentarios</p>
-                <p className="text-xl font-black text-gray-900 mt-0.5">{historyMetrics.comments.toLocaleString()}</p>
+                <p className="text-xl font-black text-gray-900 mt-0.5">{computedHistoryMetrics.comments.toLocaleString()}</p>
               </div>
             </div>
 
@@ -2077,53 +2189,207 @@ export default function TikTokAdmin() {
               </div>
               <div>
                 <p className="text-xs font-bold text-gray-500 uppercase">Compartidos</p>
-                <p className="text-xl font-black text-gray-900 mt-0.5">{historyMetrics.shares.toLocaleString()}</p>
+                <p className="text-xl font-black text-gray-900 mt-0.5">{computedHistoryMetrics.shares.toLocaleString()}</p>
               </div>
             </div>
           </div>
 
-          {/* Filtros de Búsqueda */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="relative w-full sm:w-80">
-              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={historySearch}
-                onChange={(e) => setHistorySearch(e.target.value)}
-                placeholder="Buscar por título o hashtag..."
-                className="w-full pl-9 pr-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
-              />
+          {/* BARRA DE FILTROS TEMPORALES Y ACCIONES EN HISTORIAL */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Film className="w-5 h-5 text-emerald-600" />
+                  <h2 className="text-base font-black text-gray-900 tracking-tight">
+                    Filtro Temporal de Publicaciones
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-800">
+                    {filteredHistoryVideos.length} {filteredHistoryVideos.length === 1 ? 'video' : 'videos'}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 font-medium mt-0.5">
+                  Filtra por día, semana, mes, fecha específica o rango de fechas con paginación de 20 filas.
+                </p>
+              </div>
+
+              {/* Botones de Sincronización y Refresco */}
+              <div className="flex items-center gap-2 self-start lg:self-center">
+                <button
+                  onClick={handleSyncVideos}
+                  disabled={isSyncingVideos}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+                  title="Obtener videos reales de TikTok mediante API Oficial"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingVideos ? 'animate-spin' : ''}`} />
+                  <span>{isSyncingVideos ? 'Sincronizando...' : 'Sincronizar videos de TikTok'}</span>
+                </button>
+                <button
+                  onClick={loadHistory}
+                  className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Refrescar</span>
+                </button>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleSyncVideos}
-                disabled={isSyncingVideos}
-                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
-                title="Obtener videos reales de TikTok mediante API Oficial"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isSyncingVideos ? 'animate-spin' : ''}`} />
-                <span>{isSyncingVideos ? 'Sincronizando...' : 'Sincronizar videos de TikTok'}</span>
-              </button>
-              <button
-                onClick={loadHistory}
-                className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Refrescar</span>
-              </button>
+            {/* Selector de Períodos Rápidos */}
+            <div className="flex items-center gap-1.5 flex-wrap pt-2 border-t border-gray-100">
+              {[
+                { id: 'TODO', label: 'Todo el tiempo', icon: Globe },
+                { id: 'HOY', label: 'Hoy (Diario)', icon: Clock },
+                { id: 'ESTA_SEMANA', label: 'Esta Semana (Semanal)', icon: Calendar },
+                { id: 'ESTE_MES', label: 'Este Mes (Mensual)', icon: CalendarDays },
+                { id: 'ULTIMOS_30_DIAS', label: 'Últimos 30 días', icon: TrendingUp },
+                { id: 'RANGO', label: 'Rango de fechas', icon: Filter },
+                { id: 'FECHA_ESPECIFICA', label: 'Fecha específica', icon: Calendar }
+              ].map((pill) => {
+                const IconComponent = pill.icon;
+                const isSelected = historyPeriod === pill.id;
+                return (
+                  <button
+                    key={pill.id}
+                    onClick={() => {
+                      setHistoryPeriod(pill.id);
+                      setHistoryPage(0);
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      isSelected
+                        ? 'bg-gray-900 text-white shadow-sm ring-2 ring-gray-900/10'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900'
+                    }`}
+                  >
+                    <IconComponent className="w-3.5 h-3.5" />
+                    <span>{pill.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Inputs adicionales si se selecciona Rango de Fechas */}
+            {historyPeriod === 'RANGO' && (
+              <div className="pt-3 border-t border-dashed border-gray-200 flex flex-wrap items-center gap-3 animate-fadeIn">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-gray-700">Desde:</span>
+                  <input
+                    type="date"
+                    value={historyDateFrom}
+                    onChange={(e) => {
+                      setHistoryDateFrom(e.target.value);
+                      setHistoryPage(0);
+                    }}
+                    className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold text-gray-800"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-gray-700">Hasta:</span>
+                  <input
+                    type="date"
+                    value={historyDateTo}
+                    onChange={(e) => {
+                      setHistoryDateTo(e.target.value);
+                      setHistoryPage(0);
+                    }}
+                    className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold text-gray-800"
+                  />
+                </div>
+                {(historyDateFrom || historyDateTo) && (
+                  <button
+                    onClick={() => {
+                      setHistoryDateFrom('');
+                      setHistoryDateTo('');
+                      setHistoryPage(0);
+                    }}
+                    className="px-2.5 py-1 text-xs text-gray-500 hover:text-red-600 font-semibold"
+                  >
+                    Limpiar rango
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Input adicional si se selecciona Fecha Específica */}
+            {historyPeriod === 'FECHA_ESPECIFICA' && (
+              <div className="pt-3 border-t border-dashed border-gray-200 flex flex-wrap items-center gap-3 animate-fadeIn">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-gray-700">Seleccionar fecha:</span>
+                  <input
+                    type="date"
+                    value={historySpecificDate}
+                    onChange={(e) => {
+                      setHistorySpecificDate(e.target.value);
+                      setHistoryPage(0);
+                    }}
+                    className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold text-gray-800"
+                  />
+                </div>
+                {historySpecificDate && (
+                  <button
+                    onClick={() => {
+                      setHistorySpecificDate('');
+                      setHistoryPage(0);
+                    }}
+                    className="px-2.5 py-1 text-xs text-gray-500 hover:text-red-600 font-semibold"
+                  >
+                    Limpiar fecha
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Buscador de texto en Historial */}
+            <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-3">
+              <div className="relative w-full sm:w-96">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={historySearch}
+                  onChange={(e) => {
+                    setHistorySearch(e.target.value);
+                    setHistoryPage(0);
+                  }}
+                  placeholder="Buscar por título o hashtag en el historial..."
+                  className="w-full pl-9 pr-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                />
+              </div>
+              {historySearch && (
+                <button
+                  onClick={() => {
+                    setHistorySearch('');
+                    setHistoryPage(0);
+                  }}
+                  className="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-800 font-bold"
+                >
+                  Limpiar búsqueda
+                </button>
+              )}
             </div>
           </div>
 
           {/* Tabla / Tarjetas de Videos Publicados */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            {historyVideos.length === 0 ? (
-              <div className="py-16 text-center text-gray-400 text-xs font-medium">
-                No hay videos registrados en el historial. Publica un video desde JUANDSTORE para verlo aquí.
+            {filteredHistoryVideos.length === 0 ? (
+              <div className="py-16 text-center text-gray-400 text-xs font-medium space-y-2">
+                <Film className="w-10 h-10 text-gray-300 mx-auto" />
+                <p className="font-bold text-gray-600">No hay videos para el período o búsqueda seleccionada.</p>
+                <p className="text-gray-400">Prueba cambiando el filtro temporal o limpiando el buscador.</p>
+                <button
+                  onClick={() => {
+                    setHistoryPeriod('TODO');
+                    setHistorySearch('');
+                    setHistoryDateFrom('');
+                    setHistoryDateTo('');
+                    setHistorySpecificDate('');
+                    setHistoryPage(0);
+                  }}
+                  className="mt-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition-colors inline-block"
+                >
+                  Restablecer filtros
+                </button>
               </div>
             ) : (
               <div className="divide-y divide-gray-100">
-                {historyVideos.map((vid) => (
+                {paginatedHistoryVideos.map((vid) => (
                   <div
                     key={vid.id}
                     className="p-4 hover:bg-gray-50/80 transition-colors flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
@@ -2147,7 +2413,7 @@ export default function TikTokAdmin() {
                         </p>
                         <div className="flex items-center gap-3 text-[11px] text-gray-400 pt-0.5">
                           <span>
-                            {vid.publishedAt ? new Date(vid.publishedAt).toLocaleDateString('es-CO', {
+                            {vid.publishedAt ? new Date(vid.publishedAt.trim().replace(' ', 'T')).toLocaleDateString('es-CO', {
                               day: 'numeric',
                               month: 'short',
                               year: 'numeric'
@@ -2190,6 +2456,71 @@ export default function TikTokAdmin() {
               </div>
             )}
           </div>
+
+          {/* Paginador de 20 filas */}
+          {filteredHistoryVideos.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-200 px-5 py-3.5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-medium text-gray-600">
+              <div>
+                Mostrando <span className="font-bold text-gray-900">{historyPage * HISTORY_PAGE_SIZE + 1}</span> a{' '}
+                <span className="font-bold text-gray-900">
+                  {Math.min((historyPage + 1) * HISTORY_PAGE_SIZE, filteredHistoryVideos.length)}
+                </span>{' '}
+                de <span className="font-bold text-gray-900">{filteredHistoryVideos.length}</span> videos publicados
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setHistoryPage((prev) => Math.max(0, prev - 1))}
+                  disabled={historyPage === 0}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 font-bold text-xs hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Anterior</span>
+                </button>
+
+                {/* Números de página */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalHistoryPages }, (_, i) => i).map((p) => {
+                    if (
+                      p === 0 ||
+                      p === totalHistoryPages - 1 ||
+                      (p >= historyPage - 1 && p <= historyPage + 1)
+                    ) {
+                      return (
+                        <button
+                          key={p}
+                          onClick={() => setHistoryPage(p)}
+                          className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${
+                            historyPage === p
+                              ? 'bg-emerald-600 text-white shadow-sm'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          {p + 1}
+                        </button>
+                      );
+                    }
+                    if (
+                      (p === 1 && historyPage > 2) ||
+                      (p === totalHistoryPages - 2 && historyPage < totalHistoryPages - 3)
+                    ) {
+                      return <span key={p} className="px-1 text-gray-400">...</span>;
+                    }
+                    return null;
+                  })}
+                </div>
+
+                <button
+                  onClick={() => setHistoryPage((prev) => Math.min(totalHistoryPages - 1, prev + 1))}
+                  disabled={historyPage >= totalHistoryPages - 1}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 font-bold text-xs hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                >
+                  <span>Siguiente</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
