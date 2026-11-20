@@ -33,7 +33,9 @@ import {
   ChevronsRight,
   AlertCircle,
   Tag,
-  Folder
+  Folder,
+  Image as ImageIcon,
+  Palette
 } from 'lucide-react';
 import { AuditService, ProductService, StoreService, UserService } from '../../services/api';
 import { AuditLog, Product, Store, User, AuditAlert, AuditAlertSettings } from '../../types';
@@ -311,14 +313,38 @@ export default function AuditAdmin() {
     if (!storeName) storeName = 'Todas las sedes';
 
     // Real change detection (strictly genuine user modifications, 0 fake stock, 0 fake system changes)
-    const priceChanged = oldPrice !== null && newPrice !== null && oldPrice !== newPrice;
-    const statusChanged = oldStatus !== null && newStatus !== null && oldStatus !== newStatus;
-    const nameChanged = Boolean(parsedOldObj?.name && parsedNewObj?.name && parsedOldObj.name !== parsedNewObj.name);
-    const descChanged = Boolean(oldDescription && newDescription && oldDescription.trim() !== newDescription.trim());
+    const priceChanged = oldPrice !== null && newPrice !== null && Math.abs(oldPrice - newPrice) > 0.01;
+    const statusChanged = Boolean(oldStatus && newStatus && oldStatus !== newStatus);
+    const nameChanged = Boolean(parsedOldObj?.name && parsedNewObj?.name && parsedOldObj.name.trim() !== parsedNewObj.name.trim());
+    const descChanged = Boolean(
+      oldDescription !== null && newDescription !== null && 
+      oldDescription.trim() !== newDescription.trim()
+    );
     const categoryChanged = Boolean(
-      (parsedOldObj?.category?.name || parsedOldObj?.categoryName) &&
-      (parsedNewObj?.category?.name || parsedNewObj?.categoryName) &&
-      (parsedOldObj?.category?.name || parsedOldObj?.categoryName) !== (parsedNewObj?.category?.name || parsedNewObj?.categoryName)
+      (parsedOldObj?.category?.name || parsedOldObj?.category || parsedOldObj?.categoryName) &&
+      (parsedNewObj?.category?.name || parsedNewObj?.category || parsedNewObj?.categoryName) &&
+      (parsedOldObj?.category?.name || parsedOldObj?.category || parsedOldObj?.categoryName) !== (parsedNewObj?.category?.name || parsedNewObj?.category || parsedNewObj?.categoryName)
+    );
+    const imagesChanged = Boolean(
+      Array.isArray(parsedOldObj?.images) && Array.isArray(parsedNewObj?.images) &&
+      JSON.stringify(parsedOldObj.images) !== JSON.stringify(parsedNewObj.images)
+    );
+    const sizesChanged = Boolean(
+      Array.isArray(parsedOldObj?.sizes) && Array.isArray(parsedNewObj?.sizes) &&
+      JSON.stringify([...parsedOldObj.sizes].sort()) !== JSON.stringify([...parsedNewObj.sizes].sort())
+    );
+    const colorsChanged = Boolean(
+      Array.isArray(parsedOldObj?.colors) && Array.isArray(parsedNewObj?.colors) &&
+      JSON.stringify([...parsedOldObj.colors].sort()) !== JSON.stringify([...parsedNewObj.colors].sort())
+    );
+    const storesChanged = Boolean(
+      (parsedOldObj?.storeIds || parsedOldObj?.stores) && (parsedNewObj?.storeIds || parsedNewObj?.stores) &&
+      JSON.stringify(parsedOldObj.storeIds || parsedOldObj.stores) !== JSON.stringify(parsedNewObj.storeIds || parsedNewObj.stores)
+    );
+
+    // CRITICAL: Strictly genuine modifications made by users (if nothing changed, it is not an edition)
+    const hasRealEdition = Boolean(
+      priceChanged || statusChanged || nameChanged || descChanged || categoryChanged || imagesChanged || sizesChanged || colorsChanged || storesChanged
     );
 
     // Detailed description text
@@ -336,12 +362,20 @@ export default function AuditAdmin() {
         detail = `Cambio de disponibilidad: ${oldStatus === 'AVAILABLE' ? 'Disponible' : 'Agotado'} → ${newStatus === 'AVAILABLE' ? 'Disponible' : 'Agotado'}`;
       } else if (nameChanged) {
         detail = `Cambio de nombre: ${parsedOldObj.name} → ${parsedNewObj.name}`;
-      } else if (descChanged) {
-        detail = 'Se actualizó la descripción del producto';
       } else if (categoryChanged) {
         detail = 'Se actualizó la categoría del producto';
+      } else if (imagesChanged) {
+        detail = 'Se actualizaron las fotos del producto';
+      } else if (sizesChanged) {
+        detail = 'Se modificaron las tallas del producto';
+      } else if (colorsChanged) {
+        detail = 'Se modificaron los colores del producto';
+      } else if (storesChanged) {
+        detail = 'Se modificó la asignación de sedes';
+      } else if (descChanged) {
+        detail = 'Se actualizó la descripción del producto';
       } else {
-        detail = 'Edición de producto guardada por usuario';
+        detail = 'Edición de producto';
       }
     }
 
@@ -356,13 +390,18 @@ export default function AuditAdmin() {
       newPrice, 
       priceChanged,
       oldStatus, 
-      newStatus,
+      newStatus, 
       statusChanged,
       oldDescription, 
-      newDescription,
+      newDescription, 
       descChanged,
       nameChanged,
       categoryChanged,
+      imagesChanged,
+      sizesChanged,
+      colorsChanged,
+      storesChanged,
+      hasRealEdition,
       category,
       parsedOld: parsedOldObj,
       parsedNew: parsedNewObj
@@ -439,12 +478,26 @@ export default function AuditAdmin() {
         return false;
       }
 
+      // 3. User verification: only real user accounts (never automated system changes)
+      const isSystem = !log.userName || 
+        log.userName.toUpperCase().includes('SYSTEM') || 
+        log.userName.toUpperCase().includes('SISTEMA') ||
+        (log.userRole && log.userRole.toUpperCase().includes('SYSTEM'));
+      if (isSystem) {
+        return false;
+      }
+
       const logDate = parseDateSafe(log.createdAt);
       if (!isDateInRange(logDate)) return false;
 
       const parsed = parseLogProduct(log);
 
-      // 3. STRICT FILTER BY USER (SUPERVISIÓN INDIVIDUAL DE CADA USUARIO)
+      // 4. If it's an UPDATE, must have genuine user modifications (si no hay ediciones no deben de aparecer)
+      if (log.actionType === 'UPDATE' && !parsed.hasRealEdition) {
+        return false;
+      }
+
+      // 5. STRICT FILTER BY USER (SUPERVISIÓN INDIVIDUAL DE CADA USUARIO)
       if (selectedSupervisorId !== 'all') {
         const targetOption = supervisorOptions.find(o => o.id === selectedSupervisorId);
         const targetUser = users.find(u => String(u.id) === selectedSupervisorId);
@@ -462,7 +515,7 @@ export default function AuditAdmin() {
         }
       }
 
-      // 4. Search term
+      // 6. Search term
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase();
         const matchesProduct = parsed.name.toLowerCase().includes(term);
@@ -518,7 +571,7 @@ export default function AuditAdmin() {
     return baseCatalogLogs.filter(l => l.actionType === selectedMovementAction);
   }, [baseCatalogLogs, selectedMovementAction]);
 
-  // Base logs for Historial de Cambios (strictly edited products only)
+  // Base logs for Historial de Cambios (strictly real user editions only)
   const historyBaseLogs = useMemo(() => {
     return auditLogs.filter(log => {
       // Must be strictly UPDATE (productos editados)
@@ -529,10 +582,24 @@ export default function AuditAdmin() {
         return false;
       }
 
-      const logDate = parseDateSafe(log.createdAt);
-      if (!isDateInRange(logDate)) return false;
+      // Strictly real users (exclude system background)
+      const isSystem = !log.userName || 
+        log.userName.toUpperCase().includes('SYSTEM') || 
+        log.userName.toUpperCase().includes('SISTEMA') ||
+        (log.userRole && log.userRole.toUpperCase().includes('SYSTEM'));
+      if (isSystem) {
+        return false;
+      }
 
       const parsed = parseLogProduct(log);
+
+      // CRITICAL: Must have real editions (si no hay ediciones no deben de aparecer)
+      if (!parsed.hasRealEdition) {
+        return false;
+      }
+
+      const logDate = parseDateSafe(log.createdAt);
+      if (!isDateInRange(logDate)) return false;
 
       // Sede filter
       if (historySelectedStore !== 'all') {
@@ -563,7 +630,7 @@ export default function AuditAdmin() {
 
     const statusChanges = historyBaseLogs.filter(l => {
       const p = parseLogProduct(l);
-      return p.statusChanged || p.newStatus === 'OUT_OF_STOCK' || p.oldStatus === 'OUT_OF_STOCK';
+      return p.statusChanged;
     }).length;
 
     const descChanges = historyBaseLogs.filter(l => {
@@ -584,7 +651,7 @@ export default function AuditAdmin() {
         if (historySelectedType === 'PRICE') {
           if (!parsed.priceChanged) return false;
         } else if (historySelectedType === 'STATUS') {
-          if (!parsed.statusChanged && parsed.newStatus !== 'OUT_OF_STOCK' && parsed.oldStatus !== 'OUT_OF_STOCK') return false;
+          if (!parsed.statusChanged) return false;
         } else if (historySelectedType === 'DESCRIPTION') {
           if (!parsed.descChanged) return false;
         }
@@ -654,6 +721,12 @@ export default function AuditAdmin() {
     const prevLogs = auditLogs.filter(log => {
       if (log.actionType !== 'CREATE' && log.actionType !== 'UPDATE' && log.actionType !== 'DELETE') return false;
       if (log.entityType && log.entityType !== 'PRODUCT') return false;
+      const isSystem = !log.userName || 
+        log.userName.toUpperCase().includes('SYSTEM') || 
+        log.userName.toUpperCase().includes('SISTEMA') ||
+        (log.userRole && log.userRole.toUpperCase().includes('SYSTEM'));
+      if (isSystem) return false;
+      if (log.actionType === 'UPDATE' && !parseLogProduct(log).hasRealEdition) return false;
       const d = parseDateSafe(log.createdAt);
       return d >= prevStart && d < prevEnd;
     });
@@ -700,6 +773,14 @@ export default function AuditAdmin() {
       const allStoreLogs = auditLogs.filter(log => {
         if (log.actionType !== 'CREATE' && log.actionType !== 'UPDATE' && log.actionType !== 'DELETE') return false;
         if (log.entityType && log.entityType !== 'PRODUCT') return false;
+
+        const isSystem = !log.userName || 
+          log.userName.toUpperCase().includes('SYSTEM') || 
+          log.userName.toUpperCase().includes('SISTEMA') ||
+          (log.userRole && log.userRole.toUpperCase().includes('SYSTEM'));
+        if (isSystem) return false;
+
+        if (log.actionType === 'UPDATE' && !parseLogProduct(log).hasRealEdition) return false;
 
         const matchesUserId = uId !== null && log.userId && Number(log.userId) === uId;
         const matchesUserName = managerName && log.userName && log.userName.toLowerCase().trim() === managerName.toLowerCase().trim();
@@ -1079,6 +1160,14 @@ export default function AuditAdmin() {
     return auditLogs.filter(log => {
       if (log.actionType !== 'CREATE' && log.actionType !== 'UPDATE' && log.actionType !== 'DELETE') return false;
       if (log.entityType && log.entityType !== 'PRODUCT') return false;
+
+      const isSystem = !log.userName || 
+        log.userName.toUpperCase().includes('SYSTEM') || 
+        log.userName.toUpperCase().includes('SISTEMA') ||
+        (log.userRole && log.userRole.toUpperCase().includes('SYSTEM'));
+      if (isSystem) return false;
+
+      if (log.actionType === 'UPDATE' && !parseLogProduct(log).hasRealEdition) return false;
 
       const d = parseDateSafe(log.createdAt);
       const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -4045,7 +4134,7 @@ export default function AuditAdmin() {
                 const oldDescDisplay = detailParsed.oldDescription || 'Sin descripción previa registrada';
                 const newDescDisplay = detailParsed.newDescription || detailParsed.oldDescription || 'Información verificada en catálogo';
 
-                const hasAnyFieldChange = detailParsed.priceChanged || detailParsed.statusChanged || detailParsed.nameChanged || detailParsed.categoryChanged || detailParsed.descChanged;
+                const hasAnyFieldChange = detailParsed.hasRealEdition;
 
                 return (
                   <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-2xs space-y-4">
@@ -4257,6 +4346,58 @@ export default function AuditAdmin() {
                             </div>
                             <div className="font-medium text-[11px] text-gray-600 max-w-[240px] truncate text-right">
                               Se actualizó la descripción del producto
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Fotos (only if changed) */}
+                        {detailParsed.imagesChanged && (
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
+                            <div className="flex items-center gap-2">
+                              <ImageIcon className="w-3.5 h-3.5 text-gray-500" />
+                              <span className="font-semibold">Fotos</span>
+                            </div>
+                            <div className="font-medium text-[11px] text-emerald-700 text-right">
+                              Fotos actualizadas
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Tallas (only if changed) */}
+                        {detailParsed.sizesChanged && (
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
+                            <div className="flex items-center gap-2">
+                              <Tag className="w-3.5 h-3.5 text-gray-500" />
+                              <span className="font-semibold">Tallas</span>
+                            </div>
+                            <div className="font-medium text-[11px] text-emerald-700 text-right">
+                              Tallas modificadas
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Colores (only if changed) */}
+                        {detailParsed.colorsChanged && (
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
+                            <div className="flex items-center gap-2">
+                              <Palette className="w-3.5 h-3.5 text-gray-500" />
+                              <span className="font-semibold">Colores</span>
+                            </div>
+                            <div className="font-medium text-[11px] text-emerald-700 text-right">
+                              Colores modificados
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Sedes (only if changed) */}
+                        {detailParsed.storesChanged && (
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
+                            <div className="flex items-center gap-2">
+                              <StoreIcon className="w-3.5 h-3.5 text-gray-500" />
+                              <span className="font-semibold">Sedes asignadas</span>
+                            </div>
+                            <div className="font-medium text-[11px] text-emerald-700 text-right">
+                              Sedes actualizadas
                             </div>
                           </div>
                         )}
