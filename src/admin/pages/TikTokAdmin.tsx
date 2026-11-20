@@ -162,6 +162,9 @@ export default function TikTokAdmin() {
     videos: TikTokVideo[];
   } | null>(null);
 
+  // Ordenamiento de videos en el dashboard
+  const [periodVideoSort, setPeriodVideoSort] = useState<'recientes' | 'vistas' | 'likes'>('recientes');
+
   // Modal de credenciales de desarrollador
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [oauthConfig, setOAuthConfig] = useState<{
@@ -292,11 +295,25 @@ export default function TikTokAdmin() {
       }
     }
 
+    const parseDate = (dStr?: string): Date => {
+      if (!dStr) return new Date();
+      return new Date(dStr.trim().replace(' ', 'T'));
+    };
+
     const periodVideos = videos.filter(v => {
       if (!v.publishedAt) return false;
-      const d = new Date(v.publishedAt);
+      const d = parseDate(v.publishedAt);
+      if (period.toUpperCase() === 'HOY' || period.toUpperCase() === 'DIARIO') {
+        const isSameDay = d.getFullYear() === now.getFullYear() &&
+                          d.getMonth() === now.getMonth() &&
+                          d.getDate() === now.getDate();
+        if (isSameDay) return true;
+      }
       return d >= from && d <= to;
     });
+
+    // Ordenar videos por fecha descendente por defecto
+    periodVideos.sort((a, b) => parseDate(b.publishedAt).getTime() - parseDate(a.publishedAt).getTime());
 
     const totalVideos = periodVideos.length;
     const totalViews = periodVideos.reduce((acc, v) => acc + (v.viewCount || 0), 0);
@@ -459,6 +476,21 @@ export default function TikTokAdmin() {
     }
   };
 
+  const displayVideos = useMemo(() => {
+    const list = [...(analyticsData?.videos || [])];
+    if (periodVideoSort === 'vistas') {
+      return list.sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0));
+    }
+    if (periodVideoSort === 'likes') {
+      return list.sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0));
+    }
+    return list.sort((a, b) => {
+      const d1 = new Date(b.publishedAt ? b.publishedAt.replace(' ', 'T') : 0).getTime();
+      const d2 = new Date(a.publishedAt ? a.publishedAt.replace(' ', 'T') : 0).getTime();
+      return d1 - d2;
+    });
+  }, [analyticsData?.videos, periodVideoSort]);
+
   const loadAccount = async () => {
     try {
       const acc = await TikTokService.getGlobalAccount();
@@ -507,7 +539,7 @@ export default function TikTokAdmin() {
         dateTo: historyDateTo,
         search: historySearch,
         page: historyPage,
-        size: 10
+        size: 100
       });
       setHistoryVideos(res.videos || []);
       setHistoryTotal(res.totalVideos || 0);
@@ -1094,7 +1126,7 @@ export default function TikTokAdmin() {
           <Film className="w-4 h-4" />
           <span>Historial de Videos</span>
           <span className="px-1.5 py-0.5 text-[11px] font-black rounded-full bg-gray-200 text-gray-800">
-            {historyTotal || analyticsData?.totalAllVideos || 20}
+            {historyTotal > 0 ? historyTotal : (analyticsData?.totalAllVideos || historyVideos.length || 0)}
           </span>
         </button>
 
@@ -2108,10 +2140,10 @@ export default function TikTokAdmin() {
 
                       <div className="space-y-1">
                         <h4 className="text-xs md:text-sm font-bold text-gray-900 line-clamp-1">
-                          {vid.title}
+                          {vid.title && vid.title.trim() ? vid.title : 'Publicación de TikTok'}
                         </h4>
                         <p className="text-[11px] text-gray-500 line-clamp-1">
-                          {vid.description}
+                          {vid.description && vid.description.trim() ? vid.description : 'Publicación oficial en cuenta de TikTok'}
                         </p>
                         <div className="flex items-center gap-3 text-[11px] text-gray-400 pt-0.5">
                           <span>
@@ -2463,33 +2495,76 @@ export default function TikTokAdmin() {
             </div>
           </div>
 
-          {/* RANKING: TOP VIDEOS MÁS VIRALES DEL PERÍODO */}
+          {/* PUBLICACIONES DEL PERÍODO SELECCIONADO */}
           <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-amber-500" />
-                <h3 className="text-sm md:text-base font-black text-gray-900">
-                  Ranking de Videos Más Virales
-                </h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-gray-100 gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Film className="w-5 h-5 text-emerald-600" />
+                  <h3 className="text-sm md:text-base font-black text-gray-900">
+                    Publicaciones del Período ({displayVideos.length} {displayVideos.length === 1 ? 'video' : 'videos'})
+                  </h3>
+                </div>
+                <p className="text-xs text-gray-500 font-medium mt-0.5">
+                  Mostrando todos los videos correspondientes al filtro seleccionado.
+                </p>
               </div>
-              <span className="text-xs text-gray-500 font-semibold">
-                Ordenados por reproducciones y me gusta
-              </span>
+
+              {/* Botones de ordenamiento */}
+              <div className="flex items-center gap-1.5 self-start sm:self-center">
+                <span className="text-[11px] font-bold text-gray-500 mr-1">Ordenar por:</span>
+                <button
+                  onClick={() => setPeriodVideoSort('recientes')}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors ${
+                    periodVideoSort === 'recientes'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Más recientes
+                </button>
+                <button
+                  onClick={() => setPeriodVideoSort('vistas')}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors ${
+                    periodVideoSort === 'vistas'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Más vistas
+                </button>
+                <button
+                  onClick={() => setPeriodVideoSort('likes')}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors ${
+                    periodVideoSort === 'likes'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Más likes
+                </button>
+              </div>
             </div>
 
-            {!analyticsData?.topViralVideos || analyticsData.topViralVideos.length === 0 ? (
-              <p className="text-xs text-gray-400 py-6 text-center">
-                No hay videos registrados en el período seleccionado.
-              </p>
+            {displayVideos.length === 0 ? (
+              <div className="py-12 text-center space-y-3">
+                <Film className="w-10 h-10 text-gray-300 mx-auto" />
+                <p className="text-xs font-bold text-gray-500">
+                  No se encontraron videos publicados en este período específico.
+                </p>
+                <button
+                  onClick={() => {
+                    setAnalyticsPeriod('TODO');
+                    loadAnalytics('TODO', '', '', '');
+                  }}
+                  className="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg text-xs font-bold transition-colors inline-block"
+                >
+                  Ver todo el tiempo ({analyticsData?.totalAllVideos || 21} videos)
+                </button>
+              </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {analyticsData.topViralVideos.map((vid, idx) => {
-                  const medalBadge = 
-                    idx === 0 ? { bg: 'bg-amber-100 text-amber-900 border-amber-300', icon: '🥇 1° Lugar' } :
-                    idx === 1 ? { bg: 'bg-slate-200 text-slate-800 border-slate-300', icon: '🥈 2° Lugar' } :
-                    idx === 2 ? { bg: 'bg-amber-800/10 text-amber-900 border-amber-400', icon: '🥉 3° Lugar' } :
-                    { bg: 'bg-gray-100 text-gray-700 border-gray-200', icon: `#${idx + 1}` };
-
+                {displayVideos.map((vid, idx) => {
                   return (
                     <div
                       key={vid.id || idx}
@@ -2497,19 +2572,25 @@ export default function TikTokAdmin() {
                     >
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <span className={`px-2.5 py-0.5 text-xs font-black rounded-full border ${medalBadge.bg}`}>
-                            {medalBadge.icon}
+                          <span className="px-2.5 py-0.5 text-[11px] font-black rounded-full border bg-emerald-50 text-emerald-800 border-emerald-200">
+                            #{idx + 1}
                           </span>
-                          <span className="text-[11px] font-semibold text-gray-400">
-                            {vid.publishedAt ? new Date(vid.publishedAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Reciente'}
+                          <span className="text-[11px] font-bold text-gray-500">
+                            {vid.publishedAt
+                              ? new Date(vid.publishedAt.replace(' ', 'T')).toLocaleDateString('es-CO', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric'
+                                })
+                              : 'Reciente'}
                           </span>
                         </div>
 
                         {/* Miniatura o Portada */}
                         <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-900 flex items-center justify-center group">
-                          {vid.coverImageUrl ? (
+                          {vid.thumbnailUrl ? (
                             <img
-                              src={vid.coverImageUrl}
+                              src={vid.thumbnailUrl}
                               alt={vid.title || 'Video de TikTok'}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             />
@@ -2526,11 +2607,11 @@ export default function TikTokAdmin() {
 
                         {/* Título / Descripción */}
                         <p className="text-xs font-bold text-gray-900 line-clamp-2 leading-snug">
-                          {vid.title || 'Video oficial de JUANDSTORE'}
+                          {vid.title && vid.title.trim() ? vid.title : 'Publicación oficial en TikTok'}
                         </p>
                       </div>
 
-                      {/* Estadísticas de Viralidad */}
+                      {/* Estadísticas Reales */}
                       <div className="mt-4 pt-3 border-t border-gray-200/80">
                         <div className="grid grid-cols-4 gap-1 text-center mb-3">
                           <div className="bg-white rounded p-1 border border-gray-100">
@@ -2560,7 +2641,7 @@ export default function TikTokAdmin() {
                         </div>
 
                         <a
-                          href={vid.shareUrl || 'https://www.tiktok.com/@juand.store'}
+                          href={vid.videoUrl || 'https://www.tiktok.com/@juand.store'}
                           target="_blank"
                           rel="noreferrer"
                           className="w-full py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors"
