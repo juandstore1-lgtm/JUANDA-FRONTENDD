@@ -164,8 +164,9 @@ export default function TikTokAdmin() {
     videos: TikTokVideo[];
   } | null>(null);
 
-  // Ordenamiento de videos en el dashboard
+  // Ordenamiento y paginación de videos en el dashboard analítico
   const [periodVideoSort, setPeriodVideoSort] = useState<'recientes' | 'vistas' | 'likes'>('recientes');
+  const [analyticsVideosPage, setAnalyticsVideosPage] = useState(0);
 
   // Modal de credenciales de desarrollador
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
@@ -446,6 +447,7 @@ export default function TikTokAdmin() {
   ) => {
     try {
       setAnalyticsLoading(true);
+      setAnalyticsVideosPage(0);
       try {
         const data = await TikTokService.getAnalytics({
           period,
@@ -492,6 +494,14 @@ export default function TikTokAdmin() {
       return d1 - d2;
     });
   }, [analyticsData?.videos, periodVideoSort]);
+
+  // Paginador de 15 videos (5 filas de 3 columnas) en Dashboard Analítico
+  const ANALYTICS_PAGE_SIZE = 15;
+  const totalAnalyticsPages = Math.max(1, Math.ceil(displayVideos.length / ANALYTICS_PAGE_SIZE));
+  const paginatedDisplayVideos = useMemo(() => {
+    const start = analyticsVideosPage * ANALYTICS_PAGE_SIZE;
+    return displayVideos.slice(start, start + ANALYTICS_PAGE_SIZE);
+  }, [displayVideos, analyticsVideosPage]);
 
   const filteredHistoryVideos = useMemo(() => {
     let list = [...historyVideos];
@@ -2845,7 +2855,10 @@ export default function TikTokAdmin() {
               <div className="flex items-center gap-1.5 self-start sm:self-center">
                 <span className="text-[11px] font-bold text-gray-500 mr-1">Ordenar por:</span>
                 <button
-                  onClick={() => setPeriodVideoSort('recientes')}
+                  onClick={() => {
+                    setPeriodVideoSort('recientes');
+                    setAnalyticsVideosPage(0);
+                  }}
                   className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors ${
                     periodVideoSort === 'recientes'
                       ? 'bg-emerald-600 text-white'
@@ -2855,7 +2868,10 @@ export default function TikTokAdmin() {
                   Más recientes
                 </button>
                 <button
-                  onClick={() => setPeriodVideoSort('vistas')}
+                  onClick={() => {
+                    setPeriodVideoSort('vistas');
+                    setAnalyticsVideosPage(0);
+                  }}
                   className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors ${
                     periodVideoSort === 'vistas'
                       ? 'bg-emerald-600 text-white'
@@ -2865,7 +2881,10 @@ export default function TikTokAdmin() {
                   Más vistas
                 </button>
                 <button
-                  onClick={() => setPeriodVideoSort('likes')}
+                  onClick={() => {
+                    setPeriodVideoSort('likes');
+                    setAnalyticsVideosPage(0);
+                  }}
                   className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors ${
                     periodVideoSort === 'likes'
                       ? 'bg-emerald-600 text-white'
@@ -2895,7 +2914,8 @@ export default function TikTokAdmin() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {displayVideos.map((vid, idx) => {
+                {paginatedDisplayVideos.map((vid, idx) => {
+                  const itemIndex = analyticsVideosPage * ANALYTICS_PAGE_SIZE + idx + 1;
                   return (
                     <div
                       key={vid.id || idx}
@@ -2904,7 +2924,7 @@ export default function TikTokAdmin() {
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="px-2.5 py-0.5 text-[11px] font-black rounded-full border bg-emerald-50 text-emerald-800 border-emerald-200">
-                            #{idx + 1}
+                            #{itemIndex}
                           </span>
                           <span className="text-[11px] font-bold text-gray-500">
                             {vid.publishedAt
@@ -2984,6 +3004,71 @@ export default function TikTokAdmin() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Paginador de 15 videos (5 filas de 3 columnas) */}
+            {displayVideos.length > 0 && (
+              <div className="pt-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-medium text-gray-600">
+                <div>
+                  Mostrando <span className="font-bold text-gray-900">{analyticsVideosPage * ANALYTICS_PAGE_SIZE + 1}</span> a{' '}
+                  <span className="font-bold text-gray-900">
+                    {Math.min((analyticsVideosPage + 1) * ANALYTICS_PAGE_SIZE, displayVideos.length)}
+                  </span>{' '}
+                  de <span className="font-bold text-gray-900">{displayVideos.length}</span> videos publicados (15 por página · 5 filas)
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setAnalyticsVideosPage((prev) => Math.max(0, prev - 1))}
+                    disabled={analyticsVideosPage === 0}
+                    className="px-3 py-1.5 rounded-lg border border-gray-200 font-bold text-xs hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>Anterior</span>
+                  </button>
+
+                  {/* Números de página */}
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalAnalyticsPages }, (_, i) => i).map((p) => {
+                      if (
+                        p === 0 ||
+                        p === totalAnalyticsPages - 1 ||
+                        (p >= analyticsVideosPage - 1 && p <= analyticsVideosPage + 1)
+                      ) {
+                        return (
+                          <button
+                            key={p}
+                            onClick={() => setAnalyticsVideosPage(p)}
+                            className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${
+                              analyticsVideosPage === p
+                                ? 'bg-emerald-600 text-white shadow-sm'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            {p + 1}
+                          </button>
+                        );
+                      }
+                      if (
+                        (p === 1 && analyticsVideosPage > 2) ||
+                        (p === totalAnalyticsPages - 2 && analyticsVideosPage < totalAnalyticsPages - 3)
+                      ) {
+                        return <span key={p} className="px-1 text-gray-400">...</span>;
+                      }
+                      return null;
+                    })}
+                  </div>
+
+                  <button
+                    onClick={() => setAnalyticsVideosPage((prev) => Math.min(totalAnalyticsPages - 1, prev + 1))}
+                    disabled={analyticsVideosPage >= totalAnalyticsPages - 1}
+                    className="px-3 py-1.5 rounded-lg border border-gray-200 font-bold text-xs hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                  >
+                    <span>Siguiente</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             )}
           </div>
