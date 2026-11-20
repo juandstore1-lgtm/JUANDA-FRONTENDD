@@ -152,17 +152,9 @@ export default function TikTokAdmin() {
   const coverInputRef = useRef<HTMLInputElement | null>(null);
   const videoPlayerRef = useRef<HTMLVideoElement | null>(null);
 
-  // Inicialización y detección de retorno OAuth
+  // Inicialización de datos
   useEffect(() => {
     loadInitialData();
-
-    // Detección de retorno de TikTok OAuth
-    const query = new URLSearchParams(window.location.search);
-    const code = query.get('code');
-    const state = query.get('state');
-    if (code) {
-      handleOAuthCallback(code, state || 'GLOBAL');
-    }
   }, []);
 
   // Carga según pestaña activa

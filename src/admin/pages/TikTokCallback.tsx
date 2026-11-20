@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   CheckCircle2, 
@@ -26,8 +26,11 @@ export default function TikTokCallback() {
   const [status, setStatus] = useState<'idle' | 'processing' | 'success' | 'error' | 'no_code'>('idle');
   const [accountInfo, setAccountInfo] = useState<{ username?: string; displayName?: string; permissions?: string } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const executedRef = useRef(false);
 
   useEffect(() => {
+    if (executedRef.current) return;
+
     const code = searchParams.get('code');
     const state = searchParams.get('state');
     const error = searchParams.get('error');
@@ -35,6 +38,7 @@ export default function TikTokCallback() {
 
     // 1. Si TikTok retornó un error o el usuario canceló
     if (error) {
+      executedRef.current = true;
       setStatus('error');
       setErrorMessage(
         errorDesc 
@@ -50,7 +54,8 @@ export default function TikTokCallback() {
       return;
     }
 
-    // 3. Si hay código, procesar intercambio OAuth 2.0 real con el backend
+    // 3. Si hay código, procesar intercambio OAuth 2.0 real con el backend una sola vez
+    executedRef.current = true;
     processOAuth(code, state || 'GLOBAL');
   }, [searchParams]);
 
