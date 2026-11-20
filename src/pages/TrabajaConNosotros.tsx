@@ -46,6 +46,16 @@ export default function TrabajaConNosotros() {
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [documentUploading, setDocumentUploading] = useState(false);
 
+  // Seasonal December state & helper
+  const [decemberDatesChoice, setDecemberDatesChoice] = useState('Mes completo de diciembre (1 al 31 de diciembre)');
+  const [decemberSpecificNotes, setDecemberSpecificNotes] = useState('');
+
+  const isTemporada = (v?: JobVacancy | null) => {
+    if (!v) return false;
+    const text = `${v.employmentType || ''} ${v.contractType || ''} ${v.title || ''} ${v.position || ''} ${v.description || ''}`.toLowerCase();
+    return text.includes('decembr') || text.includes('diciembre') || text.includes('temporada');
+  };
+
   // Form state
   const [formData, setFormData] = useState<JobApplication>({
     fullName: '',
@@ -319,8 +329,15 @@ export default function TrabajaConNosotros() {
         }
       }
 
+      let finalObs = formData.additionalObservations || '';
+      if (isTemporada(selectedVacancy)) {
+        const seasonalNote = `[🎄 TEMPORADA DECEMBRINA] Disponibilidad: ${decemberDatesChoice}${decemberSpecificNotes ? ` | Detalles/Excepciones: ${decemberSpecificNotes}` : ''}`;
+        finalObs = finalObs ? `${seasonalNote}\n${finalObs}` : seasonalNote;
+      }
+
       const finalApp: JobApplication = {
         ...formData,
+        additionalObservations: finalObs,
         resumeUrl: uploadedResumeUrl,
         resumeOriginalName: resumeFile ? resumeFile.name : (formData.resumeOriginalName || 'hoja_de_vida.pdf'),
         documentFileUrl: uploadedDocUrl,
@@ -390,11 +407,11 @@ export default function TrabajaConNosotros() {
                   onClick={() => setSelectedVacancy(v)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     selectedVacancy?.id === v.id
-                      ? 'bg-emerald-600 text-white shadow-md'
-                      : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                      ? (isTemporada(v) ? 'bg-gradient-to-r from-red-600 to-emerald-600 text-white shadow-md font-bold' : 'bg-emerald-600 text-white shadow-md')
+                      : (isTemporada(v) ? 'bg-red-900/40 text-red-200 border border-red-500/40 hover:bg-red-900/60' : 'bg-white/10 text-gray-300 hover:bg-white/20')
                   }`}
                 >
-                  {v.position} ({v.sede})
+                  {isTemporada(v) ? `🎄 ${v.position} (${v.sede})` : `${v.position} (${v.sede})`}
                 </button>
               ))}
             </div>
@@ -433,14 +450,44 @@ export default function TrabajaConNosotros() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             {/* Left Card: 8 cols */}
             <div className="lg:col-span-8 bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-gray-200">
+              {/* 🎄 Festive December Banner */}
+              {isTemporada(selectedVacancy) && (
+                <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-red-700 via-emerald-800 to-green-900 text-white shadow-md border border-red-400/30 flex items-start sm:items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-2xl shrink-0">
+                    🎄
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 bg-yellow-400 text-black text-[10px] font-black rounded-md uppercase tracking-wider">
+                        Temporada Navideña
+                      </span>
+                      <span className="text-xs text-emerald-200 font-semibold">Contratación Rápida Cali</span>
+                    </div>
+                    <h3 className="text-base sm:text-lg font-black mt-0.5 text-white">
+                      Convocatoria Especial: Temporada Decembrina 2026
+                    </h3>
+                    <p className="text-xs text-white/90 mt-0.5 leading-relaxed">
+                      Estamos seleccionando personal proactivo con buena energía para trabajar en las fechas claves de diciembre en nuestras sedes de Cali. ¡Postúlate en 2 minutos con tus datos y fechas disponibles!
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Header */}
               <div className="border-l-4 border-yellow-400 pl-4 mb-6">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">{selectedVacancy.position}</h2>
-                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-full">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    Vacante disponible
-                  </span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {isTemporada(selectedVacancy) && (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-red-600 to-emerald-600 text-white text-xs font-black rounded-full shadow-2xs">
+                        🎄 Temporada Decembrina
+                      </span>
+                    )}
+                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-full">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      Vacante disponible
+                    </span>
+                  </div>
                 </div>
                 <p className="text-sm text-gray-500 mt-1">{selectedVacancy.title}</p>
                 
@@ -609,10 +656,14 @@ export default function TrabajaConNosotros() {
                   setModalStep(1);
                   setIsModalOpen(true);
                 }}
-                className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
+                className={`w-full py-3.5 px-4 font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-sm cursor-pointer ${
+                  isTemporada(selectedVacancy)
+                    ? 'bg-gradient-to-r from-red-600 via-rose-600 to-emerald-600 hover:from-red-700 hover:to-emerald-700 text-white shadow-red-500/20'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                }`}
               >
                 <Send className="w-4 h-4" />
-                Postularme a esta vacante
+                {isTemporada(selectedVacancy) ? '🎄 Postularme para Temporada Decembrina' : 'Postularme a esta vacante'}
               </button>
 
               <div className="flex items-center gap-2 justify-center text-[11px] text-gray-400 mt-4 text-center">
@@ -999,6 +1050,67 @@ export default function TrabajaConNosotros() {
                     <h3 className="text-sm font-bold text-gray-900">Horarios, pago y disponibilidad</h3>
                     <p className="text-xs text-gray-500">Indícanos tu disponibilidad y preferencia de trabajo.</p>
                   </div>
+
+                  {/* 🎄 Disponibilidad especial para Temporada Decembrina */}
+                  {isTemporada(selectedVacancy) && (
+                    <div className="p-4 rounded-xl bg-gradient-to-br from-red-50/70 via-emerald-50 to-green-50/50 border-2 border-emerald-400 space-y-3.5 shadow-2xs">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl shrink-0">🎄</span>
+                        <div>
+                          <span className="px-2 py-0.5 bg-red-600 text-white text-[9px] font-black rounded uppercase tracking-wider">
+                            Requisito de Temporada
+                          </span>
+                          <h4 className="text-xs font-black text-emerald-950 mt-0.5">
+                            ¿En cuáles fechas de Diciembre tienes disponibilidad para trabajar? *
+                          </h4>
+                          <p className="text-[11px] text-emerald-800">
+                            Selecciona el rango de fechas que mejor se ajuste a tu disponibilidad:
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        {[
+                          'Mes completo de diciembre (1 al 31 de diciembre)',
+                          'Primera quincena (1 al 15 de diciembre)',
+                          'Segunda quincena y semana navideña (16 al 31 de diciembre)',
+                          'Fines de semana y trasnochones comerciales de diciembre',
+                          'Días y fechas específicas (indicar en la casilla de abajo)'
+                        ].map((dOpt) => (
+                          <label
+                            key={dOpt}
+                            className={`flex items-center gap-2.5 p-2.5 rounded-lg border text-xs cursor-pointer transition-all ${
+                              decemberDatesChoice === dOpt
+                                ? 'border-emerald-600 bg-white shadow-2xs font-extrabold text-emerald-950'
+                                : 'border-emerald-200/80 bg-white/70 hover:bg-white text-gray-700'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="decemberDates"
+                              checked={decemberDatesChoice === dOpt}
+                              onChange={() => setDecemberDatesChoice(dOpt)}
+                              className="text-emerald-600 focus:ring-emerald-500"
+                            />
+                            <span>{dOpt}</span>
+                          </label>
+                        ))}
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-emerald-950 mb-1">
+                          ¿Tienes alguna fecha o compromiso en diciembre en el que NO puedas trabajar?
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ej. Ninguno, disponibilidad total / Solo no puedo el 24 en la tarde / Solo turnos de mañana"
+                          value={decemberSpecificNotes}
+                          onChange={e => setDecemberSpecificNotes(e.target.value)}
+                          className="w-full px-3 py-2 text-xs border border-emerald-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-800 placeholder-gray-400"
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   <div className="space-y-4 text-xs">
                     <div>

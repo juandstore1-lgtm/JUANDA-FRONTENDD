@@ -41,7 +41,10 @@ import {
   UserPlus,
   CalendarCheck,
   Pause,
-  Play
+  Play,
+  Share2,
+  Sparkles,
+  Copy
 } from 'lucide-react';
 import { RecruitmentService, StoreService } from '../../services/api';
 import { JobVacancy, JobApplication, JobInterview, RecruitmentSummary, Store } from '../../types';
@@ -331,6 +334,93 @@ export default function RecruitmentAdmin() {
       default:
         return <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600">{status || 'En revisión'}</span>;
     }
+  };
+
+  // --- Helper: Detect December Seasonal Vacancy ---
+  const isTemporada = (v?: JobVacancy | null) => {
+    if (!v) return false;
+    const text = `${v.employmentType || ''} ${v.contractType || ''} ${v.title || ''} ${v.position || ''} ${v.description || ''}`.toLowerCase();
+    return text.includes('decembr') || text.includes('diciembre') || text.includes('temporada');
+  };
+
+  // --- Helper: Copy TikTok / Social Media Ready Recruitment Ad ---
+  const copyTikTokAd = (v?: JobVacancy | null) => {
+    const position = v?.position || "Asesor(a) de Ventas";
+    const sede = v?.sede ? `Sede ${v.sede}` : "Sedes en Cali (Villa Colombia, República de Israel y Ciudad Modelo)";
+    const salary = v?.baseSalary || "$ 1.423.500";
+    const text = `🎄 ¡TRABAJO SÍ HAY EN CALI PARA ESTE DICIEMBRE! 🎄✨\n\nEn JUANDSTORE estamos contratando personal para nuestra TEMPORADA DECEMBRINA 2026 👕👟🔥\n\n💼 Cargo: ${position}\n📍 Ubicación: ${sede} (Cali)\n💰 Salario: ${salary} + Auxilio de transporte + Recargos de ley dominicales/festivos + Bonos por metas de venta\n⚡ Contratación rápida e inmediata para las fechas de diciembre\n\n👉 REQUISITOS:\n✅ Mayor de 18 años y bachiller\n✅ Buena energía, excelente presentación y actitud comercial\n✅ Disponibilidad para fechas decembrinas y fines de semana\n\n📲 ¿CÓMO POSTULARTE?\nEntra ya mismo al link oficial en nuestro perfil de TikTok:\n🌐 https://www.juandstore.com/trabaja-con-nosotros\nLlena tus datos en el formulario y selecciona tu disponibilidad de fechas. ¡Te esperamos en nuestro equipo!\n\n#trabajosihaycali #empleoscali #temporadadiciembre #juandstore #vacantescali #cali #navidadcali #trabajocali #ropacali #ventascali`;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text);
+    } else {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+
+    Swal.fire({
+      icon: 'success',
+      title: '¡Anuncio para TikTok / Redes Copiado!',
+      html: '<p class="text-xs text-gray-600">El texto optimizado con hashtags, requisitos y link directo a la vacante ya está en tu portapapeles.<br/><br/><b>Listo para pegar en la descripción de tu video de TikTok, reels de Instagram o estados de WhatsApp.</b></p>',
+      confirmButtonColor: '#10b981'
+    });
+  };
+
+  // --- Helper: Load Recommended December Seasonal Vacancy Template ---
+  const loadDecemberTemplate = () => {
+    const chosenSede = stores.length > 0 ? (stores[0].barrio || stores[0].name) : "Villa Colombia";
+    setVacancyForm({
+      company: "Juan'D Store",
+      sede: chosenSede,
+      position: "Asesor(a) de ventas - Temporada Decembrina",
+      employmentType: "Temporada Decembrina",
+      contractType: "Temporada Decembrina (Obra o labor)",
+      title: "Asesor(a) de ventas - Temporada Decembrina Cali (Ropa y Calzado Urbano)",
+      description: "Buscamos personas proactivas, con excelente energía y actitud comercial para integrarse a nuestro equipo en tiendas durante la temporada decembrina (diciembre y fin de año). Atención al cliente, asesoría personalizada en prendas y calzado, organización de exhibiciones y cierre de ventas. ¡Excelente ambiente de trabajo y contratación rápida!",
+      workScheduleType: "Tiempo completo",
+      workScheduleHours: "10:00 a. m. - 8:30 p. m. (horario extendido de temporada)",
+      saturdayHours: "9:00 a. m. - 9:00 p. m.",
+      workDays: "Lunes a domingo con descansos programados",
+      sundayPolicy: "Todos los domingos",
+      sundayHours: "10:00 a. m. - 8:00 p. m.",
+      holidayPolicy: "Sí, se trabajan",
+      holidayHours: "10:00 a. m. - 8:00 p. m.",
+      scheduleObservations: "Disponibilidad completa para fechas decembrinas: Día de Velitas (7 y 8 dic), quincenas de diciembre, trasnochones navideños (16 al 24 dic) y fin de año.",
+      remunerationType: "Salario fijo + Recargos de ley",
+      baseSalary: "$ 1.423.500",
+      transportAid: "$ 162.000",
+      sundayHolidaySurcharge: "$ 59.300 por día trabajado",
+      benefits: "Bonificaciones por cumplimiento de metas navideñas en tienda, descuentos exclusivos en prendas y calzado de Juan'D Store, dotación de tienda.",
+      salaryObservations: "Pagos puntuales quincenales o al corte acordado de temporada con todos los recargos festivos y dominicales de ley.",
+      requirements: "Mayor de 18 años, Bachiller académico, Excelente actitud de servicio y asesoría al cliente, Disponibilidad total para fechas especiales de diciembre, Experiencia en ventas de ropa o calzado (deseable pero no excluyente).",
+      paymentFrequency: "Quincenal",
+      paymentDates: "15 y 30 de diciembre",
+      probationPeriod: "Durante la vigencia de la temporada",
+      workPlace: `Sede ${chosenSede}`,
+      status: "ACTIVA",
+      vacanciesCount: 3
+    });
+    const decReqs = [
+      'Mayor de 18 años.',
+      'Bachiller académico.',
+      'Excelente actitud de servicio y atención al cliente.',
+      'Disponibilidad total para fechas especiales de diciembre (velitas, quincenas y trasnochones).',
+      'Disponibilidad para trabajar fines de semana y festivos.',
+      'Experiencia en ventas de ropa o calzado urbano (deseable).',
+      'Puntualidad, buena presentación y trabajo en equipo.'
+    ];
+    setAvailableReqs(prev => Array.from(new Set([...prev, ...decReqs])));
+    setSelectedReqs(decReqs);
+    Swal.fire({
+      icon: 'success',
+      title: '¡Plantilla Decembrina Cargada!',
+      text: 'Se han configurado todos los campos recomendados para la vacante de Temporada Decembrina. Puedes revisarla y ajustarla si lo deseas.',
+      timer: 2200,
+      showConfirmButton: false
+    });
   };
 
   // --- Vacancy Operations ---
@@ -1354,7 +1444,14 @@ export default function RecruitmentAdmin() {
                               <User className="w-4 h-4" />
                             </div>
                             <div>
-                              <strong className="block text-xs font-extrabold text-gray-900">{v.position}</strong>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <strong className="block text-xs font-extrabold text-gray-900">{v.position}</strong>
+                                {isTemporada(v) && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-black bg-gradient-to-r from-red-600 to-emerald-600 text-white shadow-2xs">
+                                    🎄 Decembrina
+                                  </span>
+                                )}
+                              </div>
                               <span className="text-[11px] text-gray-500 block truncate max-w-[180px]">{v.title}</span>
                               <span className="text-[10px] text-gray-400 flex items-center gap-1 mt-1">
                                 <MapPin className="w-3 h-3" />
@@ -1416,9 +1513,14 @@ export default function RecruitmentAdmin() {
                         <User className="w-6 h-6" />
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h2 className="text-lg font-black text-gray-900">{selectedVacancy.position}</h2>
                           {getStatusBadge(selectedVacancy.status)}
+                          {isTemporada(selectedVacancy) && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-red-600 to-emerald-600 text-white shadow-2xs">
+                              🎄 Temporada Decembrina
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-gray-500 mt-0.5">
                           {selectedVacancy.company} – Sede {selectedVacancy.sede}
@@ -1426,7 +1528,16 @@ export default function RecruitmentAdmin() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => copyTikTokAd(selectedVacancy)}
+                        className="px-3 py-1.5 bg-gradient-to-r from-gray-900 via-gray-800 to-emerald-950 hover:bg-black text-white text-xs font-bold rounded-lg flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                        title="Copiar texto optimizado para TikTok, Instagram y WhatsApp"
+                      >
+                        <Share2 className="w-3.5 h-3.5 text-yellow-400" />
+                        <span className="hidden sm:inline">Copiar anuncio</span> TikTok / Redes
+                      </button>
                       <button
                         type="button"
                         onClick={() => openEditVacancyModal(selectedVacancy)}
@@ -3440,6 +3551,37 @@ export default function RecruitmentAdmin() {
               <div className="lg:col-span-7 space-y-4">
                 {wizardStep === 1 && (
                   <div className="space-y-4">
+                    {/* Festive helper banner to load template */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-gradient-to-r from-red-50 via-emerald-50 to-green-50 rounded-xl border border-emerald-200 shadow-2xs">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">🎄</span>
+                        <div>
+                          <span className="text-xs font-black text-emerald-950 block">¿Contratando para Diciembre?</span>
+                          <span className="text-[11px] text-emerald-800">Carga la vacante recomendada para Temporada Decembrina con 1 clic</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={loadDecemberTemplate}
+                        className="px-3 py-1.5 bg-gradient-to-r from-red-600 to-emerald-600 hover:from-red-700 hover:to-emerald-700 text-white text-xs font-black rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0 transition-all hover:scale-102 active:scale-95"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                        Plantilla Decembrina
+                      </button>
+                    </div>
+
+                    {vacancyForm.employmentType === 'Temporada Decembrina' && (
+                      <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200 text-xs text-emerald-950 space-y-1">
+                        <div className="flex items-center gap-1.5 font-extrabold text-emerald-800">
+                          <span>🎄</span>
+                          <span>Modalidad de Temporada Decembrina Activa</span>
+                        </div>
+                        <p className="text-[11px] text-emerald-800 leading-relaxed">
+                          Esta vacante aparecerá con distintivo festivo en <code>juandstore.com/trabaja-con-nosotros</code> y solicitará a los candidatos sus fechas específicas disponibles de diciembre (quincenas, velitas y trasnochones).
+                        </p>
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-2 mb-2">
                       <Briefcase className="w-4 h-4 text-emerald-600" />
                       <h3 className="text-sm font-extrabold text-gray-900">1. Información general</h3>
@@ -3502,10 +3644,22 @@ export default function RecruitmentAdmin() {
                         <label className="block text-xs font-semibold text-gray-700 mb-1">Modalidad de vinculación *</label>
                         <select
                           value={vacancyForm.employmentType}
-                          onChange={e => setVacancyForm({ ...vacancyForm, employmentType: e.target.value, contractType: e.target.value })}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setVacancyForm(prev => ({
+                              ...prev,
+                              employmentType: val,
+                              contractType: val === 'Temporada Decembrina' ? 'Temporada Decembrina (Obra o labor)' : val,
+                              title: val === 'Temporada Decembrina' && !prev.title.includes('Decembrina')
+                                ? (prev.position ? `${prev.position} - Temporada Decembrina Cali` : 'Asesor(a) de ventas - Temporada Decembrina Cali')
+                                : prev.title
+                            }));
+                          }}
                           className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg bg-white"
                         >
                           <option value="Vinculación laboral directa">Vinculación laboral directa</option>
+                          <option value="Temporada Decembrina">🎄 Temporada Decembrina (Contratación Inmediata)</option>
+                          <option value="Obra o Labor (Temporada)">Obra o Labor (Temporada)</option>
                           <option value="Término fijo">Término fijo</option>
                           <option value="Prestación de servicios">Prestación de servicios</option>
                         </select>
@@ -4541,6 +4695,27 @@ export default function RecruitmentAdmin() {
                   </button>
                 </div>
               </div>
+
+              {/* 🎄 Highlight card for Seasonal candidate */}
+              {(selectedApplication.additionalObservations?.includes('TEMPORADA DECEMBRINA') || 
+                selectedApplication.targetPosition?.toLowerCase().includes('decembr') ||
+                selectedApplication.vacancyTitle?.toLowerCase().includes('decembr')) && (
+                <div className="p-4 rounded-xl bg-gradient-to-r from-red-50 via-emerald-50 to-green-50 border-2 border-emerald-300 shadow-2xs flex items-start gap-3">
+                  <span className="text-2xl shrink-0">🎄</span>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2.5 py-0.5 bg-gradient-to-r from-red-600 to-emerald-600 text-white text-[10px] font-black rounded-full uppercase tracking-wider shadow-2xs">
+                        Aspirante Temporada Decembrina
+                      </span>
+                      <span className="text-[11px] font-bold text-emerald-800">Cali · Contratación Inmediata</span>
+                    </div>
+                    <h4 className="text-xs font-black text-emerald-950 mt-1.5">Disponibilidad en Diciembre y Fechas seleccionadas:</h4>
+                    <div className="text-xs text-emerald-900 font-semibold mt-1 bg-white/80 p-2.5 rounded-lg border border-emerald-200 leading-relaxed">
+                      {selectedApplication.additionalObservations || 'El aspirante se postuló directamente a la vacante de temporada decembrina.'}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Step 1: Datos personales y contacto */}
               <div className="p-4 rounded-xl border border-gray-200 space-y-3">
