@@ -30,7 +30,10 @@ import {
   ArrowRight,
   Package,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  AlertCircle,
+  Tag,
+  Folder
 } from 'lucide-react';
 import { AuditService, ProductService, StoreService, UserService } from '../../services/api';
 import { AuditLog, Product, Store, User, AuditAlert, AuditAlertSettings } from '../../types';
@@ -208,8 +211,6 @@ export default function AuditAdmin() {
     let newPrice: number | null = null;
     let oldStatus: string | null = null;
     let newStatus: string | null = null;
-    let oldStock: number | null = null;
-    let newStock: number | null = null;
     let oldDescription: string | null = null;
     let newDescription: string | null = null;
     let category: string = 'Calzado';
@@ -222,8 +223,7 @@ export default function AuditAdmin() {
         parsedNewObj = parsedNew;
         if (parsedNew.name) name = parsedNew.name;
         if (parsedNew.images && parsedNew.images[0]) image = parsedNew.images[0];
-        if (parsedNew.price) newPrice = parsedNew.price;
-        if (parsedNew.stock !== undefined) newStock = parsedNew.stock;
+        if (parsedNew.price !== undefined && parsedNew.price !== null) newPrice = Number(parsedNew.price);
         if (parsedNew.description) newDescription = parsedNew.description;
         if (parsedNew.status) newStatus = parsedNew.status;
         if (parsedNew.category?.name) category = parsedNew.category.name;
@@ -236,8 +236,7 @@ export default function AuditAdmin() {
         parsedOldObj = parsedOld;
         if (!name || name === 'Producto') name = parsedOld.name || name;
         if (parsedOld.images && parsedOld.images[0] && image.includes('unsplash')) image = parsedOld.images[0];
-        if (parsedOld.price) oldPrice = parsedOld.price;
-        if (parsedOld.stock !== undefined) oldStock = parsedOld.stock;
+        if (parsedOld.price !== undefined && parsedOld.price !== null) oldPrice = Number(parsedOld.price);
         if (parsedOld.description) oldDescription = parsedOld.description;
         if (parsedOld.status) oldStatus = parsedOld.status;
         if (parsedOld.category?.name) category = parsedOld.category.name;
@@ -250,16 +249,16 @@ export default function AuditAdmin() {
       }
     } catch (e) {}
 
-    // ALWAYS cross-reference with products table to resolve store, name, images, category, stock, and description
+    // ALWAYS cross-reference with products table to resolve store, name, images, category, and description
     if (log.entityId) {
       const found = products.find((p) => String(p.id) === String(log.entityId));
       if (found) {
         if (!name || name === 'Producto') name = found.name;
         if (found.images && found.images[0]) image = found.images[0];
         if (found.category?.name) category = found.category.name;
-        if (newPrice === null && found.price) newPrice = found.price;
-        if (newStock === null && found.stock !== undefined) newStock = found.stock;
+        if (newPrice === null && found.price !== undefined) newPrice = Number(found.price);
         if (!newDescription && found.description) newDescription = found.description;
+        if (!newStatus && found.status) newStatus = found.status;
         if (!storeId && found.storeIds && found.storeIds.length > 0) {
           storeId = String(found.storeIds[0]);
         }
@@ -311,19 +310,38 @@ export default function AuditAdmin() {
     }
     if (!storeName) storeName = 'Todas las sedes';
 
+    // Real change detection (strictly genuine user modifications, 0 fake stock, 0 fake system changes)
+    const priceChanged = oldPrice !== null && newPrice !== null && oldPrice !== newPrice;
+    const statusChanged = oldStatus !== null && newStatus !== null && oldStatus !== newStatus;
+    const nameChanged = Boolean(parsedOldObj?.name && parsedNewObj?.name && parsedOldObj.name !== parsedNewObj.name);
+    const descChanged = Boolean(oldDescription && newDescription && oldDescription.trim() !== newDescription.trim());
+    const categoryChanged = Boolean(
+      (parsedOldObj?.category?.name || parsedOldObj?.categoryName) &&
+      (parsedNewObj?.category?.name || parsedNewObj?.categoryName) &&
+      (parsedOldObj?.category?.name || parsedOldObj?.categoryName) !== (parsedNewObj?.category?.name || parsedNewObj?.categoryName)
+    );
+
     // Detailed description text
-    let detail = 'Se registró un movimiento en el catálogo';
+    let detail = 'Actualización en catálogo';
     if (log.actionType === 'CREATE') {
-      detail = 'Se agregó al catálogo';
+      detail = 'Se publicó el producto en catálogo';
     } else if (log.actionType === 'DELETE') {
-      detail = 'Se eliminó del catálogo';
+      detail = 'Se eliminó el producto del catálogo';
     } else if (log.actionType === 'UPDATE') {
-      if (oldPrice !== null && newPrice !== null && oldPrice !== newPrice) {
-        detail = `Cambio de precio: ${formatPrice(oldPrice)} → ${formatPrice(newPrice)}`;
-      } else if (oldStatus && newStatus && oldStatus !== newStatus) {
+      if (priceChanged && statusChanged) {
+        detail = `Cambio de precio (${formatPrice(oldPrice!)} → ${formatPrice(newPrice!)}) y disponibilidad`;
+      } else if (priceChanged) {
+        detail = `Cambio de precio: ${formatPrice(oldPrice!)} → ${formatPrice(newPrice!)}`;
+      } else if (statusChanged) {
         detail = `Cambio de disponibilidad: ${oldStatus === 'AVAILABLE' ? 'Disponible' : 'Agotado'} → ${newStatus === 'AVAILABLE' ? 'Disponible' : 'Agotado'}`;
+      } else if (nameChanged) {
+        detail = `Cambio de nombre: ${parsedOldObj.name} → ${parsedNewObj.name}`;
+      } else if (descChanged) {
+        detail = 'Se actualizó la descripción del producto';
+      } else if (categoryChanged) {
+        detail = 'Se actualizó la categoría del producto';
       } else {
-        detail = 'Se actualizaron datos del producto (precio, stock y descripción)';
+        detail = 'Edición de producto guardada por usuario';
       }
     }
 
@@ -336,12 +354,15 @@ export default function AuditAdmin() {
       detail, 
       oldPrice, 
       newPrice, 
+      priceChanged,
       oldStatus, 
       newStatus,
-      oldStock,
-      newStock,
-      oldDescription,
+      statusChanged,
+      oldDescription, 
       newDescription,
+      descChanged,
+      nameChanged,
+      categoryChanged,
       category,
       parsedOld: parsedOldObj,
       parsedNew: parsedNewObj
@@ -531,31 +552,26 @@ export default function AuditAdmin() {
     });
   }, [auditLogs, dateRangeMode, selectedSpecificDate, customStartDate, customEndDate, historySelectedStore, historySelectedUser, products, stores, users]);
 
-  // Real KPIs for Historial de Cambios (reflecting real edit counts)
+  // Real KPIs for Historial de Cambios (reflecting real edit counts from genuine user actions)
   const historyKpis = useMemo(() => {
     const totalEdited = historyBaseLogs.length;
 
     const priceChanges = historyBaseLogs.filter(l => {
       const p = parseLogProduct(l);
-      return (p.oldPrice !== null && p.newPrice !== null && p.oldPrice !== p.newPrice) || p.detail.toLowerCase().includes('precio');
-    }).length;
-
-    const stockChanges = historyBaseLogs.filter(l => {
-      const p = parseLogProduct(l);
-      return (p.oldStock !== null && p.newStock !== null && p.oldStock !== p.newStock) || p.detail.toLowerCase().includes('stock');
-    }).length;
-
-    const descChanges = historyBaseLogs.filter(l => {
-      const p = parseLogProduct(l);
-      return (p.oldDescription && p.newDescription && p.oldDescription !== p.newDescription) || p.detail.toLowerCase().includes('descripción') || p.detail.toLowerCase().includes('datos');
+      return p.priceChanged;
     }).length;
 
     const statusChanges = historyBaseLogs.filter(l => {
       const p = parseLogProduct(l);
-      return (p.oldStatus && p.newStatus && p.oldStatus !== p.newStatus) || p.newStatus === 'OUT_OF_STOCK' || p.oldStatus === 'OUT_OF_STOCK' || p.detail.toLowerCase().includes('disponibilidad');
+      return p.statusChanged || p.newStatus === 'OUT_OF_STOCK' || p.oldStatus === 'OUT_OF_STOCK';
     }).length;
 
-    return { totalEdited, priceChanges, stockChanges, descChanges, statusChanges };
+    const descChanges = historyBaseLogs.filter(l => {
+      const p = parseLogProduct(l);
+      return p.descChanged;
+    }).length;
+
+    return { totalEdited, priceChanges, statusChanges, descChanges };
   }, [historyBaseLogs]);
 
   // Logs filtered specifically for Historial de Cambios (Tab 6)
@@ -566,17 +582,11 @@ export default function AuditAdmin() {
       // Change type filter
       if (historySelectedType !== 'ALL') {
         if (historySelectedType === 'PRICE') {
-          const isPrice = (parsed.oldPrice !== null && parsed.newPrice !== null && parsed.oldPrice !== parsed.newPrice) || parsed.detail.toLowerCase().includes('precio');
-          if (!isPrice) return false;
-        } else if (historySelectedType === 'STOCK') {
-          const isStock = (parsed.oldStock !== null && parsed.newStock !== null && parsed.oldStock !== parsed.newStock) || parsed.detail.toLowerCase().includes('stock');
-          if (!isStock) return false;
-        } else if (historySelectedType === 'DESCRIPTION') {
-          const isDesc = (parsed.oldDescription && parsed.newDescription && parsed.oldDescription !== parsed.newDescription) || parsed.detail.toLowerCase().includes('descripción') || parsed.detail.toLowerCase().includes('datos');
-          if (!isDesc) return false;
+          if (!parsed.priceChanged) return false;
         } else if (historySelectedType === 'STATUS') {
-          const isStatus = (parsed.oldStatus && parsed.newStatus && parsed.oldStatus !== parsed.newStatus) || parsed.newStatus === 'OUT_OF_STOCK' || parsed.oldStatus === 'OUT_OF_STOCK' || parsed.detail.toLowerCase().includes('disponibilidad');
-          if (!isStatus) return false;
+          if (!parsed.statusChanged && parsed.newStatus !== 'OUT_OF_STOCK' && parsed.oldStatus !== 'OUT_OF_STOCK') return false;
+        } else if (historySelectedType === 'DESCRIPTION') {
+          if (!parsed.descChanged) return false;
         }
       }
 
@@ -3689,9 +3699,8 @@ export default function AuditAdmin() {
                     >
                       <option value="ALL">Todos los cambios</option>
                       <option value="PRICE">Cambios de precio</option>
-                      <option value="STOCK">Cambios de stock</option>
-                      <option value="DESCRIPTION">Cambios de descripción</option>
                       <option value="STATUS">Cambios de disponibilidad</option>
+                      <option value="DESCRIPTION">Cambios de descripción</option>
                     </select>
                     <Layers className="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-2.5 pointer-events-none" />
                   </div>
@@ -3794,18 +3803,18 @@ export default function AuditAdmin() {
               <h3 className="text-2xl font-black text-gray-900">{historyKpis.priceChanges}</h3>
             </div>
 
-            {/* 3. Cambios de stock */}
+            {/* 3. Cambios de disponibilidad */}
             <div className="bg-white rounded-2xl p-4 border border-purple-100/80 shadow-2xs space-y-1">
               <div className="flex items-center justify-between">
                 <div className="w-8 h-8 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600">
-                  <Package className="w-4 h-4" />
+                  <AlertCircle className="w-4 h-4" />
                 </div>
                 <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded-md">
-                  Stock
+                  Estado
                 </span>
               </div>
-              <p className="text-[11px] font-bold text-gray-500 pt-1">Cambios de stock</p>
-              <h3 className="text-2xl font-black text-gray-900">{historyKpis.stockChanges}</h3>
+              <p className="text-[11px] font-bold text-gray-500 pt-1">Cambios disponibilidad</p>
+              <h3 className="text-2xl font-black text-gray-900">{historyKpis.statusChanges}</h3>
             </div>
 
             {/* 4. Cambios de descripción */}
@@ -4024,15 +4033,19 @@ export default function AuditAdmin() {
                 const formattedDetailDate = detailDate.toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' }) + ', ' +
                   detailDate.toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit', hour12: true });
 
-                // Comparison values for edited product
-                const oldPriceDisplay = detailParsed.oldPrice ? formatPrice(detailParsed.oldPrice) : (detailParsed.newPrice ? formatPrice(detailParsed.newPrice) : '$320.000');
-                const newPriceDisplay = detailParsed.newPrice ? formatPrice(detailParsed.newPrice) : '$299.900';
-                
-                const oldStockDisplay = detailParsed.oldStock !== null ? `${detailParsed.oldStock} unidades` : (detailParsed.newStock !== null ? `${detailParsed.newStock} unidades` : '6 unidades');
-                const newStockDisplay = detailParsed.newStock !== null ? `${detailParsed.newStock} unidades` : '12 unidades';
+                // Genuine comparison values for edited product (0 fake stock, 0 fake price changes)
+                const currentPriceVal = detailParsed.newPrice ?? detailParsed.oldPrice ?? 0;
+                const oldPriceVal = detailParsed.oldPrice ?? currentPriceVal;
+                const hasPriceChange = detailParsed.priceChanged && detailParsed.oldPrice !== null && detailParsed.newPrice !== null;
 
-                const oldDescDisplay = detailParsed.oldDescription || 'Zapatillas deportivas diseño clásico.';
-                const newDescDisplay = detailParsed.newDescription || detailParsed.detail || 'Información actualizada y verificada en tienda.';
+                const oldStatusLabel = detailParsed.oldStatus === 'OUT_OF_STOCK' ? 'Agotado' : 'Disponible';
+                const newStatusLabel = detailParsed.newStatus === 'OUT_OF_STOCK' ? 'Agotado' : 'Disponible';
+                const hasStatusChange = detailParsed.statusChanged;
+
+                const oldDescDisplay = detailParsed.oldDescription || 'Sin descripción previa registrada';
+                const newDescDisplay = detailParsed.newDescription || detailParsed.oldDescription || 'Información verificada en catálogo';
+
+                const hasAnyFieldChange = detailParsed.priceChanged || detailParsed.statusChanged || detailParsed.nameChanged || detailParsed.categoryChanged || detailParsed.descChanged;
 
                 return (
                   <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-2xs space-y-4">
@@ -4103,10 +4116,22 @@ export default function AuditAdmin() {
                             />
                             <div className="min-w-0">
                               <p className="text-[11px] text-gray-700">
-                                Precio: <strong className="text-xs line-through text-red-600 font-bold">{oldPriceDisplay}</strong>
+                                Precio:{' '}
+                                {hasPriceChange ? (
+                                  <strong className="text-xs line-through text-red-600 font-bold">
+                                    {formatPrice(oldPriceVal)}
+                                  </strong>
+                                ) : (
+                                  <span className="font-semibold text-gray-700">
+                                    {formatPrice(oldPriceVal)}
+                                  </span>
+                                )}
                               </p>
                               <p className="text-[11px] text-gray-700">
-                                Stock: <span className="font-semibold">{oldStockDisplay}</span>
+                                Estado:{' '}
+                                <span className={`font-semibold ${detailParsed.oldStatus === 'OUT_OF_STOCK' ? 'text-red-600' : 'text-gray-700'}`}>
+                                  {oldStatusLabel}
+                                </span>
                               </p>
                             </div>
                           </div>
@@ -4133,10 +4158,16 @@ export default function AuditAdmin() {
                             />
                             <div className="min-w-0">
                               <p className="text-[11px] text-gray-700">
-                                Precio: <strong className="text-xs text-emerald-700 font-extrabold">{newPriceDisplay}</strong>
+                                Precio:{' '}
+                                <strong className={`text-xs ${hasPriceChange ? 'text-emerald-700 font-extrabold' : 'text-gray-800 font-bold'}`}>
+                                  {formatPrice(currentPriceVal)}
+                                </strong>
                               </p>
                               <p className="text-[11px] text-gray-700">
-                                Stock: <strong className="font-bold text-emerald-700">{newStockDisplay}</strong>
+                                Estado:{' '}
+                                <strong className={`font-bold ${detailParsed.newStatus === 'OUT_OF_STOCK' ? 'text-red-600' : 'text-emerald-700'}`}>
+                                  {newStatusLabel}
+                                </strong>
                               </p>
                             </div>
                           </div>
@@ -4147,7 +4178,7 @@ export default function AuditAdmin() {
                       </div>
                     </div>
 
-                    {/* Campos modificados */}
+                    {/* Campos modificados (strictly genuine modifications, 0 fake stock, 0 fake edits) */}
                     <div className="space-y-2 pt-2 border-t border-gray-100">
                       <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800">
                         <Layers className="w-3.5 h-3.5 text-gray-600" />
@@ -4155,44 +4186,92 @@ export default function AuditAdmin() {
                       </div>
 
                       <div className="space-y-1.5 text-xs text-gray-700">
-                        {/* Precio */}
-                        <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-gray-500 w-4 text-center">$</span>
-                            <span className="font-semibold">Precio</span>
+                        {/* Precio (only if actually changed) */}
+                        {detailParsed.priceChanged && (
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-gray-500 w-4 text-center">$</span>
+                              <span className="font-semibold">Precio</span>
+                            </div>
+                            <div className="font-bold text-[11px]">
+                              <span className="text-gray-500 line-through">{formatPrice(detailParsed.oldPrice!)}</span>
+                              <span className="mx-1.5 text-gray-400">→</span>
+                              <span className="text-emerald-700">{formatPrice(detailParsed.newPrice!)}</span>
+                            </div>
                           </div>
-                          <div className="font-bold text-[11px]">
-                            <span className="text-gray-500">{oldPriceDisplay}</span>
-                            <span className="mx-1.5 text-gray-400">→</span>
-                            <span className="text-emerald-700">{newPriceDisplay}</span>
-                          </div>
-                        </div>
+                        )}
 
-                        {/* Stock */}
-                        <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
-                          <div className="flex items-center gap-2">
-                            <Package className="w-3.5 h-3.5 text-gray-500" />
-                            <span className="font-semibold">Stock</span>
+                        {/* Disponibilidad (only if status changed) */}
+                        {hasStatusChange && (
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-gray-500" />
+                              <span className="font-semibold">Disponibilidad</span>
+                            </div>
+                            <div className="font-bold text-[11px]">
+                              <span className="text-gray-500">{oldStatusLabel}</span>
+                              <span className="mx-1.5 text-gray-400">→</span>
+                              <span className={detailParsed.newStatus === 'OUT_OF_STOCK' ? 'text-red-600' : 'text-emerald-700'}>
+                                {newStatusLabel}
+                              </span>
+                            </div>
                           </div>
-                          <div className="font-bold text-[11px]">
-                            <span className="text-gray-500">{oldStockDisplay.replace(' unidades', '')}</span>
-                            <span className="mx-1.5 text-gray-400">→</span>
-                            <span className="text-emerald-700">{newStockDisplay}</span>
-                          </div>
-                        </div>
+                        )}
 
-                        {/* Descripción */}
-                        <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-3.5 h-3.5 text-gray-500" />
-                            <span className="font-semibold">Descripción</span>
+                        {/* Nombre (only if changed) */}
+                        {detailParsed.nameChanged && (
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
+                            <div className="flex items-center gap-2">
+                              <Tag className="w-3.5 h-3.5 text-gray-500" />
+                              <span className="font-semibold">Nombre</span>
+                            </div>
+                            <div className="font-bold text-[11px] text-right truncate max-w-[200px]">
+                              <span className="text-gray-500">{detailParsed.parsedOld?.name}</span>
+                              <span className="mx-1.5 text-gray-400">→</span>
+                              <span className="text-emerald-700">{detailParsed.parsedNew?.name}</span>
+                            </div>
                           </div>
-                          <div className="font-medium text-[11px] text-gray-600 max-w-[240px] truncate text-right">
-                            {detailParsed.oldDescription && detailParsed.newDescription && detailParsed.oldDescription !== detailParsed.newDescription
-                              ? 'Se actualizó la descripción del producto'
-                              : 'Se actualizó la información del producto'}
+                        )}
+
+                        {/* Categoría (only if changed) */}
+                        {detailParsed.categoryChanged && (
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
+                            <div className="flex items-center gap-2">
+                              <Folder className="w-3.5 h-3.5 text-gray-500" />
+                              <span className="font-semibold">Categoría</span>
+                            </div>
+                            <div className="font-bold text-[11px]">
+                              <span className="text-gray-500">{detailParsed.parsedOld?.category?.name || 'Anterior'}</span>
+                              <span className="mx-1.5 text-gray-400">→</span>
+                              <span className="text-emerald-700">{detailParsed.parsedNew?.category?.name || 'Nueva'}</span>
+                            </div>
                           </div>
-                        </div>
+                        )}
+
+                        {/* Descripción (only if changed) */}
+                        {detailParsed.descChanged && (
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
+                            <div className="flex items-center gap-2">
+                              <FileText className="w-3.5 h-3.5 text-gray-500" />
+                              <span className="font-semibold">Descripción</span>
+                            </div>
+                            <div className="font-medium text-[11px] text-gray-600 max-w-[240px] truncate text-right">
+                              Se actualizó la descripción del producto
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Note when user saved without changing price/status/name/desc/category (e.g. photos/sizes/re-save) */}
+                        {!hasAnyFieldChange && (
+                          <div className="p-3 rounded-xl bg-gray-50 border border-gray-100 text-center space-y-0.5">
+                            <p className="text-[11px] font-bold text-gray-700">
+                              Edición guardada por {currentDetailLog.userName || 'el usuario'}
+                            </p>
+                            <p className="text-[10px] text-gray-500">
+                              Actualización de fotos, tallas o verificación de catálogo (sin modificación de precio ni disponibilidad).
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
