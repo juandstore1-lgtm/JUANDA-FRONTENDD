@@ -1209,6 +1209,14 @@ export const TikTokService = {
       body: JSON.stringify({ code, sede })
     });
     return await handleResponse(res);
+  },
+
+  syncVideos: async (): Promise<{ success: boolean; count?: number; message?: string }> => {
+    const res = await fetch(`${API_URL}/tiktok/admin/videos/sync`, {
+      method: 'POST',
+      headers: getHeaders()
+    });
+    return await handleResponse(res);
   }
 };
 

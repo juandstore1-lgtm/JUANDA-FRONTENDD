@@ -244,6 +244,43 @@ export default function TikTokAdmin() {
     }
   };
 
+  const [isSyncingVideos, setIsSyncingVideos] = useState(false);
+
+  const handleSyncVideos = async () => {
+    try {
+      setIsSyncingVideos(true);
+      const res = await TikTokService.syncVideos();
+      await loadSummary();
+      await loadHistory();
+      if (res?.success) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Videos sincronizados',
+          text: `Se sincronizaron ${res.count || 0} publicaciones oficiales de tu cuenta de TikTok.`,
+          timer: 2500,
+          showConfirmButton: false
+        });
+      } else {
+        Swal.fire({
+          icon: 'info',
+          title: 'Sincronización',
+          text: res?.message || 'No hay publicaciones nuevas o la cuenta necesita reconectarse.',
+          confirmButtonColor: '#10b981'
+        });
+      }
+    } catch (e: any) {
+      console.error('Error sincronizando videos de TikTok:', e);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error al sincronizar',
+        text: e?.message || 'No se pudieron sincronizar las publicaciones de TikTok.',
+        confirmButtonColor: '#ef4444'
+      });
+    } finally {
+      setIsSyncingVideos(false);
+    }
+  };
+
   // --- Manejo del retorno OAuth 2.0 Oficial ---
   const handleOAuthCallback = async (code: string, state: string) => {
     // Limpiar query params de la URL sin recargar
@@ -1770,11 +1807,20 @@ export default function TikTokAdmin() {
 
             <div className="flex items-center gap-2">
               <button
+                onClick={handleSyncVideos}
+                disabled={isSyncingVideos}
+                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+                title="Obtener videos reales de TikTok mediante API Oficial"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncingVideos ? 'animate-spin' : ''}`} />
+                <span>{isSyncingVideos ? 'Sincronizando...' : 'Sincronizar videos de TikTok'}</span>
+              </button>
+              <button
                 onClick={loadHistory}
                 className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>Actualizar</span>
+                <span>Refrescar</span>
               </button>
             </div>
           </div>
@@ -1886,12 +1932,23 @@ export default function TikTokAdmin() {
           <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <h3 className="text-sm font-black text-gray-900">Últimas publicaciones</h3>
-              <button
-                onClick={() => setActiveTab('historial')}
-                className="text-xs text-emerald-600 font-bold hover:underline"
-              >
-                Ver historial completo →
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleSyncVideos}
+                  disabled={isSyncingVideos}
+                  className="text-xs text-emerald-600 font-bold hover:underline flex items-center gap-1 disabled:opacity-50"
+                  title="Sincronizar videos reales de TikTok"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isSyncingVideos ? 'animate-spin' : ''}`} />
+                  <span>{isSyncingVideos ? 'Sincronizando...' : 'Sincronizar videos'}</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('historial')}
+                  className="text-xs text-gray-500 font-bold hover:underline"
+                >
+                  Ver historial completo →
+                </button>
+              </div>
             </div>
 
             {summary?.recentVideos?.length === 0 ? (
