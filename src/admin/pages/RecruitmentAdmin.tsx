@@ -339,16 +339,15 @@ export default function RecruitmentAdmin() {
   // --- Helper: Detect December Seasonal Vacancy ---
   const isTemporada = (v?: JobVacancy | null) => {
     if (!v) return false;
-    const text = `${v.employmentType || ''} ${v.contractType || ''} ${v.title || ''} ${v.position || ''} ${v.description || ''}`.toLowerCase();
-    return text.includes('decembr') || text.includes('diciembre') || text.includes('temporada');
+    const text = `${v.employmentType || ''} ${v.contractType || ''} ${v.title || ''} ${v.position || ''} ${v.description || ''} ${v.remunerationType || ''}`.toLowerCase();
+    return text.includes('decembr') || text.includes('diciembre') || text.includes('temporada') || text.includes('dia trabajado') || text.includes('día trabajado');
   };
 
   // --- Helper: Copy TikTok / Social Media Ready Recruitment Ad ---
   const copyTikTokAd = (v?: JobVacancy | null) => {
-    const position = v?.position || "Asesor(a) de Ventas";
+    const position = v?.position || "Personal de apoyo - Temporada Decembrina";
     const sede = v?.sede ? `Sede ${v.sede}` : "Sedes en Cali (Villa Colombia, República de Israel y Ciudad Modelo)";
-    const salary = v?.baseSalary || "$ 1.423.500";
-    const text = `🎄 ¡TRABAJO SÍ HAY EN CALI PARA ESTE DICIEMBRE! 🎄✨\n\nEn JUANDSTORE estamos contratando personal para nuestra TEMPORADA DECEMBRINA 2026 👕👟🔥\n\n💼 Cargo: ${position}\n📍 Ubicación: ${sede} (Cali)\n💰 Salario: ${salary} + Auxilio de transporte + Recargos de ley dominicales/festivos + Bonos por metas de venta\n⚡ Contratación rápida e inmediata para las fechas de diciembre\n\n👉 REQUISITOS:\n✅ Mayor de 18 años y bachiller\n✅ Buena energía, excelente presentación y actitud comercial\n✅ Disponibilidad para fechas decembrinas y fines de semana\n\n📲 ¿CÓMO POSTULARTE?\nEntra ya mismo al link oficial en nuestro perfil de TikTok:\n🌐 https://www.juandstore.com/trabaja-con-nosotros\nLlena tus datos en el formulario y selecciona tu disponibilidad de fechas. ¡Te esperamos en nuestro equipo!\n\n#trabajosihaycali #empleoscali #temporadadiciembre #juandstore #vacantescali #cali #navidadcali #trabajocali #ropacali #ventascali`;
+    const text = `🎄 ¡TRABAJO DE TEMPORADA EN CALI PARA DICIEMBRE! 🎄✨\n\nEn JUANDSTORE estamos buscando personal de apoyo para las fechas claves de Diciembre (días como 6, 7, 20, 21, 22, 23, 24 y fin de año) 👕👟🔥\n\n💼 Cargo: ${position}\n📍 Ubicación: ${sede} (Cali)\n💰 Pago: PAGO POR DÍA TRABAJADO (se cancela directamente el día laborado)\n⏰ Horarios y días: Varían según las fechas que elija la tienda (la administración te asigna los días y turnos de apoyo)\n❌ Sin contratos fijos ni ataduras: Trabajas los días acordados y recibes el pago de tu día\n\n👉 REQUISITOS:\n✅ Mayor de 18 años\n✅ Excelente actitud de servicio y proactividad comercial\n✅ Disponibilidad para trabajar en las fechas decembrinas que te programen\n\n📲 ¿CÓMO POSTULARTE?\nEntra al enlace oficial en nuestro perfil de TikTok:\n🌐 https://www.juandstore.com/trabaja-con-nosotros\nLlena tus datos y selecciona en qué fechas de diciembre tienes disponibilidad para asignarte turnos. ¡Te esperamos!\n\n#trabajosihaycali #empleoscali #temporadadiciembre #juandstore #vacantescali #cali #navidadcali #trabajopordia #empleocali`;
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text);
@@ -364,7 +363,7 @@ export default function RecruitmentAdmin() {
     Swal.fire({
       icon: 'success',
       title: '¡Anuncio para TikTok / Redes Copiado!',
-      html: '<p class="text-xs text-gray-600">El texto optimizado con hashtags, requisitos y link directo a la vacante ya está en tu portapapeles.<br/><br/><b>Listo para pegar en la descripción de tu video de TikTok, reels de Instagram o estados de WhatsApp.</b></p>',
+      html: '<p class="text-xs text-gray-600">Texto optimizado con la modalidad de <b>pago por día trabajado</b> y fechas variables listo para pegar en TikTok o redes sociales.</p>',
       confirmButtonColor: '#10b981'
     });
   };
@@ -375,49 +374,47 @@ export default function RecruitmentAdmin() {
     setVacancyForm({
       company: "Juan'D Store",
       sede: chosenSede,
-      position: "Asesor(a) de ventas - Temporada Decembrina",
+      position: "Personal de apoyo - Temporada Decembrina",
       employmentType: "Temporada Decembrina",
-      contractType: "Temporada Decembrina (Obra o labor)",
-      title: "Asesor(a) de ventas - Temporada Decembrina Cali (Ropa y Calzado Urbano)",
-      description: "Buscamos personas proactivas, con excelente energía y actitud comercial para integrarse a nuestro equipo en tiendas durante la temporada decembrina (diciembre y fin de año). Atención al cliente, asesoría personalizada en prendas y calzado, organización de exhibiciones y cierre de ventas. ¡Excelente ambiente de trabajo y contratación rápida!",
-      workScheduleType: "Tiempo completo",
-      workScheduleHours: "10:00 a. m. - 8:30 p. m. (horario extendido de temporada)",
-      saturdayHours: "9:00 a. m. - 9:00 p. m.",
-      workDays: "Lunes a domingo con descansos programados",
-      sundayPolicy: "Todos los domingos",
-      sundayHours: "10:00 a. m. - 8:00 p. m.",
+      contractType: "Pago por día trabajado",
+      title: "Personal de apoyo - Temporada Decembrina Cali (Pago por día trabajado)",
+      description: "Buscamos personal con excelente energía y actitud comercial para trabajar como apoyo en fechas clave de diciembre. Se paga directamente el día trabajado según los turnos asignados por la administración de la tienda.",
+      workScheduleType: "Por turnos / Fechas asignadas",
+      workScheduleHours: "Horario asignado según fecha comercial de la tienda",
+      saturdayHours: "Según fecha programada",
+      workDays: "Fechas específicas de diciembre asignadas por la tienda",
+      sundayPolicy: "Según fechas asignadas",
+      sundayHours: "Según turno programado",
       holidayPolicy: "Sí, se trabajan",
-      holidayHours: "10:00 a. m. - 8:00 p. m.",
-      scheduleObservations: "Disponibilidad completa para fechas decembrinas: Día de Velitas (7 y 8 dic), quincenas de diciembre, trasnochones navideños (16 al 24 dic) y fin de año.",
-      remunerationType: "Salario fijo + Recargos de ley",
-      baseSalary: "$ 1.423.500",
-      transportAid: "$ 162.000",
-      sundayHolidaySurcharge: "$ 59.300 por día trabajado",
-      benefits: "Bonificaciones por cumplimiento de metas navideñas en tienda, descuentos exclusivos en prendas y calzado de Juan'D Store, dotación de tienda.",
-      salaryObservations: "Pagos puntuales quincenales o al corte acordado de temporada con todos los recargos festivos y dominicales de ley.",
-      requirements: "Mayor de 18 años, Bachiller académico, Excelente actitud de servicio y asesoría al cliente, Disponibilidad total para fechas especiales de diciembre, Experiencia en ventas de ropa o calzado (deseable pero no excluyente).",
-      paymentFrequency: "Quincenal",
-      paymentDates: "15 y 30 de diciembre",
-      probationPeriod: "Durante la vigencia de la temporada",
+      holidayHours: "Según turno programado",
+      scheduleObservations: "Los días y horarios varían dependiendo las fechas que elija la tienda (ejemplo: 6, 7, 20, 21, 22, 23, 24 de diciembre). La administración asigna previamente las fechas y los horarios.",
+      remunerationType: "Pago por día trabajado",
+      baseSalary: "$ 60.000 / día trabajado",
+      transportAid: "No aplica (se paga el día trabajado)",
+      sundayHolidaySurcharge: "No aplica (tarifa por día)",
+      benefits: "Pago directo por día laborado",
+      salaryObservations: "Para esta vacante no hay salario mensual fijo, auxilio de transporte ni recargos adicionales: se cancela directamente el valor de cada día trabajado.",
+      requirements: "Mayor de 18 años, Bachiller o actitud comercial, Disponibilidad para presentarse en las fechas asignadas de diciembre (ej. 6, 7, 20, 21, 22, 23, 24 dic), Puntualidad, buena presentación y trabajo en equipo.",
+      paymentFrequency: "Diario / Por día trabajado",
+      paymentDates: "Al terminar el día laborado",
+      probationPeriod: "No aplica",
       workPlace: `Sede ${chosenSede}`,
       status: "ACTIVA",
-      vacanciesCount: 3
+      vacanciesCount: 5
     });
     const decReqs = [
       'Mayor de 18 años.',
-      'Bachiller académico.',
       'Excelente actitud de servicio y atención al cliente.',
-      'Disponibilidad total para fechas especiales de diciembre (velitas, quincenas y trasnochones).',
-      'Disponibilidad para trabajar fines de semana y festivos.',
-      'Experiencia en ventas de ropa o calzado urbano (deseable).',
-      'Puntualidad, buena presentación y trabajo en equipo.'
+      'Disponibilidad para trabajar en las fechas de diciembre asignadas por la tienda (ej. 6, 7, 20, 21, 22, 23, 24 dic).',
+      'Puntualidad, buena presentación y compromiso.',
+      'Aceptación de modalidad de pago por día trabajado.'
     ];
     setAvailableReqs(prev => Array.from(new Set([...prev, ...decReqs])));
     setSelectedReqs(decReqs);
     Swal.fire({
       icon: 'success',
       title: '¡Plantilla Decembrina Cargada!',
-      text: 'Se han configurado todos los campos recomendados para la vacante de Temporada Decembrina. Puedes revisarla y ajustarla si lo deseas.',
+      text: 'Configurada en modalidad de PAGO POR DÍA TRABAJADO y fechas variables asignadas por la tienda.',
       timer: 2200,
       showConfirmButton: false
     });
@@ -1573,32 +1570,62 @@ export default function RecruitmentAdmin() {
                     </h4>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                      <div className="p-3.5 rounded-xl bg-gray-50/80 border border-gray-100 space-y-1.5">
-                        <span className="font-bold text-gray-900 flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 text-gray-500" />
-                          Horario de trabajo
-                        </span>
-                        <ul className="space-y-1 text-gray-600 pl-4 list-disc text-[11px]">
-                          <li>Jornada: {selectedVacancy.workScheduleType}</li>
-                          {selectedVacancy.workScheduleHours && <li>Lunes a viernes: {selectedVacancy.workScheduleHours}</li>}
-                          {selectedVacancy.saturdayHours && <li>Sábados: {selectedVacancy.saturdayHours}</li>}
-                          {selectedVacancy.sundayHours && <li>Domingos y lunes festivos/trabajados: {selectedVacancy.sundayHours}</li>}
-                          {selectedVacancy.holidayHours && <li>Festivos: {selectedVacancy.holidayHours}</li>}
-                        </ul>
-                      </div>
+                      {isTemporada(selectedVacancy) ? (
+                        <div className="p-3.5 rounded-xl bg-gray-50/80 border border-gray-100 space-y-1.5">
+                          <span className="font-bold text-gray-900 flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-gray-500" />
+                            Fechas y horarios (Asignados por tienda)
+                          </span>
+                          <ul className="space-y-1 text-gray-700 pl-4 list-disc text-[11px]">
+                            <li><strong>Modalidad:</strong> {selectedVacancy.workScheduleType || 'Por turnos / Fechas asignadas'}</li>
+                            <li><strong>Fechas de apoyo:</strong> Días asignados por la tienda (ej. 6, 7, 20, 21, 22, 23, 24 dic)</li>
+                            <li><strong>Horarios:</strong> Varían según las necesidades comerciales de cada fecha</li>
+                            {selectedVacancy.scheduleObservations && <li>{selectedVacancy.scheduleObservations}</li>}
+                          </ul>
+                        </div>
+                      ) : (
+                        <div className="p-3.5 rounded-xl bg-gray-50/80 border border-gray-100 space-y-1.5">
+                          <span className="font-bold text-gray-900 flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-gray-500" />
+                            Horario de trabajo
+                          </span>
+                          <ul className="space-y-1 text-gray-600 pl-4 list-disc text-[11px]">
+                            <li>Jornada: {selectedVacancy.workScheduleType}</li>
+                            {selectedVacancy.workScheduleHours && <li>Lunes a viernes: {selectedVacancy.workScheduleHours}</li>}
+                            {selectedVacancy.saturdayHours && <li>Sábados: {selectedVacancy.saturdayHours}</li>}
+                            {selectedVacancy.sundayHours && <li>Domingos y lunes festivos/trabajados: {selectedVacancy.sundayHours}</li>}
+                            {selectedVacancy.holidayHours && <li>Festivos: {selectedVacancy.holidayHours}</li>}
+                          </ul>
+                        </div>
+                      )}
 
-                      <div className="p-3.5 rounded-xl bg-gray-50/80 border border-gray-100 space-y-1.5">
-                        <span className="font-bold text-gray-900 flex items-center gap-1.5">
-                          <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
-                          Salario y pagos
-                        </span>
-                        <ul className="space-y-1 text-gray-600 pl-4 list-disc text-[11px]">
-                          {selectedVacancy.baseSalary && <li>Salario base: {selectedVacancy.baseSalary}</li>}
-                          {selectedVacancy.transportAid && <li>Auxilio transporte: {selectedVacancy.transportAid}</li>}
-                          {selectedVacancy.sundayHolidaySurcharge && <li>Recargo festivos: {selectedVacancy.sundayHolidaySurcharge}</li>}
-                          {selectedVacancy.paymentFrequency && <li>Frecuencia: {selectedVacancy.paymentFrequency}</li>}
-                        </ul>
-                      </div>
+                      {isTemporada(selectedVacancy) ? (
+                        <div className="p-3.5 rounded-xl bg-gradient-to-br from-emerald-50 to-green-50/50 border border-emerald-200 space-y-1.5">
+                          <span className="font-bold text-emerald-950 flex items-center gap-1.5">
+                            <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
+                            Modalidad de pago (Día laborado)
+                          </span>
+                          <ul className="space-y-1 text-gray-800 pl-4 list-disc text-[11px]">
+                            <li><strong>Pago:</strong> {selectedVacancy.baseSalary || 'Pago por día trabajado'}</li>
+                            <li><strong>Sin salario mensual:</strong> Se cancela exclusivamente el día trabajado.</li>
+                            <li><strong>Sin auxilio ni recargos:</strong> No aplica auxilio de transporte ni recargos.</li>
+                            <li><strong>Frecuencia:</strong> {selectedVacancy.paymentFrequency || 'Diario / Al finalizar el día'}</li>
+                          </ul>
+                        </div>
+                      ) : (
+                        <div className="p-3.5 rounded-xl bg-gray-50/80 border border-gray-100 space-y-1.5">
+                          <span className="font-bold text-gray-900 flex items-center gap-1.5">
+                            <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
+                            Salario y pagos
+                          </span>
+                          <ul className="space-y-1 text-gray-600 pl-4 list-disc text-[11px]">
+                            {selectedVacancy.baseSalary && <li>Salario base: {selectedVacancy.baseSalary}</li>}
+                            {selectedVacancy.transportAid && <li>Auxilio transporte: {selectedVacancy.transportAid}</li>}
+                            {selectedVacancy.sundayHolidaySurcharge && <li>Recargo festivos: {selectedVacancy.sundayHolidaySurcharge}</li>}
+                            {selectedVacancy.paymentFrequency && <li>Frecuencia: {selectedVacancy.paymentFrequency}</li>}
+                          </ul>
+                        </div>
+                      )}
 
                       <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
                         <span className="text-gray-400 text-[10px] uppercase font-bold block">Bonificaciones</span>
@@ -3798,15 +3825,31 @@ export default function RecruitmentAdmin() {
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 mb-2">
                       <DollarSign className="w-4 h-4 text-emerald-600" />
-                      <h3 className="text-sm font-extrabold text-gray-900">3. Salario y beneficios</h3>
+                      <h3 className="text-sm font-extrabold text-gray-900">
+                        {vacancyForm.employmentType === 'Temporada Decembrina' ? '3. Pago por día trabajado' : '3. Salario y beneficios'}
+                      </h3>
                     </div>
+
+                    {vacancyForm.employmentType === 'Temporada Decembrina' && (
+                      <div className="p-3.5 bg-amber-50/90 border border-amber-300 rounded-xl text-xs text-amber-950 space-y-1">
+                        <div className="flex items-center gap-2 font-bold text-amber-900">
+                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                          <span>Modalidad: Pago por día trabajado (Sin salario mensual)</span>
+                        </div>
+                        <p className="text-[11px] text-amber-900 leading-relaxed">
+                          Para esta labor temporal <strong>no hay salario mensual fijo, auxilio de transporte ni recargos</strong>. Se cancela directamente el valor acordado por cada día laborado según las fechas que asignes (ej. 6, 7, 20 al 24 de diciembre).
+                        </p>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">Salario base mensual *</label>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">
+                          {vacancyForm.employmentType === 'Temporada Decembrina' ? 'Valor por día trabajado *' : 'Salario base mensual *'}
+                        </label>
                         <input
                           type="text"
-                          placeholder="Ej. $ 1.750.000"
+                          placeholder={vacancyForm.employmentType === 'Temporada Decembrina' ? 'Ej. $ 60.000 / día trabajado' : 'Ej. $ 1.750.000'}
                           value={vacancyForm.baseSalary}
                           onChange={e => setVacancyForm({ ...vacancyForm, baseSalary: e.target.value })}
                           className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg font-bold"
@@ -3814,10 +3857,12 @@ export default function RecruitmentAdmin() {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">Auxilio de transporte *</label>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">
+                          {vacancyForm.employmentType === 'Temporada Decembrina' ? 'Auxilio de transporte (Opcional)' : 'Auxilio de transporte *'}
+                        </label>
                         <input
                           type="text"
-                          placeholder="Ej. $ 70.000"
+                          placeholder={vacancyForm.employmentType === 'Temporada Decembrina' ? 'No aplica (se paga el día trabajado)' : 'Ej. $ 70.000'}
                           value={vacancyForm.transportAid}
                           onChange={e => setVacancyForm({ ...vacancyForm, transportAid: e.target.value })}
                           className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg"
@@ -3825,10 +3870,12 @@ export default function RecruitmentAdmin() {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">Recargo por domingos y festivos *</label>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">
+                          {vacancyForm.employmentType === 'Temporada Decembrina' ? 'Recargo festivos (Opcional)' : 'Recargo por domingos y festivos *'}
+                        </label>
                         <input
                           type="text"
-                          placeholder="Ej. $ 43.666"
+                          placeholder={vacancyForm.employmentType === 'Temporada Decembrina' ? 'No aplica (tarifa por día)' : 'Ej. $ 43.666'}
                           value={vacancyForm.sundayHolidaySurcharge}
                           onChange={e => setVacancyForm({ ...vacancyForm, sundayHolidaySurcharge: e.target.value })}
                           className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg"
@@ -3836,10 +3883,12 @@ export default function RecruitmentAdmin() {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">Beneficios *</label>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">
+                          {vacancyForm.employmentType === 'Temporada Decembrina' ? 'Condiciones de pago *' : 'Beneficios *'}
+                        </label>
                         <input
                           type="text"
-                          placeholder="Ej. Descuento en tienda, Incentivos por metas"
+                          placeholder={vacancyForm.employmentType === 'Temporada Decembrina' ? 'Ej. Pago diario al terminar el turno' : 'Ej. Descuento en tienda, Incentivos por metas'}
                           value={vacancyForm.benefits}
                           onChange={e => setVacancyForm({ ...vacancyForm, benefits: e.target.value })}
                           className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg"

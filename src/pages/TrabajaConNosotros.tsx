@@ -331,7 +331,7 @@ export default function TrabajaConNosotros() {
 
       let finalObs = formData.additionalObservations || '';
       if (isTemporada(selectedVacancy)) {
-        const seasonalNote = `[🎄 TEMPORADA DECEMBRINA] Disponibilidad: ${decemberDatesChoice}${decemberSpecificNotes ? ` | Detalles/Excepciones: ${decemberSpecificNotes}` : ''}`;
+        const seasonalNote = `[🎄 TEMPORADA DECEMBRINA - PAGO POR DÍA] Disponibilidad: ${decemberDatesChoice}${decemberSpecificNotes ? ` | Días específicos: ${decemberSpecificNotes}` : ''}. Confirma acuerdo: pago por día laborado sin salario mensual ni auxilio.`;
         finalObs = finalObs ? `${seasonalNote}\n${finalObs}` : seasonalNote;
       }
 
@@ -539,82 +539,122 @@ export default function TrabajaConNosotros() {
                   </div>
                 )}
 
-                {/* Salario y pagos */}
-                {(selectedVacancy.baseSalary || selectedVacancy.transportAid || selectedVacancy.sundayHolidaySurcharge || selectedVacancy.paymentFrequency) && (
-                  <div className="border-t border-gray-100 pt-5">
-                    <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-3">
-                      <DollarSign className="w-4 h-4 text-emerald-600" />
-                      Salario y pagos
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-700">
-                      {selectedVacancy.baseSalary && (
-                        <div className="p-3 bg-gray-50 rounded-lg">
-                          <span className="text-gray-500 block">Salario base</span>
-                          <strong className="text-sm text-gray-900">{selectedVacancy.baseSalary}</strong> (mensual)
+                {/* Modalidad de pago (Temporada Decembrina - Pago por día) */}
+                {isTemporada(selectedVacancy) ? (
+                  <div className="border-t border-gray-100 pt-5 space-y-4">
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-3">
+                        <DollarSign className="w-4 h-4 text-emerald-600" />
+                        Modalidad de pago y remuneración
+                      </h3>
+                      <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-50/80 to-green-50/50 border border-emerald-300 space-y-2 text-xs">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <span className="font-extrabold text-emerald-950 text-sm">Pago por día trabajado</span>
+                          <span className="px-3 py-1 bg-emerald-600 text-white font-black text-xs rounded-lg shadow-2xs">
+                            {selectedVacancy.baseSalary || 'Pago por día trabajado'}
+                          </span>
                         </div>
-                      )}
-                      {selectedVacancy.transportAid && (
-                        <div className="p-3 bg-gray-50 rounded-lg">
-                          <span className="text-gray-500 block">Ayuda de transporte</span>
-                          <strong className="text-sm text-gray-900">{selectedVacancy.transportAid}</strong> (aporte de la empresa)
-                        </div>
-                      )}
-                      {selectedVacancy.sundayHolidaySurcharge && (
-                        <div className="p-3 bg-gray-50 rounded-lg">
-                          <span className="text-gray-500 block">Recargo por domingo o festivo</span>
-                          <strong className="text-sm text-gray-900">{selectedVacancy.sundayHolidaySurcharge}</strong> por cada día trabajado
-                        </div>
-                      )}
-                      {selectedVacancy.paymentFrequency && (
-                        <div className="p-3 bg-gray-50 rounded-lg">
-                          <span className="text-gray-500 block">Frecuencia y fechas de pago</span>
-                          <strong className="text-gray-900">{selectedVacancy.paymentFrequency}:</strong> {selectedVacancy.paymentDates || 'A convenir'}
-                        </div>
-                      )}
+                        <p className="text-emerald-900 text-xs leading-relaxed font-medium">
+                          <strong>Condición de pago:</strong> En esta vacante se cancela directamente cada día laborado. No hay salario mensual fijo, auxilio de transporte ni recargos adicionales.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-3">
+                        <Clock className="w-4 h-4 text-emerald-600" />
+                        Fechas y horarios de apoyo
+                      </h3>
+                      <div className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-2 text-xs text-gray-700">
+                        <p className="leading-relaxed">
+                          <strong>Asignación de días:</strong> Los turnos y fechas varían según las necesidades de la tienda (por ejemplo: <strong>6, 7, 20, 21, 22, 23, 24 de diciembre</strong> u otras fechas de temporada).
+                        </p>
+                        <p className="text-gray-600">
+                          La administración te programará y asignará previamente los días y los horarios de cada turno según tu disponibilidad.
+                        </p>
+                      </div>
                     </div>
                   </div>
-                )}
+                ) : (
+                  <>
+                    {/* Salario y pagos */}
+                    {(selectedVacancy.baseSalary || selectedVacancy.transportAid || selectedVacancy.sundayHolidaySurcharge || selectedVacancy.paymentFrequency) && (
+                      <div className="border-t border-gray-100 pt-5">
+                        <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-3">
+                          <DollarSign className="w-4 h-4 text-emerald-600" />
+                          Salario y pagos
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-700">
+                          {selectedVacancy.baseSalary && (
+                            <div className="p-3 bg-gray-50 rounded-lg">
+                              <span className="text-gray-500 block">Salario base</span>
+                              <strong className="text-sm text-gray-900">{selectedVacancy.baseSalary}</strong> (mensual)
+                            </div>
+                          )}
+                          {selectedVacancy.transportAid && (
+                            <div className="p-3 bg-gray-50 rounded-lg">
+                              <span className="text-gray-500 block">Ayuda de transporte</span>
+                              <strong className="text-sm text-gray-900">{selectedVacancy.transportAid}</strong> (aporte de la empresa)
+                            </div>
+                          )}
+                          {selectedVacancy.sundayHolidaySurcharge && (
+                            <div className="p-3 bg-gray-50 rounded-lg">
+                              <span className="text-gray-500 block">Recargo por domingo o festivo</span>
+                              <strong className="text-sm text-gray-900">{selectedVacancy.sundayHolidaySurcharge}</strong> por cada día trabajado
+                            </div>
+                          )}
+                          {selectedVacancy.paymentFrequency && (
+                            <div className="p-3 bg-gray-50 rounded-lg">
+                              <span className="text-gray-500 block">Frecuencia y fechas de pago</span>
+                              <strong className="text-gray-900">{selectedVacancy.paymentFrequency}:</strong> {selectedVacancy.paymentDates || 'A convenir'}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
-                {/* Horarios y descansos */}
-                {(selectedVacancy.workScheduleHours || selectedVacancy.saturdayHours || selectedVacancy.sundayHours || selectedVacancy.scheduleObservations) && (
-                  <div className="border-t border-gray-100 pt-5">
-                    <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-3">
-                      <Clock className="w-4 h-4 text-emerald-600" />
-                      Horarios y descansos
-                    </h3>
-                    <div className="space-y-1.5 text-xs text-gray-700">
-                      {selectedVacancy.workScheduleHours && (
-                        <p><strong className="text-gray-900">Lunes a viernes:</strong> {selectedVacancy.workScheduleHours}</p>
-                      )}
-                      {selectedVacancy.saturdayHours && (
-                        <p><strong className="text-gray-900">Sábado:</strong> {selectedVacancy.saturdayHours}</p>
-                      )}
-                      {selectedVacancy.sundayHours && (
-                        <p><strong className="text-gray-900">Domingo y lunes trabajado:</strong> {selectedVacancy.sundayHours}</p>
-                      )}
-                      {(selectedVacancy.scheduleObservations || selectedVacancy.sundayPolicy) && (
-                        <p><strong className="text-gray-900">Observaciones domingos/festivos:</strong> {selectedVacancy.scheduleObservations || selectedVacancy.sundayPolicy}</p>
-                      )}
-                    </div>
-                  </div>
-                )}
+                    {/* Horarios y descansos */}
+                    {(selectedVacancy.workScheduleHours || selectedVacancy.saturdayHours || selectedVacancy.sundayHours || selectedVacancy.scheduleObservations) && (
+                      <div className="border-t border-gray-100 pt-5">
+                        <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-3">
+                          <Clock className="w-4 h-4 text-emerald-600" />
+                          Horarios y descansos
+                        </h3>
+                        <div className="space-y-1.5 text-xs text-gray-700">
+                          {selectedVacancy.workScheduleHours && (
+                            <p><strong className="text-gray-900">Lunes a viernes:</strong> {selectedVacancy.workScheduleHours}</p>
+                          )}
+                          {selectedVacancy.saturdayHours && (
+                            <p><strong className="text-gray-900">Sábado:</strong> {selectedVacancy.saturdayHours}</p>
+                          )}
+                          {selectedVacancy.sundayHours && (
+                            <p><strong className="text-gray-900">Domingo y lunes trabajado:</strong> {selectedVacancy.sundayHours}</p>
+                          )}
+                          {(selectedVacancy.scheduleObservations || selectedVacancy.sundayPolicy) && (
+                            <p><strong className="text-gray-900">Observaciones domingos/festivos:</strong> {selectedVacancy.scheduleObservations || selectedVacancy.sundayPolicy}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
-                {/* Beneficios */}
-                {benefitsList.length > 0 && (
-                  <div className="border-t border-gray-100 pt-5">
-                    <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-3">
-                      <Gift className="w-4 h-4 text-emerald-600" />
-                      Beneficios
-                    </h3>
-                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-700">
-                      {benefitsList.map((ben, i) => (
-                        <li key={i} className="flex items-center gap-2">
-                          <Check className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>{ben}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                    {/* Beneficios */}
+                    {benefitsList.length > 0 && (
+                      <div className="border-t border-gray-100 pt-5">
+                        <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-3">
+                          <Gift className="w-4 h-4 text-emerald-600" />
+                          Beneficios
+                        </h3>
+                        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-700">
+                          {benefitsList.map((ben, i) => (
+                            <li key={i} className="flex items-center gap-2">
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>{ben}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -1058,24 +1098,25 @@ export default function TrabajaConNosotros() {
                         <span className="text-2xl shrink-0">🎄</span>
                         <div>
                           <span className="px-2 py-0.5 bg-red-600 text-white text-[9px] font-black rounded uppercase tracking-wider">
-                            Requisito de Temporada
+                            Pago Por Día Trabajado
                           </span>
                           <h4 className="text-xs font-black text-emerald-950 mt-0.5">
-                            ¿En cuáles fechas de Diciembre tienes disponibilidad para trabajar? *
+                            ¿En cuáles fechas de Diciembre tienes disponibilidad para que te asignemos turnos? *
                           </h4>
                           <p className="text-[11px] text-emerald-800">
-                            Selecciona el rango de fechas que mejor se ajuste a tu disponibilidad:
+                            La tienda te asignará los días (ej. 6, 7, 20, 21, 22, 23, 24 dic) y turnos según tu selección:
                           </p>
                         </div>
                       </div>
 
                       <div className="space-y-1.5">
                         {[
-                          'Mes completo de diciembre (1 al 31 de diciembre)',
-                          'Primera quincena (1 al 15 de diciembre)',
-                          'Segunda quincena y semana navideña (16 al 31 de diciembre)',
-                          'Fines de semana y trasnochones comerciales de diciembre',
-                          'Días y fechas específicas (indicar en la casilla de abajo)'
+                          'Disponibilidad total para cualquier fecha de diciembre que la tienda me asigne',
+                          'Fechas claves de quincena y velitas (6, 7, 14, 15 de diciembre)',
+                          'Semana navideña y pico de fin de año (20, 21, 22, 23 y 24 de diciembre)',
+                          'Días de feria y fin de año (27, 28, 29, 30 y 31 de diciembre)',
+                          'Fines de semana de diciembre',
+                          'Fechas específicas (escribe abajo las fechas exactas que puedes)'
                         ].map((dOpt) => (
                           <label
                             key={dOpt}
@@ -1099,15 +1140,22 @@ export default function TrabajaConNosotros() {
 
                       <div>
                         <label className="block text-[11px] font-bold text-emerald-950 mb-1">
-                          ¿Tienes alguna fecha o compromiso en diciembre en el que NO puedas trabajar?
+                          Escribe los días específicos de diciembre que puedes laborar (o si tienes alguna excepción):
                         </label>
                         <input
                           type="text"
-                          placeholder="Ej. Ninguno, disponibilidad total / Solo no puedo el 24 en la tarde / Solo turnos de mañana"
+                          placeholder="Ej. Puedo el 6, 7, 20, 21, 22, 23 y 24 / O disponibilidad completa cualquier día"
                           value={decemberSpecificNotes}
                           onChange={e => setDecemberSpecificNotes(e.target.value)}
-                          className="w-full px-3 py-2 text-xs border border-emerald-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-800 placeholder-gray-400"
+                          className="w-full px-3 py-2 text-xs border border-emerald-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-800 placeholder-gray-400 font-medium"
                         />
+                      </div>
+
+                      <div className="p-2.5 bg-white/90 rounded-lg border border-emerald-300 text-[11px] text-emerald-950 flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <span>
+                          <strong>Condición de pago:</strong> En esta vacante se cancela el <strong>día trabajado</strong> asignado. No hay salario mensual fijo, auxilio de transporte ni recargos adicionales.
+                        </span>
                       </div>
                     </div>
                   )}
@@ -1136,7 +1184,9 @@ export default function TrabajaConNosotros() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block font-semibold text-gray-700 mb-1.5">
-                          ¿Estás de acuerdo con el horario y los turnos informados? *
+                          {isTemporada(selectedVacancy)
+                            ? '¿Estás de acuerdo con los horarios y fechas asignados por la tienda? *'
+                            : '¿Estás de acuerdo con el horario y los turnos informados? *'}
                         </label>
                         <div className="space-y-1.5">
                           {['Sí, estoy de acuerdo', 'Deseo aclarar algunas condiciones', 'No estoy de acuerdo'].map(opt => (
@@ -1156,7 +1206,9 @@ export default function TrabajaConNosotros() {
 
                       <div>
                         <label className="block font-semibold text-gray-700 mb-1.5">
-                          ¿Estás de acuerdo con las condiciones de pago y modalidad? *
+                          {isTemporada(selectedVacancy)
+                            ? '¿Estás de acuerdo con el pago por día trabajado (sin salario mensual ni auxilio)? *'
+                            : '¿Estás de acuerdo con las condiciones de pago y modalidad? *'}
                         </label>
                         <div className="space-y-1.5">
                           {['Sí, estoy de acuerdo', 'Necesito más información', 'No estoy de acuerdo'].map(opt => (
