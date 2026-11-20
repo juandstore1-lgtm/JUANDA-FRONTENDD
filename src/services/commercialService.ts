@@ -3,8 +3,7 @@ export interface CommercialProduct {
   id: string;
   name: string;
   category: string;
-  costPrice: number;
-  sellingPrice: number;
+  costPrice: number; // Costo de compra únicamente
   stocks: { [storeKey: string]: number }; // republica | modelo | quality | mariano
 }
 
@@ -14,7 +13,7 @@ export interface CommercialSaleLine {
   productName: string;
   quantity: number;
   costPrice: number;
-  sellingPrice: number;
+  sellingPrice: number; // Se define ÚNICAMENTE al registrar la venta
   subtotal: number;
   costTotal: number;
   profit: number;
@@ -114,23 +113,24 @@ export const PAYMENT_METHODS = [
   { id: 'Addi', label: 'Addi', color: '#2563eb', bg: 'bg-indigo-50 text-indigo-700 border-indigo-200' }
 ];
 
-// Catálogo base con 4 inventarios independientes por sede (del Excel del negocio)
+// Catálogo base de inventario: Solo Nombre, Categoría, Costo de compra y Stock en las 4 sedes.
+// NO CONTIENE PRECIO DE VENTA NI % DE VENTA.
 const INITIAL_PRODUCTS: CommercialProduct[] = [
-  { id: 'p1', name: 'CAMISAS ALTA GAMA', category: 'Camisas', costPrice: 40000, sellingPrice: 70000, stocks: { republica: 45, modelo: 38, quality: 50, mariano: 42 } },
-  { id: 'p2', name: 'CAMISAS FB', category: 'Camisas', costPrice: 25000, sellingPrice: 55000, stocks: { republica: 16, modelo: 11, quality: 20, mariano: 22 } },
-  { id: 'p3', name: 'JEANS', category: 'Pantalones', costPrice: 100000, sellingPrice: 140000, stocks: { republica: 18, modelo: 18, quality: 20, mariano: 20 } },
-  { id: 'p4', name: 'PETOS', category: 'Camisetas', costPrice: 35000, sellingPrice: 65000, stocks: { republica: 27, modelo: 24, quality: 30, mariano: 28 } },
-  { id: 'p5', name: 'PANTALONETA NBA', category: 'Pantalonetas', costPrice: 33000, sellingPrice: 65000, stocks: { republica: 21, modelo: 19, quality: 25, mariano: 22 } },
-  { id: 'p6', name: 'PANTALONETA 1.1', category: 'Pantalonetas', costPrice: 32000, sellingPrice: 60000, stocks: { republica: 24, modelo: 20, quality: 28, mariano: 25 } },
-  { id: 'p7', name: 'ESQUELETO FB', category: 'Camisetas', costPrice: 30000, sellingPrice: 55000, stocks: { republica: 18, modelo: 15, quality: 22, mariano: 19 } },
-  { id: 'p8', name: 'ZAPATILLAS / TENIS', category: 'Calzado', costPrice: 80000, sellingPrice: 150000, stocks: { republica: 16, modelo: 14, quality: 18, mariano: 15 } },
-  { id: 'p9', name: 'GORRAS', category: 'Accesorios', costPrice: 25000, sellingPrice: 50000, stocks: { republica: 40, modelo: 35, quality: 45, mariano: 38 } },
-  { id: 'p10', name: 'MEDIAS (CAJA)', category: 'Accesorios', costPrice: 15000, sellingPrice: 30000, stocks: { republica: 60, modelo: 55, quality: 70, mariano: 65 } },
-  { id: 'p11', name: 'MOCHOS', category: 'Pantalones', costPrice: 95000, sellingPrice: 135000, stocks: { republica: 14, modelo: 12, quality: 16, mariano: 15 } },
-  { id: 'p12', name: 'PAVAS', category: 'Accesorios', costPrice: 25000, sellingPrice: 45000, stocks: { republica: 33, modelo: 28, quality: 35, mariano: 30 } },
-  { id: 'p13', name: 'CONJUNTO IMPERMEABLE', category: 'Conjuntos', costPrice: 110000, sellingPrice: 160000, stocks: { republica: 12, modelo: 10, quality: 15, mariano: 12 } },
-  { id: 'p14', name: 'BUZO 1.1', category: 'Buzos', costPrice: 65000, sellingPrice: 100000, stocks: { republica: 20, modelo: 18, quality: 22, mariano: 20 } },
-  { id: 'p15', name: 'SUDADERA', category: 'Pantalones', costPrice: 55000, sellingPrice: 85000, stocks: { republica: 15, modelo: 14, quality: 18, mariano: 16 } }
+  { id: 'p1', name: 'CAMISAS ALTA GAMA', category: 'Camisas', costPrice: 40000, stocks: { republica: 45, modelo: 38, quality: 50, mariano: 42 } },
+  { id: 'p2', name: 'CAMISAS FB', category: 'Camisas', costPrice: 25000, stocks: { republica: 16, modelo: 11, quality: 20, mariano: 22 } },
+  { id: 'p3', name: 'JEANS', category: 'Pantalones', costPrice: 100000, stocks: { republica: 18, modelo: 18, quality: 20, mariano: 20 } },
+  { id: 'p4', name: 'PETOS', category: 'Camisetas', costPrice: 35000, stocks: { republica: 27, modelo: 24, quality: 30, mariano: 28 } },
+  { id: 'p5', name: 'PANTALONETA NBA', category: 'Pantalonetas', costPrice: 33000, stocks: { republica: 21, modelo: 19, quality: 25, mariano: 22 } },
+  { id: 'p6', name: 'PANTALONETA 1.1', category: 'Pantalonetas', costPrice: 32000, stocks: { republica: 24, modelo: 20, quality: 28, mariano: 25 } },
+  { id: 'p7', name: 'ESQUELETO FB', category: 'Camisetas', costPrice: 30000, stocks: { republica: 18, modelo: 15, quality: 22, mariano: 19 } },
+  { id: 'p8', name: 'ZAPATILLAS / TENIS', category: 'Calzado', costPrice: 80000, stocks: { republica: 16, modelo: 14, quality: 18, mariano: 15 } },
+  { id: 'p9', name: 'GORRAS', category: 'Accesorios', costPrice: 25000, stocks: { republica: 40, modelo: 35, quality: 45, mariano: 38 } },
+  { id: 'p10', name: 'MEDIAS (CAJA)', category: 'Accesorios', costPrice: 15000, stocks: { republica: 60, modelo: 55, quality: 70, mariano: 65 } },
+  { id: 'p11', name: 'MOCHOS', category: 'Pantalones', costPrice: 95000, stocks: { republica: 14, modelo: 12, quality: 16, mariano: 15 } },
+  { id: 'p12', name: 'PAVAS', category: 'Accesorios', costPrice: 25000, stocks: { republica: 33, modelo: 28, quality: 35, mariano: 30 } },
+  { id: 'p13', name: 'CONJUNTO IMPERMEABLE', category: 'Conjuntos', costPrice: 110000, stocks: { republica: 12, modelo: 10, quality: 15, mariano: 12 } },
+  { id: 'p14', name: 'BUZO 1.1', category: 'Buzos', costPrice: 65000, stocks: { republica: 20, modelo: 18, quality: 22, mariano: 20 } },
+  { id: 'p15', name: 'SUDADERA', category: 'Pantalones', costPrice: 55000, stocks: { republica: 15, modelo: 14, quality: 18, mariano: 16 } }
 ];
 
 // Gastos fijos reales del negocio
@@ -167,9 +167,9 @@ const INITIAL_DEBTS: CommercialDebt[] = [
 ];
 
 export class CommercialService {
-  private static STORAGE_KEY = 'juand_commercial_system_v3';
+  private static STORAGE_KEY = 'juand_commercial_system_v4';
 
-  // Get all commercial master data
+  // Obtener datos maestros comerciales
   public static getData(): {
     products: CommercialProduct[];
     cuadres: CommercialDailyCuadre[];
@@ -181,13 +181,14 @@ export class CommercialService {
       const saved = localStorage.getItem(this.STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Ensure products have stocks for all 4 stores
         if (parsed.products && Array.isArray(parsed.products)) {
-          parsed.products.forEach((p: CommercialProduct) => {
+          parsed.products.forEach((p: any) => {
             if (!p.stocks) p.stocks = { republica: 0, modelo: 0, quality: 0, mariano: 0 };
             STORES_LIST.forEach(s => {
               if (typeof p.stocks[s.id] !== 'number') p.stocks[s.id] = 0;
             });
+            // Eliminar sellingPrice si venía de versiones viejas
+            delete p.sellingPrice;
           });
         }
         return parsed;
@@ -196,11 +197,10 @@ export class CommercialService {
       console.warn('Could not parse commercial storage, using clean initial data:', e);
     }
 
-    // Clean initial state: Cuadres and movements start EMPTY so data is 100% dynamic based on user entry!
     const initial = {
       products: INITIAL_PRODUCTS,
-      cuadres: [] as CommercialDailyCuadre[], // Totalmente dinámico: solo lo que el usuario ingrese
-      movements: [] as CommercialMovement[], // Totalmente dinámico
+      cuadres: [] as CommercialDailyCuadre[],
+      movements: [] as CommercialMovement[],
       expenses: INITIAL_EXPENSES,
       debts: INITIAL_DEBTS
     };
@@ -212,7 +212,7 @@ export class CommercialService {
     return initial;
   }
 
-  // Save full state
+  // Guardar estado completo
   public static saveData(data: {
     products: CommercialProduct[];
     cuadres: CommercialDailyCuadre[];
@@ -227,12 +227,12 @@ export class CommercialService {
     }
   }
 
-  // Guardar Cierre de Ventas diario con descuento automático de inventario de esa sede específica
+  // Guardar Cierre de Ventas diario con descuento automático de inventario de esa sede
   public static saveCuadre(newCuadre: CommercialDailyCuadre): boolean {
     const data = this.getData();
     const existingIndex = data.cuadres.findIndex(c => c.dateStr === newCuadre.dateStr && c.storeId === newCuadre.storeId);
 
-    // Si ya existía un cuadre para esa sede y fecha, primero revertimos las cantidades previas de su inventario
+    // Revertir inventario anterior si se está editando un cuadre existente
     if (existingIndex >= 0) {
       const oldCuadre = data.cuadres[existingIndex];
       if (oldCuadre.sales && Array.isArray(oldCuadre.sales)) {
@@ -245,7 +245,7 @@ export class CommercialService {
       }
     }
 
-    // Descontar del inventario de la sede del nuevo cuadre
+    // Descontar inventario de la sede según las ventas
     if (newCuadre.status === 'REGISTERED' && newCuadre.sales && Array.isArray(newCuadre.sales)) {
       newCuadre.sales.forEach(sale => {
         const prod = data.products.find(p => p.id === sale.productId || p.name.toUpperCase() === sale.productName.toUpperCase());
@@ -266,7 +266,7 @@ export class CommercialService {
     return true;
   }
 
-  // Eliminar un cuadre con opción de revertir el stock a la sede
+  // Eliminar un cuadre con reversión de stock
   public static deleteCuadre(cuadreId: string, revertStock: boolean = true): boolean {
     const data = this.getData();
     const cuadre = data.cuadres.find(c => c.id === cuadreId);
@@ -317,13 +317,10 @@ export class CommercialService {
       const prod = data.products.find(p => p.id === item.productId || p.name.toUpperCase() === item.productName.toUpperCase());
       if (prod && prod.stocks) {
         if (movement.type === 'ENTRADA') {
-          // Entrada a la sede especificada
           prod.stocks[movement.storeId] = (prod.stocks[movement.storeId] || 0) + item.quantity;
         } else if (movement.type === 'SALIDA') {
-          // Salida de la sede especificada
           prod.stocks[movement.storeId] = Math.max(0, (prod.stocks[movement.storeId] || 0) - item.quantity);
         } else if (movement.type === 'TRASLADO' && movement.targetStoreId) {
-          // Traslado: Descuenta en origen y suma en destino
           prod.stocks[movement.storeId] = Math.max(0, (prod.stocks[movement.storeId] || 0) - item.quantity);
           prod.stocks[movement.targetStoreId] = (prod.stocks[movement.targetStoreId] || 0) + item.quantity;
         }
@@ -335,7 +332,6 @@ export class CommercialService {
     return true;
   }
 
-  // Eliminar un movimiento
   public static deleteMovement(movementId: string): boolean {
     const data = this.getData();
     data.movements = data.movements.filter(m => m.id !== movementId);
@@ -343,7 +339,7 @@ export class CommercialService {
     return true;
   }
 
-  // Crear o editar producto con sus 4 inventarios independientes
+  // Crear o editar producto (solo nombre, categoría, costo y stock en las 4 sedes)
   public static saveProduct(product: CommercialProduct): boolean {
     const data = this.getData();
     if (!product.stocks) {
@@ -447,7 +443,7 @@ export class CommercialService {
     return true;
   }
 
-  // Reiniciar datos a limpio (por si el usuario desea empezar completamente desde cero)
+  // Reiniciar datos a limpio
   public static resetData(): void {
     const initial = {
       products: INITIAL_PRODUCTS,
