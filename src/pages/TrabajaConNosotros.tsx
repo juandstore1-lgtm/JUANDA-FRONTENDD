@@ -29,7 +29,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { RecruitmentService } from '../services/api';
-import { JobVacancy, JobApplication } from '../types';
+import { JobVacancy, JobApplication, ShiftDateItem, parseShiftDates } from '../types';
 import Swal from 'sweetalert2';
 import confetti from 'canvas-confetti';
 
@@ -116,6 +116,18 @@ export default function TrabajaConNosotros() {
   ]);
   const [otherSkill, setOtherSkill] = useState('');
   const [preferredSede, setPreferredSede] = useState('Disponible para cualquier sede (Recomendado)');
+  const [candidateSelectedShifts, setCandidateSelectedShifts] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (selectedVacancy) {
+      const parsed = parseShiftDates(selectedVacancy.scheduleObservations);
+      if (parsed.length > 0) {
+        setCandidateSelectedShifts(parsed.map(s => s.date));
+      } else {
+        setCandidateSelectedShifts([]);
+      }
+    }
+  }, [selectedVacancy]);
 
   useEffect(() => {
     loadVacancies();
@@ -333,7 +345,8 @@ export default function TrabajaConNosotros() {
       let finalObs = formData.additionalObservations || '';
       if (isTemporada(selectedVacancy)) {
         const sedeNote = (selectedVacancy?.sede && selectedVacancy.sede.toLowerCase().includes('todas')) ? ` | Sede preferencia: ${preferredSede}` : '';
-        const seasonalNote = `[🎄 TEMPORADA DECEMBRINA - PAGO POR DÍA]${sedeNote} | Disponibilidad: ${decemberDatesChoice}${decemberSpecificNotes ? ` | Días específicos: ${decemberSpecificNotes}` : ''}. Confirma acuerdo: pago por día laborado sin salario mensual ni auxilio.`;
+        const shiftsChoiceNote = candidateSelectedShifts.length > 0 ? ` | Fechas seleccionadas (${candidateSelectedShifts.length}): ${candidateSelectedShifts.join(', ')}` : '';
+        const seasonalNote = `[🎄 TEMPORADA DECEMBRINA - PAGO POR DÍA]${sedeNote}${shiftsChoiceNote} | Disponibilidad: ${decemberDatesChoice}${decemberSpecificNotes ? ` | Días específicos: ${decemberSpecificNotes}` : ''}. Confirma acuerdo: pago por día laborado sin salario mensual ni auxilio.`;
         finalObs = finalObs ? `${seasonalNote}\n${finalObs}` : seasonalNote;
       }
 
@@ -587,18 +600,57 @@ export default function TrabajaConNosotros() {
                     </div>
 
                     <div>
-                      <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-3">
-                        <Clock className="w-4 h-4 text-emerald-600" />
-                        Fechas y horarios de apoyo
-                      </h3>
-                      <div className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-2 text-xs text-gray-700">
-                        <p className="leading-relaxed">
-                          <strong>Asignación de días:</strong> Los turnos y fechas varían según las necesidades de la tienda (por ejemplo: <strong>6, 7, 20, 21, 22, 23, 24 de diciembre</strong> u otras fechas de temporada).
-                        </p>
-                        <p className="text-gray-600">
-                          La administración te programará y asignará previamente los días y los horarios de cada turno según tu disponibilidad.
-                        </p>
-                      </div>
+                      {(() => {
+                        const publishedShifts = parseShiftDates(selectedVacancy.scheduleObservations);
+                        if (publishedShifts.length > 0) {
+                          return (
+                            <div>
+                              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                                  <Clock className="w-4 h-4 text-emerald-600" />
+                                  Fechas y horarios programados ({publishedShifts.length} fechas disponibles)
+                                </h3>
+                                <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-full">
+                                  Horarios variables por fecha
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                {publishedShifts.map((s, idx) => (
+                                  <div key={idx} className="p-3 rounded-xl bg-white border border-gray-200 shadow-2xs hover:border-emerald-300 transition-all flex items-start justify-between gap-2">
+                                    <div>
+                                      <span className="font-extrabold text-gray-900 text-xs block">📅 {s.date}</span>
+                                      {s.label && (
+                                        <span className="text-[10px] text-emerald-800 font-semibold block mt-0.5">
+                                          {s.label}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="inline-block px-2.5 py-1 bg-gray-900 text-white font-bold text-[11px] rounded-lg shrink-0 shadow-2xs">
+                                      ⏰ {s.hours}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div>
+                            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-3">
+                              <Clock className="w-4 h-4 text-emerald-600" />
+                              Fechas y horarios de apoyo
+                            </h3>
+                            <div className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-2 text-xs text-gray-700">
+                              <p className="leading-relaxed">
+                                <strong>Asignación de días:</strong> Los turnos y fechas varían según las necesidades de la tienda (por ejemplo: <strong>6, 7, 20, 21, 22, 23, 24 de diciembre</strong> u otras fechas de temporada).
+                              </p>
+                              <p className="text-gray-600">
+                                La administración te programará y asignará previamente los días y los horarios de cada turno según tu disponibilidad.
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 ) : (
@@ -1158,34 +1210,97 @@ export default function TrabajaConNosotros() {
                         </div>
                       </div>
 
-                      <div className="space-y-1.5">
-                        {[
-                          'Disponibilidad total para cualquier fecha de diciembre que la tienda me asigne',
-                          'Fechas claves de quincena y velitas (6, 7, 14, 15 de diciembre)',
-                          'Semana navideña y pico de fin de año (20, 21, 22, 23 y 24 de diciembre)',
-                          'Días de feria y fin de año (27, 28, 29, 30 y 31 de diciembre)',
-                          'Fines de semana de diciembre',
-                          'Fechas específicas (escribe abajo las fechas exactas que puedes)'
-                        ].map((dOpt) => (
-                          <label
-                            key={dOpt}
-                            className={`flex items-center gap-2.5 p-2.5 rounded-lg border text-xs cursor-pointer transition-all ${
-                              decemberDatesChoice === dOpt
-                                ? 'border-emerald-600 bg-white shadow-2xs font-extrabold text-emerald-950'
-                                : 'border-emerald-200/80 bg-white/70 hover:bg-white text-gray-700'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="decemberDates"
-                              checked={decemberDatesChoice === dOpt}
-                              onChange={() => setDecemberDatesChoice(dOpt)}
-                              className="text-emerald-600 focus:ring-emerald-500"
-                            />
-                            <span>{dOpt}</span>
-                          </label>
-                        ))}
-                      </div>
+                      {(() => {
+                        const publishedShifts = parseShiftDates(selectedVacancy.scheduleObservations);
+                        if (publishedShifts.length > 0) {
+                          const allSelected = candidateSelectedShifts.length === publishedShifts.length;
+                          return (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between text-[11px] font-black text-emerald-950 pb-0.5">
+                                <span>Marca las fechas en que puedes presentarte a trabajar:</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (allSelected) {
+                                      setCandidateSelectedShifts([]);
+                                    } else {
+                                      setCandidateSelectedShifts(publishedShifts.map(s => s.date));
+                                    }
+                                  }}
+                                  className="text-emerald-700 hover:text-emerald-900 font-bold text-[10px] underline cursor-pointer"
+                                >
+                                  {allSelected ? 'Deseleccionar todas' : 'Seleccionar todas las fechas'}
+                                </button>
+                              </div>
+                              <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+                                {publishedShifts.map((s, idx) => {
+                                  const isChecked = candidateSelectedShifts.includes(s.date);
+                                  return (
+                                    <label
+                                      key={idx}
+                                      className={`flex items-center justify-between p-2.5 rounded-lg border text-xs cursor-pointer transition-all ${
+                                        isChecked
+                                          ? 'border-emerald-600 bg-white shadow-2xs font-extrabold text-emerald-950'
+                                          : 'border-emerald-200/80 bg-white/70 hover:bg-white text-gray-700'
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                          type="checkbox"
+                                          checked={isChecked}
+                                          onChange={e => {
+                                            if (e.target.checked) {
+                                              setCandidateSelectedShifts([...candidateSelectedShifts, s.date]);
+                                            } else {
+                                              setCandidateSelectedShifts(candidateSelectedShifts.filter(d => d !== s.date));
+                                            }
+                                          }}
+                                          className="text-emerald-600 rounded focus:ring-emerald-500"
+                                        />
+                                        <span>📅 {s.date}</span>
+                                        {s.label && <span className="text-[10px] text-emerald-800 font-normal">({s.label})</span>}
+                                      </div>
+                                      <span className="px-2 py-0.5 bg-gray-900 text-white rounded text-[10px] font-bold">
+                                        ⏰ {s.hours}
+                                      </span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="space-y-1.5">
+                            {[
+                              'Disponibilidad total para cualquier fecha de diciembre que la tienda me asigne',
+                              'Fechas claves de quincena y velitas (6, 7, 14, 15 de diciembre)',
+                              'Semana navideña y pico de fin de año (20, 21, 22, 23 y 24 de diciembre)',
+                              'Días de feria y fin de año (27, 28, 29, 30 y 31 de diciembre)',
+                              'Fines de semana de diciembre',
+                              'Fechas específicas (escribe abajo las fechas exactas que puedes)'
+                            ].map((dOpt) => (
+                              <label
+                                key={dOpt}
+                                className={`flex items-center gap-2.5 p-2.5 rounded-lg border text-xs cursor-pointer transition-all ${
+                                  decemberDatesChoice === dOpt
+                                    ? 'border-emerald-600 bg-white shadow-2xs font-extrabold text-emerald-950'
+                                    : 'border-emerald-200/80 bg-white/70 hover:bg-white text-gray-700'
+                                }`}
+                              >
+                                <input
+                                  type="radio"
+                                  name="decemberDates"
+                                  checked={decemberDatesChoice === dOpt}
+                                  onChange={() => setDecemberDatesChoice(dOpt)}
+                                  className="text-emerald-600 focus:ring-emerald-500"
+                                />
+                                <span>{dOpt}</span>
+                              </label>
+                            ))}
+                          </div>
+                        );
+                      })()}
 
                       <div>
                         <label className="block text-[11px] font-bold text-emerald-950 mb-1">

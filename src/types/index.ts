@@ -269,6 +269,63 @@ export interface HomeCategoryCollection {
   displayOrder: number;
 }
 
+export interface ShiftDateItem {
+  id: string;
+  date: string;
+  label?: string;
+  hours: string;
+}
+
+export const defaultDecemberShifts: ShiftDateItem[] = [
+  { id: '1', date: 'Sábado 06 Dic', label: 'Día de Velitas / Apertura temporada', hours: '9:00 a. m. - 9:00 p. m.' },
+  { id: '2', date: 'Domingo 07 Dic', label: 'Velitas (Domingo comercial)', hours: '10:00 a. m. - 8:00 p. m.' },
+  { id: '3', date: 'Lunes 15 Dic', label: 'Primera Quincena de Diciembre', hours: '9:30 a. m. - 8:30 p. m.' },
+  { id: '4', date: 'Sábado 20 Dic', label: 'Pico fin de semana navideño / Trasnochón', hours: '9:00 a. m. - 10:00 p. m.' },
+  { id: '5', date: 'Domingo 21 Dic', label: 'Domingo previo a Navidad', hours: '9:30 a. m. - 9:00 p. m.' },
+  { id: '6', date: 'Lunes 22 Dic', label: 'Semana de Navidad', hours: '9:00 a. m. - 9:30 p. m.' },
+  { id: '7', date: 'Martes 23 Dic', label: 'Víspera de Navidad / Horario extendido', hours: '8:30 a. m. - 10:30 p. m.' },
+  { id: '8', date: 'Miércoles 24 Dic', label: 'Día de Navidad', hours: '8:00 a. m. - 7:00 p. m.' },
+  { id: '9', date: 'Martes 30 Dic', label: 'Temporada de Fin de Año', hours: '9:30 a. m. - 8:30 p. m.' },
+  { id: '10', date: 'Miércoles 31 Dic', label: 'Cierre de Fin de Año', hours: '8:30 a. m. - 6:00 p. m.' },
+];
+
+export const serializeShiftDates = (dates: ShiftDateItem[]): string => {
+  if (!dates || dates.length === 0) return '';
+  const lines = dates.map(d => `• ${d.date}${d.label ? ` (${d.label})` : ''}: ${d.hours}`);
+  return `📅 FECHAS Y HORARIOS ASIGNADOS:\n${lines.join('\n')}\n\n[DATOS_TURNOS_JSON:${JSON.stringify(dates)}]`;
+};
+
+export const parseShiftDates = (text?: string): ShiftDateItem[] => {
+  if (!text) return [];
+  const match = text.match(/\[DATOS_TURNOS_JSON:(.*?)\]/s);
+  if (match && match[1]) {
+    try {
+      return JSON.parse(match[1]);
+    } catch {
+      // fallback
+    }
+  }
+  const items: ShiftDateItem[] = [];
+  const lines = text.split('\n');
+  lines.forEach((line, i) => {
+    if (line.trim().startsWith('•')) {
+      const cleaned = line.replace('•', '').trim();
+      const parts = cleaned.split(':');
+      if (parts.length >= 2) {
+        const datePart = parts[0].trim();
+        const hoursPart = parts.slice(1).join(':').trim();
+        items.push({
+          id: `shift-${i}`,
+          date: datePart,
+          label: '',
+          hours: hoursPart
+        });
+      }
+    }
+  });
+  return items;
+};
+
 export interface JobVacancy {
   id?: number;
   company: string;
@@ -286,6 +343,7 @@ export interface JobVacancy {
   holidayPolicy: string;
   holidayHours: string;
   scheduleObservations?: string;
+  shiftDates?: ShiftDateItem[];
   remunerationType: string;
   baseSalary: string;
   transportAid: string;
