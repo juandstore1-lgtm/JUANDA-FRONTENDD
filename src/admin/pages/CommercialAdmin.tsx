@@ -1566,94 +1566,221 @@ Devuelve ÚNICAMENTE un array JSON con esta estructura exacta, sin texto introdu
   }, [data.products, invStoreFilter]);
 
   // =========================================================================
-  // TAB 7: MOVIMIENTOS (TRASLADOS ENTRE SEDES)
+  // TAB 7: MOVIMIENTOS DE MERCANCÍA (ENTRADA Y SALIDA VINCULADOS A INVENTARIO)
   // =========================================================================
-  const [movementSubTab, setMovementSubTab] = useState<'ENTRADA' | 'SALIDA' | 'TRASLADO'>('TRASLADO');
-  const [transferOrigin, setTransferOrigin] = useState<string>('republica');
-  const [transferDest, setTransferDest] = useState<string>('modelo');
-  const [transferDateStr, setTransferDateStr] = useState<string>(now.toISOString().split('T')[0]);
-  const [transferRef, setTransferRef] = useState<string>('Redistribución de inventario');
-  const [transferItems, setTransferItems] = useState<{ productId: string; quantity: number }[]>([]);
+  const [movementType, setMovementType] = useState<'ENTRADA' | 'SALIDA'>('ENTRADA');
+  const [movementStoreId, setMovementStoreId] = useState<string>('republica');
+  const [movementDateStr, setMovementDateStr] = useState<string>(now.toISOString().split('T')[0]);
+  const [movementProductId, setMovementProductId] = useState<string>('');
+  const [movementQuantity, setMovementQuantity] = useState<number | string>(1);
+  const [movementDescription, setMovementDescription] = useState<string>('');
+  const [isMovementSelectOpen, setIsMovementSelectOpen] = useState(false);
+  const [movementProductSearch, setMovementProductSearch] = useState('');
+  const movementSelectRef = useRef<HTMLDivElement>(null);
 
-  const handleAddTransferItem = () => {
-    const available = data.products[0];
-    if (available) {
-      setTransferItems(prev => [...prev, { productId: available.id, quantity: 5 }]);
+  // Filtros del historial de movimientos
+  const [movementFilterStore, setMovementFilterStore] = useState<string>('all');
+  const [movementFilterType, setMovementFilterType] = useState<'ALL' | 'ENTRADA' | 'SALIDA'>('ALL');
+  const [movementHistorySearch, setMovementHistorySearch] = useState<string>('');
+
+  useEffect(() => {
+    function handleClickOutsideMovement(event: MouseEvent) {
+      if (movementSelectRef.current && !movementSelectRef.current.contains(event.target as Node)) {
+        setIsMovementSelectOpen(false);
+      }
     }
-  };
+    document.addEventListener('mousedown', handleClickOutsideMovement);
+    return () => document.removeEventListener('mousedown', handleClickOutsideMovement);
+  }, []);
 
-  const handleConfirmTransfer = () => {
-    if (transferOrigin === transferDest) {
-      Swal.fire({ icon: 'warning', title: 'Sedes iguales', text: 'La sede origen y destino deben ser distintas.' });
+  const movementSelectedProduct = useMemo(() => {
+    return data.products.find(p => p.id === movementProductId) || null;
+  }, [data.products, movementProductId]);
+
+  const movementCurrentStock = useMemo(() => {
+    if (!movementSelectedProduct) return 0;
+    return movementSelectedProduct.stocks[movementStoreId] || 0;
+  }, [movementSelectedProduct, movementStoreId]);
+
+  const filteredMovementProducts = useMemo(() => {
+    const q = movementProductSearch.trim().toLowerCase();
+    return data.products.filter(p => {
+      if (movementType === 'SALIDA') {
+        const stock = p.stocks[movementStoreId] || 0;
+        if (stock <= 0) return false;
+      }
+      if (!q) return true;
+      return p.name.toLowerCase().includes(q);
+    });
+  }, [data.products, movementProductSearch, movementType, movementStoreId]);
+
+  const handleRegisterMovement = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    if (!movementProductId) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Producto requerido',
+        text: 'Por favor selecciona la prenda a la que deseas registrar el movimiento.',
+        confirmButtonColor: '#059669'
+      });
       return;
     }
-    if (transferItems.length === 0) {
-      Swal.fire({ icon: 'warning', title: 'Sin productos', text: 'Agrega al menos una prenda para trasladar.' });
+
+    const prod = data.products.find(p => p.id === movementProductId);
+    if (!prod) {
+      Swal.fire({ icon: 'error', title: 'Producto no encontrado', text: 'El producto seleccionado no existe en el catálogo.' });
       return;
     }
 
-    const originStore = STORES_LIST.find(s => s.id === transferOrigin)!;
-    const destStore = STORES_LIST.find(s => s.id === transferDest)!;
+    const qty = Math.floor(Number(movementQuantity));
+    if (isNaN(qty) || qty <= 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Cantidad inválida',
+        text: 'Ingresa una cantidad mayor a cero (0).',
+        confirmButtonColor: '#059669'
+      });
+      return;
+    }
 
-    const items: { productId: string; productName: string; quantity: number; costPrice: number; subtotal: number }[] = [];
-    let totalUnits = 0;
-    let totalCost = 0;
+    const currentStock = prod.stocks[movementStoreId] || 0;
+    const storeObj = STORES_LIST.find(s => s.id === movementStoreId);
+    const storeName = storeObj?.shortName || movementStoreId;
 
-    for (const ti of transferItems) {
-      const prod = data.products.find(p => p.id === ti.productId);
-      if (prod) {
-        const originStock = prod.stocks[transferOrigin] || 0;
-        if (originStock < ti.quantity) {
-          Swal.fire({
-            icon: 'error',
-            title: 'Stock insuficiente',
-            text: `En ${originStore.shortName} solo hay ${originStock} unidades de ${prod.name}. No se pueden trasladar ${ti.quantity}.`
-          });
-          return;
-        }
-        const costSub = ti.quantity * prod.costPrice;
-        items.push({
-          productId: prod.id,
-          productName: prod.name,
-          quantity: ti.quantity,
-          costPrice: prod.costPrice,
-          subtotal: costSub
+    if (movementType === 'SALIDA') {
+      if (qty > currentStock) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Stock insuficiente',
+          html: `
+            <p class="text-xs text-gray-700">En <b>${storeName}</b> solo hay <b>${currentStock} unidades</b> disponibles de <b>${prod.name}</b>.</p>
+            <p class="text-[11px] text-red-600 font-bold mt-2">No se puede realizar una salida por ${qty} unidades.</p>
+          `,
+          confirmButtonColor: '#dc2626'
         });
-        totalUnits += ti.quantity;
-        totalCost += costSub;
+        return;
       }
     }
 
+    const costSub = qty * prod.costPrice;
+
     const movement: CommercialMovement = {
-      id: `mov-${Date.now()}`,
-      type: 'TRASLADO',
-      dateStr: transferDateStr,
-      storeId: transferOrigin,
-      storeName: originStore.shortName,
-      targetStoreId: transferDest,
-      targetStoreName: destStore.shortName,
-      items,
-      totalUnits,
-      totalCost,
-      reference: transferRef,
-      observations: `Traslado confirmado de ${originStore.shortName} a ${destStore.shortName}`,
+      id: `mov-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      type: movementType,
+      dateStr: movementDateStr,
+      storeId: movementStoreId,
+      storeName: storeName,
+      items: [
+        {
+          productId: prod.id,
+          productName: prod.name,
+          quantity: qty,
+          costPrice: prod.costPrice,
+          subtotal: costSub
+        }
+      ],
+      totalUnits: qty,
+      totalCost: costSub,
+      reference: movementDescription.trim() || (movementType === 'ENTRADA' ? 'Entrada de mercancía' : 'Salida de mercancía'),
+      observations: movementDescription.trim() || '',
       createdAt: new Date().toISOString()
     };
 
     CommercialService.saveMovement(movement);
     refreshData();
-    setTransferItems([]);
+
+    // Resetear formulario
+    setMovementQuantity(1);
+    setMovementDescription('');
+
+    const newStock = movementType === 'ENTRADA' ? currentStock + qty : currentStock - qty;
 
     Swal.fire({
       icon: 'success',
-      title: '¡Traslado Exitoso!',
+      title: movementType === 'ENTRADA' ? '¡Entrada Registrada!' : '¡Salida Registrada!',
       html: `
-        <p class="text-sm">Se trasladaron <b>${totalUnits} prendas</b> de <b>${originStore.shortName}</b> a <b>${destStore.shortName}</b>.</p>
-        <p class="text-xs text-gray-500 mt-2">Los inventarios de ambas sedes se actualizaron al instante.</p>
+        <div class="text-left text-xs text-gray-700 space-y-2">
+          <p>Se registraron <b>${qty} unidades</b> de <b>${prod.name}</b> en <b>${storeName}</b>.</p>
+          <div class="p-2.5 ${movementType === 'ENTRADA' ? 'bg-emerald-50 border-emerald-200 text-emerald-950' : 'bg-amber-50 border-amber-200 text-amber-950'} rounded-xl border text-[11px] font-mono">
+            <p>• Stock anterior: ${currentStock} u</p>
+            <p class="font-bold">• Nuevo stock en sede: ${newStock} u ${movementType === 'ENTRADA' ? '(+ ' + qty + ')' : '(- ' + qty + ')'}</p>
+          </div>
+          <p class="text-[10px] text-gray-500">El inventario de la sede y el historial se actualizaron en tiempo real.</p>
+        </div>
       `,
-      confirmButtonColor: '#007A33'
+      confirmButtonColor: '#059669'
     });
   };
+
+  const handleDeleteMovement = (mov: CommercialMovement) => {
+    Swal.fire({
+      title: '¿Eliminar movimiento?',
+      html: `
+        <p class="text-xs text-gray-600">Se eliminará el registro de <b>${mov.type}</b> de ${mov.totalUnits} prendas en <b>${mov.storeName}</b>.</p>
+        <p class="text-[11px] text-amber-700 font-bold mt-2">El stock de la sede se revertirá automáticamente.</p>
+      `,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar y revertir stock',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626'
+    }).then(res => {
+      if (res.isConfirmed) {
+        CommercialService.deleteMovement(mov.id);
+        refreshData();
+        Swal.fire({
+          icon: 'success',
+          title: 'Movimiento eliminado',
+          text: 'El movimiento ha sido eliminado y el stock fue revertido en la sede.',
+          confirmButtonColor: '#059669'
+        });
+      }
+    });
+  };
+
+  const filteredMovementsHistory = useMemo(() => {
+    return data.movements.filter(m => {
+      if (m.type === 'TRASLADO') return false;
+      if (movementFilterStore !== 'all' && m.storeId !== movementFilterStore) return false;
+      if (movementFilterType !== 'ALL' && m.type !== movementFilterType) return false;
+      if (movementHistorySearch.trim()) {
+        const q = movementHistorySearch.trim().toLowerCase();
+        const matchProd = m.items.some(i => i.productName.toLowerCase().includes(q));
+        const matchRef = (m.reference || '').toLowerCase().includes(q);
+        const matchObs = (m.observations || '').toLowerCase().includes(q);
+        const matchDate = m.dateStr.includes(q);
+        const matchStore = m.storeName.toLowerCase().includes(q);
+        return matchProd || matchRef || matchObs || matchDate || matchStore;
+      }
+      return true;
+    });
+  }, [data.movements, movementFilterStore, movementFilterType, movementHistorySearch]);
+
+  const movementTotalsSummary = useMemo(() => {
+    let totalEntradasUnits = 0;
+    let totalEntradasCost = 0;
+    let totalSalidasUnits = 0;
+    let totalSalidasCost = 0;
+
+    data.movements.forEach(m => {
+      if (m.type === 'ENTRADA') {
+        totalEntradasUnits += m.totalUnits;
+        totalEntradasCost += m.totalCost;
+      } else if (m.type === 'SALIDA') {
+        totalSalidasUnits += m.totalUnits;
+        totalSalidasCost += m.totalCost;
+      }
+    });
+
+    return {
+      totalEntradasUnits,
+      totalEntradasCost,
+      totalSalidasUnits,
+      totalSalidasCost,
+      totalRecords: data.movements.filter(m => m.type !== 'TRASLADO').length
+    };
+  }, [data.movements]);
 
   // =========================================================================
   // TAB 5: VENTAS MENSUALES (100% DINÁMICO DESDE CUADRES REALES)
@@ -1880,7 +2007,7 @@ Devuelve ÚNICAMENTE un array JSON con esta estructura exacta, sin texto introdu
             { id: 'historial', label: 'Historial de ventas', icon: History },
             { id: 'ventas-mensuales', label: 'Ventas mensuales', icon: BarChart3 },
             { id: 'inventario', label: '4 Inventarios (Por Sede)', icon: Boxes },
-            { id: 'movimientos', label: 'Movimientos (Traslados)', icon: ArrowLeftRight },
+            { id: 'movimientos', label: 'Movimientos (Entradas / Salidas)', icon: ArrowLeftRight },
             { id: 'cuadres', label: 'Cuadres de ventas', icon: CalendarCheck },
             { id: 'gastos-deudas', label: 'Gastos y deudas', icon: DollarSign },
             { id: 'reportes', label: 'Reportes', icon: FileText },
@@ -3997,183 +4124,480 @@ Devuelve ÚNICAMENTE un array JSON con esta estructura exacta, sin texto introdu
       )}
 
       {/* =====================================================================
-          VISTA 7: MOVIMIENTOS Y TRASLADOS
+          VISTA 7: MOVIMIENTOS DE MERCANCÍA (ENTRADA Y SALIDA VINCULADOS A STOCK)
           ===================================================================== */}
       {activeTab === 'movimientos' && (
         <div className="space-y-6 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl border border-gray-200/80 p-2 shadow-2xs flex items-center gap-2">
-            <button
-              onClick={() => setMovementSubTab('TRASLADO')}
-              className={`flex-1 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                movementSubTab === 'TRASLADO' 
-                  ? 'bg-emerald-700 text-white shadow-xs' 
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <ArrowLeftRight className="w-4 h-4" /> Traslado entre sedes
-            </button>
-            <button
-              onClick={() => setMovementSubTab('ENTRADA')}
-              className={`flex-1 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                movementSubTab === 'ENTRADA' 
-                  ? 'bg-emerald-700 text-white shadow-xs' 
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <ArrowDownLeft className="w-4 h-4" /> Entrada de mercancía
-            </button>
-            <button
-              onClick={() => setMovementSubTab('SALIDA')}
-              className={`flex-1 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                movementSubTab === 'SALIDA' 
-                  ? 'bg-emerald-700 text-white shadow-xs' 
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <ArrowUpRight className="w-4 h-4" /> Salida / Bajas
-            </button>
+          {/* Tarjetas KPI de Resumen de Movimientos */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-gray-400 font-bold uppercase block">Total Entradas</span>
+                <strong className="text-xl font-black text-emerald-700 block mt-1">
+                  +{movementTotalsSummary.totalEntradasUnits} prendas
+                </strong>
+                <span className="text-[10px] text-gray-500 font-mono mt-0.5 block">
+                  Costo: {formatPrice(movementTotalsSummary.totalEntradasCost)}
+                </span>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
+                <ArrowDownLeft className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-gray-400 font-bold uppercase block">Total Salidas / Bajas</span>
+                <strong className="text-xl font-black text-red-600 block mt-1">
+                  -{movementTotalsSummary.totalSalidasUnits} prendas
+                </strong>
+                <span className="text-[10px] text-gray-500 font-mono mt-0.5 block">
+                  Costo: {formatPrice(movementTotalsSummary.totalSalidasCost)}
+                </span>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
+                <ArrowUpRight className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-gray-400 font-bold uppercase block">Movimientos Registrados</span>
+                <strong className="text-xl font-black text-gray-900 block mt-1">
+                  {movementTotalsSummary.totalRecords} registros
+                </strong>
+                <span className="text-[10px] text-gray-400 mt-0.5 block">Historial en tiempo real</span>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-gray-100 text-gray-700 flex items-center justify-center font-bold">
+                <History className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-gray-400 font-bold uppercase block">Inventarios Vinculados</span>
+                <strong className="text-xl font-black text-gray-900 block mt-1">4 Sedes Activas</strong>
+                <span className="text-[10px] text-emerald-700 font-bold mt-0.5 block">Descuento / Suma en vivo</span>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold">
+                <Boxes className="w-5 h-5" />
+              </div>
+            </div>
           </div>
 
-          {movementSubTab === 'TRASLADO' && (
-            <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-2xs space-y-5">
-              <div className="border-b border-gray-100 pb-3">
-                <h3 className="text-sm font-extrabold text-gray-900">Registrar traslado entre sedes</h3>
-                <p className="text-xs text-gray-500">
-                  Mueve mercancía de una tienda a otra. El sistema descuenta automáticamente las unidades en la sede origen y las suma en la sede destino.
+          {/* Formulario Principal de Registro: ENTRADA / SALIDA */}
+          <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-2xs space-y-5">
+            {/* Selector de Tipo: Entrada o Salida */}
+            <div className="flex items-center gap-2 p-1.5 bg-gray-100 rounded-2xl max-w-md mx-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  setMovementType('ENTRADA');
+                  setMovementProductId('');
+                }}
+                className={`flex-1 py-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  movementType === 'ENTRADA'
+                    ? 'bg-emerald-700 text-white shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <ArrowDownLeft className="w-4 h-4" /> Entrada de Mercancía
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMovementType('SALIDA');
+                  setMovementProductId('');
+                }}
+                className={`flex-1 py-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  movementType === 'SALIDA'
+                    ? 'bg-red-600 text-white shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <ArrowUpRight className="w-4 h-4" /> Salida de Mercancía
+              </button>
+            </div>
+
+            {/* Banner explicativo del tipo seleccionado */}
+            <div className={`p-3.5 rounded-xl border flex items-center justify-between text-xs font-medium ${
+              movementType === 'ENTRADA'
+                ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
+                : 'bg-red-50/70 border-red-200 text-red-950'
+            }`}>
+              <div className="flex items-center gap-2">
+                {movementType === 'ENTRADA' ? (
+                  <Check className="w-4 h-4 text-emerald-700 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                )}
+                <span>
+                  {movementType === 'ENTRADA'
+                    ? 'Las entradas sumarán unidades directamente al stock de la sede seleccionada.'
+                    : 'Las salidas descontarán unidades del inventario de la sede. No se permite retirar más del stock disponible.'}
+                </span>
+              </div>
+              <span className="text-[11px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-white border">
+                {movementType}
+              </span>
+            </div>
+
+            {/* Campos del Formulario */}
+            <form onSubmit={handleRegisterMovement} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end text-xs">
+                {/* Sede */}
+                <div className="sm:col-span-3">
+                  <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Sede de destino / retiro *</label>
+                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 bg-gray-50/50 font-bold">
+                    <Store className="w-3.5 h-3.5 text-emerald-700" />
+                    <select
+                      value={movementStoreId}
+                      onChange={e => {
+                        setMovementStoreId(e.target.value);
+                        setMovementProductId('');
+                      }}
+                      className="w-full bg-transparent font-bold cursor-pointer focus:outline-hidden"
+                    >
+                      {STORES_LIST.map(st => (
+                        <option key={st.id} value={st.id}>{st.shortName}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Fecha */}
+                <div className="sm:col-span-3">
+                  <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Fecha de movimiento *</label>
+                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 bg-white font-bold">
+                    <Calendar className="w-3.5 h-3.5 text-gray-500" />
+                    <input
+                      type="date"
+                      value={movementDateStr}
+                      onChange={e => setMovementDateStr(e.target.value)}
+                      className="w-full bg-transparent font-bold cursor-pointer focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+
+                {/* Producto (Select Buscable con Stock) */}
+                <div className="sm:col-span-4 relative" ref={movementSelectRef}>
+                  <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">
+                    Producto * {movementSelectedProduct && (
+                      <span className={`font-mono font-bold ${movementCurrentStock > 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                        (Stock en sede: {movementCurrentStock} u)
+                      </span>
+                    )}
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMovementSelectOpen(!isMovementSelectOpen);
+                      setMovementProductSearch('');
+                    }}
+                    className={`w-full px-3 py-2 border rounded-xl bg-white text-left font-bold flex items-center justify-between text-xs cursor-pointer ${
+                      isMovementSelectOpen ? 'border-emerald-600 ring-2 ring-emerald-100' : 'border-gray-200'
+                    }`}
+                  >
+                    <span className="truncate">
+                      {movementSelectedProduct ? movementSelectedProduct.name : '— Seleccionar producto —'}
+                    </span>
+                    <span className="text-gray-400 text-[10px]">▼</span>
+                  </button>
+
+                  {/* Dropdown flotante con buscador */}
+                  {isMovementSelectOpen && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 p-2 space-y-1.5">
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          placeholder="Buscar producto..."
+                          value={movementProductSearch}
+                          onChange={e => setMovementProductSearch(e.target.value)}
+                          className="w-full pl-8 pr-2.5 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-emerald-600 bg-gray-50/50"
+                          autoFocus
+                        />
+                      </div>
+
+                      <div className="max-h-52 overflow-y-auto custom-scrollbar space-y-0.5">
+                        {filteredMovementProducts.length === 0 ? (
+                          <div className="py-3 text-center text-xs text-gray-400">
+                            {movementType === 'SALIDA' 
+                              ? 'No hay productos con stock disponible para retirar.' 
+                              : 'No se encontraron productos coincidentes.'}
+                          </div>
+                        ) : (
+                          filteredMovementProducts.map(p => {
+                            const pStock = p.stocks[movementStoreId] || 0;
+                            return (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => {
+                                  setMovementProductId(p.id);
+                                  setIsMovementSelectOpen(false);
+                                  setMovementProductSearch('');
+                                }}
+                                className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between hover:bg-emerald-50 cursor-pointer ${
+                                  movementProductId === p.id ? 'bg-emerald-100 font-extrabold text-emerald-950' : 'text-gray-800'
+                                }`}
+                              >
+                                <span className="font-bold truncate">{p.name}</span>
+                                <span className={`text-[11px] font-mono font-bold shrink-0 ml-2 px-1.5 py-0.2 rounded ${
+                                  pStock > 0 ? 'bg-emerald-50 text-emerald-800' : 'bg-gray-100 text-gray-500'
+                                }`}>
+                                  {pStock} u
+                                </span>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Cantidad */}
+                <div className="sm:col-span-2">
+                  <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">
+                    Cantidad * {movementType === 'SALIDA' && movementSelectedProduct && (
+                      <span className="text-red-600 font-mono">(Máx: {movementCurrentStock})</span>
+                    )}
+                  </label>
+                  <div className="flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => setMovementQuantity(prev => Math.max(1, (Number(prev) || 1) - 1))}
+                      className="w-8 h-8 rounded-l-xl border border-r-0 border-gray-200 bg-gray-50 hover:bg-gray-100 font-black text-xs flex items-center justify-center cursor-pointer"
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      max={movementType === 'SALIDA' ? movementCurrentStock : undefined}
+                      value={movementQuantity}
+                      onChange={e => setMovementQuantity(e.target.value === '' ? '' : Math.max(1, Number(e.target.value)))}
+                      className="w-full h-8 text-center border border-gray-200 font-bold font-mono text-xs focus:outline-emerald-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setMovementQuantity(prev => {
+                        const val = (Number(prev) || 0) + 1;
+                        if (movementType === 'SALIDA' && val > movementCurrentStock) return prev;
+                        return val;
+                      })}
+                      className="w-8 h-8 rounded-r-xl border border-l-0 border-gray-200 bg-gray-50 hover:bg-gray-100 font-black text-xs flex items-center justify-center cursor-pointer"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Descripción / Motivo y Botón Submit */}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end text-xs pt-2">
+                <div className="sm:col-span-9">
+                  <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">
+                    Descripción / Motivo del movimiento *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={
+                      movementType === 'ENTRADA'
+                        ? 'Ej: Compra a proveedor, Reposición de lote, Ingreso de bodega...'
+                        : 'Ej: Prenda con costura rota (avería), Dotación empleados, Pérdida...'
+                    }
+                    value={movementDescription}
+                    onChange={e => setMovementDescription(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-emerald-600 font-medium"
+                  />
+                  {/* Sugerencias rápidas */}
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    <span className="text-[10px] text-gray-400 font-bold">Sugerencias:</span>
+                    {(movementType === 'ENTRADA' ? [
+                      'Compra a proveedor',
+                      'Reposición de stock',
+                      'Devolución de cliente',
+                      'Ajuste de inventario (+)'
+                    ] : [
+                      'Prenda averiada / merma',
+                      'Uso interno / dotación',
+                      'Devolución a proveedor',
+                      'Ajuste de inventario (-)'
+                    ]).map(sug => (
+                      <button
+                        key={sug}
+                        type="button"
+                        onClick={() => setMovementDescription(sug)}
+                        className="text-[10px] px-2 py-0.5 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 cursor-pointer font-medium"
+                      >
+                        {sug}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="sm:col-span-3">
+                  <button
+                    type="submit"
+                    className={`w-full py-2.5 px-4 rounded-xl text-xs font-black text-white shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                      movementType === 'ENTRADA'
+                        ? 'bg-emerald-700 hover:bg-emerald-800'
+                        : 'bg-red-600 hover:bg-red-700'
+                    }`}
+                  >
+                    {movementType === 'ENTRADA' ? (
+                      <>
+                        <ArrowDownLeft className="w-4 h-4" /> Registrar Entrada (+{movementQuantity || 0} u)
+                      </>
+                    ) : (
+                      <>
+                        <ArrowUpRight className="w-4 h-4" /> Registrar Salida (-{movementQuantity || 0} u)
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          {/* Historial de Movimientos */}
+          <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+              <div>
+                <h3 className="text-sm font-extrabold text-gray-900 flex items-center gap-2">
+                  <History className="w-4 h-4 text-emerald-700" />
+                  <span>Historial de Movimientos de Mercancía</span>
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-gray-100 font-bold text-gray-700">
+                    {filteredMovementsHistory.length} registros
+                  </span>
+                </h3>
+                <p className="text-xs text-gray-400">
+                  Registro cronológico de entradas y salidas que modificaron el inventario de las sedes.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Sede origen *</label>
-                  <select
-                    value={transferOrigin}
-                    onChange={e => setTransferOrigin(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 font-bold bg-white"
-                  >
-                    {STORES_LIST.map(st => (
-                      <option key={st.id} value={st.id}>{st.shortName}</option>
-                    ))}
-                  </select>
-                </div>
+              {/* Filtros de Historial */}
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                {/* Filtro por Tipo */}
+                <select
+                  value={movementFilterType}
+                  onChange={e => setMovementFilterType(e.target.value as any)}
+                  className="px-2.5 py-1.5 border border-gray-200 rounded-xl font-bold bg-gray-50 focus:outline-hidden text-xs"
+                >
+                  <option value="ALL">Todos los tipos</option>
+                  <option value="ENTRADA">🟢 Solo Entradas</option>
+                  <option value="SALIDA">🔴 Solo Salidas</option>
+                </select>
 
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Sede destino *</label>
-                  <select
-                    value={transferDest}
-                    onChange={e => setTransferDest(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 font-bold bg-white"
-                  >
-                    {STORES_LIST.filter(s => s.id !== transferOrigin).map(st => (
-                      <option key={st.id} value={st.id}>{st.shortName}</option>
-                    ))}
-                  </select>
-                </div>
+                {/* Filtro por Sede */}
+                <select
+                  value={movementFilterStore}
+                  onChange={e => setMovementFilterStore(e.target.value)}
+                  className="px-2.5 py-1.5 border border-gray-200 rounded-xl font-bold bg-gray-50 focus:outline-hidden text-xs"
+                >
+                  <option value="all">Todas las sedes</option>
+                  {STORES_LIST.map(st => (
+                    <option key={st.id} value={st.id}>{st.shortName}</option>
+                  ))}
+                </select>
 
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Fecha *</label>
-                  <input
-                    type="date"
-                    value={transferDateStr}
-                    onChange={e => setTransferDateStr(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 font-bold bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Referencia / Motivo</label>
+                {/* Buscador de texto */}
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    value={transferRef}
-                    onChange={e => setTransferRef(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 font-bold bg-white"
+                    placeholder="Buscar producto o motivo..."
+                    value={movementHistorySearch}
+                    onChange={e => setMovementHistorySearch(e.target.value)}
+                    className="pl-8 pr-2.5 py-1.5 border border-gray-200 rounded-xl text-xs focus:outline-emerald-600 bg-white"
                   />
                 </div>
               </div>
+            </div>
 
-              <div className="space-y-3 pt-3 border-t border-gray-100">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-gray-800">Prendas a trasladar</h4>
-                  <button
-                    onClick={handleAddTransferItem}
-                    className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Agregar producto
-                  </button>
-                </div>
-
-                {transferItems.length === 0 ? (
-                  <div className="p-6 border border-dashed border-gray-200 rounded-xl text-center text-gray-400 text-xs">
-                    Haz clic en "+ Agregar producto" para seleccionar las prendas que saldrán de {STORES_LIST.find(s => s.id === transferOrigin)?.shortName}.
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {transferItems.map((item, idx) => {
-                      const prod = data.products.find(p => p.id === item.productId);
-                      const originStock = prod ? (prod.stocks[transferOrigin] || 0) : 0;
-                      const destStock = prod ? (prod.stocks[transferDest] || 0) : 0;
-
+            {filteredMovementsHistory.length === 0 ? (
+              <div className="p-10 border border-dashed border-gray-200 rounded-2xl text-center text-gray-400 space-y-2">
+                <Boxes className="w-8 h-8 mx-auto text-gray-300" />
+                <p className="text-xs font-bold text-gray-600">No hay movimientos registrados</p>
+                <p className="text-[11px] text-gray-400">
+                  Usa el formulario superior para registrar una entrada o salida de mercancía en cualquier sede.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto custom-scrollbar border border-gray-100 rounded-xl">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase">
+                      <th className="py-2.5 px-3">Tipo</th>
+                      <th className="py-2.5 px-3">Fecha</th>
+                      <th className="py-2.5 px-3">Sede</th>
+                      <th className="py-2.5 px-3">Producto</th>
+                      <th className="py-2.5 px-3 text-center">Cantidad</th>
+                      <th className="py-2.5 px-3 text-right">Costo Total</th>
+                      <th className="py-2.5 px-4">Descripción / Motivo</th>
+                      <th className="py-2.5 px-2 text-center w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredMovementsHistory.map(mov => {
+                      const item = mov.items[0];
+                      const isEntrada = mov.type === 'ENTRADA';
                       return (
-                        <div key={idx} className="p-3 rounded-xl border border-gray-200 bg-gray-50/50 grid grid-cols-12 gap-3 items-center text-xs">
-                          <div className="col-span-6">
-                            <select
-                              value={item.productId}
-                              onChange={e => {
-                                const newId = e.target.value;
-                                setTransferItems(prev => prev.map((x, i) => i === idx ? { ...x, productId: newId } : x));
-                              }}
-                              className="w-full font-bold bg-white px-2.5 py-1.5 rounded-lg border border-gray-200"
-                            >
-                              {data.products.map(p => (
-                                <option key={p.id} value={p.id}>{p.name} (Stock Origen: {p.stocks[transferOrigin] || 0})</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div className="col-span-2">
-                            <input
-                              type="number"
-                              min="1"
-                              max={originStock}
-                              value={item.quantity}
-                              onChange={e => {
-                                const q = Math.max(1, Number(e.target.value));
-                                setTransferItems(prev => prev.map((x, i) => i === idx ? { ...x, quantity: q } : x));
-                              }}
-                              className="w-full px-2 py-1.5 border border-gray-200 rounded-lg bg-white font-mono font-bold text-center"
-                            />
-                          </div>
-
-                          <div className="col-span-3 text-[11px] text-gray-500">
-                            <span>Origen: {originStock} → <b>{Math.max(0, originStock - item.quantity)}</b></span><br/>
-                            <span>Destino: {destStock} → <b>{destStock + item.quantity}</b></span>
-                          </div>
-
-                          <div className="col-span-1 text-right">
+                        <tr key={mov.id} className="hover:bg-gray-50/70 transition-colors">
+                          <td className="py-2.5 px-3">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                              isEntrada 
+                                ? 'bg-emerald-100 text-emerald-800' 
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {isEntrada ? <ArrowDownLeft className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
+                              {mov.type}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-mono text-[11px] font-bold text-gray-700 whitespace-nowrap">
+                            {mov.dateStr}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="font-bold text-gray-900 px-2 py-0.5 rounded-md bg-gray-100 text-[11px]">
+                              {mov.storeName}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-bold text-gray-900 uppercase">
+                            {item ? item.productName : '—'}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-black text-xs">
+                            <span className={isEntrada ? 'text-emerald-700' : 'text-red-600'}>
+                              {isEntrada ? `+${mov.totalUnits}` : `-${mov.totalUnits}`} u
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono font-bold text-gray-700">
+                            {formatPrice(mov.totalCost)}
+                          </td>
+                          <td className="py-2.5 px-4 text-gray-600 text-[11px]">
+                            <span className="font-medium">{mov.reference || mov.observations || '—'}</span>
+                          </td>
+                          <td className="py-2.5 px-2 text-center">
                             <button
-                              onClick={() => setTransferItems(prev => prev.filter((_, i) => i !== idx))}
-                              className="text-gray-400 hover:text-red-600"
+                              type="button"
+                              onClick={() => handleDeleteMovement(mov)}
+                              title="Eliminar movimiento y revertir inventario"
+                              className="text-gray-300 hover:text-red-600 cursor-pointer p-1 rounded hover:bg-red-50 transition-colors"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
-                          </div>
-                        </div>
+                          </td>
+                        </tr>
                       );
                     })}
-
-                    <div className="pt-3 flex justify-end">
-                      <button
-                        onClick={handleConfirmTransfer}
-                        className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black shadow-xs flex items-center gap-2 cursor-pointer"
-                      >
-                        <ArrowLeftRight className="w-4 h-4" /> Confirmar Traslado
-                      </button>
-                    </div>
-                  </div>
-                )}
+                  </tbody>
+                </table>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 

@@ -361,9 +361,26 @@ export class CommercialService {
 
   public static deleteMovement(movementId: string): boolean {
     const data = this.getData();
-    data.movements = data.movements.filter(m => m.id !== movementId);
-    this.saveData(data);
-    return true;
+    const mov = data.movements.find(m => m.id === movementId);
+    if (mov) {
+      mov.items.forEach(item => {
+        const prod = data.products.find(p => p.id === item.productId || p.name.toUpperCase() === item.productName.toUpperCase());
+        if (prod && prod.stocks) {
+          if (mov.type === 'ENTRADA') {
+            prod.stocks[mov.storeId] = Math.max(0, (prod.stocks[mov.storeId] || 0) - item.quantity);
+          } else if (mov.type === 'SALIDA') {
+            prod.stocks[mov.storeId] = (prod.stocks[mov.storeId] || 0) + item.quantity;
+          } else if (mov.type === 'TRASLADO' && mov.targetStoreId) {
+            prod.stocks[mov.storeId] = (prod.stocks[mov.storeId] || 0) + item.quantity;
+            prod.stocks[mov.targetStoreId] = Math.max(0, (prod.stocks[mov.targetStoreId] || 0) - item.quantity);
+          }
+        }
+      });
+      data.movements = data.movements.filter(m => m.id !== movementId);
+      this.saveData(data);
+      return true;
+    }
+    return false;
   }
 
   // Crear o editar producto (solo nombre único de categoría/producto, costo y stock en las 4 sedes)
