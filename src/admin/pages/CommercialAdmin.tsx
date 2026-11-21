@@ -34,6 +34,8 @@ import {
   CreditCard, 
   Eye, 
   ShieldCheck,
+  Lock,
+  Unlock,
   ChevronLeft,
   ChevronsLeft,
   ChevronsRight,
@@ -481,6 +483,7 @@ export default function CommercialAdmin() {
   const [selectedProductEdit, setSelectedProductEdit] = useState<CommercialProduct | null>(null);
   const [isEditProductModalOpen, setIsEditProductModalOpen] = useState(false);
   const [editStoreTarget, setEditStoreTarget] = useState<StoreId>('republica');
+  const [inventorySecurityLocked, setInventorySecurityLocked] = useState(false);
   const [editProductForm, setEditProductForm] = useState<{
     name: string;
     costPrice: string | number;
@@ -493,6 +496,17 @@ export default function CommercialAdmin() {
   const [isNewProductModalOpen, setIsNewProductModalOpen] = useState(false);
 
   const handleOpenEditProductModal = (product: CommercialProduct) => {
+    if (inventorySecurityLocked) {
+      Swal.fire({
+        icon: 'info',
+        title: '🔒 Modo Seguro Bloqueado',
+        text: 'La edición está bloqueada para prevenir clics accidentales. Desactiva el candado de seguridad en la barra superior para continuar.',
+        confirmButtonColor: '#059669',
+        confirmButtonText: 'Entendido'
+      });
+      return;
+    }
+
     const targetStore: StoreId = invStoreFilter === 'all' ? 'republica' : (invStoreFilter as StoreId);
     setSelectedProductEdit(product);
     setEditStoreTarget(targetStore);
@@ -520,28 +534,112 @@ export default function CommercialAdmin() {
     e.preventDefault();
     if (!selectedProductEdit) return;
 
-    const updated: CommercialProduct = {
-      ...selectedProductEdit,
-      name: editProductForm.name.trim().toUpperCase(),
-      costPrice: Number(editProductForm.costPrice) || 0,
-      stocks: {
-        ...selectedProductEdit.stocks,
-        [editStoreTarget]: Math.max(0, Number(editProductForm.stock) || 0)
-      }
-    };
+    const newStock = Math.max(0, Number(editProductForm.stock) || 0);
+    const newCost = Math.max(0, Number(editProductForm.costPrice) || 0);
+    const newName = editProductForm.name.trim().toUpperCase();
 
-    CommercialService.saveProduct(updated);
-    refreshData();
-    setIsEditProductModalOpen(false);
-    setSelectedProductEdit(null);
+    const currentStoreObj = STORES_LIST.find(s => s.id === editStoreTarget);
+    const prevStock = selectedProductEdit.stocks[editStoreTarget] || 0;
+    const prevCost = selectedProductEdit.costPrice;
+    const prevName = selectedProductEdit.name;
 
-    const storeObj = STORES_LIST.find(s => s.id === editStoreTarget);
+    const stockDiff = newStock - prevStock;
+    const costDiff = newCost - prevCost;
+
+    // Si no hubo ningún cambio, cerrar sin alerta
+    if (newStock === prevStock && newCost === prevCost && newName === prevName) {
+      setIsEditProductModalOpen(false);
+      setSelectedProductEdit(null);
+      return;
+    }
+
+    const stockChangeBadge = stockDiff === 0 
+      ? '<span style="color: #6b7280; font-weight: bold;">Sin cambio</span>' 
+      : stockDiff > 0 
+        ? `<span style="color: #059669; font-weight: bold; background-color: #ecfdf5; padding: 2px 6px; border-radius: 4px;">+${stockDiff} u (Aumento)</span>` 
+        : `<span style="color: #dc2626; font-weight: bold; background-color: #fef2f2; padding: 2px 6px; border-radius: 4px;">${stockDiff} u (Disminución)</span>`;
+
+    const costChangeBadge = costDiff === 0
+      ? '<span style="color: #6b7280; font-weight: bold;">Sin cambio</span>'
+      : costDiff > 0
+        ? `<span style="color: #b45309; font-weight: bold; background-color: #fefce8; padding: 2px 6px; border-radius: 4px;">+${formatPrice(costDiff)}</span>`
+        : `<span style="color: #059669; font-weight: bold; background-color: #ecfdf5; padding: 2px 6px; border-radius: 4px;">-${formatPrice(Math.abs(costDiff))}</span>`;
+
     Swal.fire({
-      icon: 'success',
-      title: 'Producto actualizado',
-      text: `Se actualizaron las existencias de ${updated.name} en ${storeObj?.name || 'la sede seleccionada'}.`,
-      timer: 1500,
-      showConfirmButton: false
+      title: '🛡️ Confirmar Modificación de Inventario',
+      html: `
+        <div style="text-align: left; font-size: 12px; line-height: 1.5; color: #374151;">
+          <div style="background-color: #ecfdf5; border: 1px solid #d1fae5; border-radius: 12px; padding: 12px; margin-bottom: 12px;">
+            <div style="font-size: 11px; text-transform: uppercase; font-weight: 800; color: #047857; margin-bottom: 2px;">
+              Sede: ${currentStoreObj?.name}
+            </div>
+            <div style="font-size: 15px; font-weight: 900; color: #064e3b;">
+              ${newName}
+            </div>
+          </div>
+
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 12px;">
+            <thead>
+              <tr style="background-color: #f3f4f6; text-align: left; font-size: 10px; color: #6b7280; text-transform: uppercase;">
+                <th style="padding: 6px 8px; border-radius: 6px 0 0 6px;">Campo</th>
+                <th style="padding: 6px 8px;">Antes</th>
+                <th style="padding: 6px 8px;">Nuevo</th>
+                <th style="padding: 6px 8px; border-radius: 0 6px 6px 0;">Ajuste</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom: 1px solid #f3f4f6;">
+                <td style="padding: 8px; font-weight: bold; color: #111827;">Stock (${currentStoreObj?.shortName})</td>
+                <td style="padding: 8px; font-family: monospace;">${prevStock} u</td>
+                <td style="padding: 8px; font-family: monospace; font-weight: 900; color: #047857;">${newStock} u</td>
+                <td style="padding: 8px; font-size: 11px;">${stockChangeBadge}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; font-weight: bold; color: #111827;">Costo unitario</td>
+                <td style="padding: 8px; font-family: monospace;">${formatPrice(prevCost)}</td>
+                <td style="padding: 8px; font-family: monospace; font-weight: 900; color: #1e40af;">${formatPrice(newCost)}</td>
+                <td style="padding: 8px; font-size: 11px;">${costChangeBadge}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <p style="margin: 0; color: #4b5563; font-size: 11px; background-color: #f9fafb; padding: 8px; border-radius: 8px;">
+            ⚠️ <i>Verifica los valores antes de confirmar. Esta actualización afectará las existencias en tiempo real de <strong>${currentStoreObj?.name}</strong>.</i>
+          </p>
+        </div>
+      `,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, aplicar cambios',
+      cancelButtonText: 'Revisar / Cancelar',
+      confirmButtonColor: '#059669',
+      cancelButtonColor: '#6b7280',
+      focusConfirm: true,
+    }).then(res => {
+      if (res.isConfirmed) {
+        const updated: CommercialProduct = {
+          ...selectedProductEdit,
+          name: newName,
+          costPrice: newCost,
+          stocks: {
+            ...selectedProductEdit.stocks,
+            [editStoreTarget]: newStock
+          }
+        };
+
+        CommercialService.saveProduct(updated);
+        refreshData();
+        setIsEditProductModalOpen(false);
+        setSelectedProductEdit(null);
+
+        Swal.fire({
+          icon: 'success',
+          title: 'Inventario actualizado',
+          text: `Se aplicaron los cambios de ${updated.name} en ${currentStoreObj?.name}.`,
+          timer: 1600,
+          showConfirmButton: false
+        });
+      }
     });
   };
 
@@ -599,23 +697,75 @@ export default function CommercialAdmin() {
     });
   };
 
-  const handleDeleteProduct = (productId: string, productName: string) => {
+  const handleDeleteProduct = (product: CommercialProduct) => {
+    if (inventorySecurityLocked) {
+      Swal.fire({
+        icon: 'info',
+        title: '🔒 Modo Seguro Bloqueado',
+        text: 'La eliminación está bloqueada para prevenir pérdidas accidentales de catálogo. Desactiva el candado de seguridad en la barra superior para continuar.',
+        confirmButtonColor: '#059669',
+        confirmButtonText: 'Entendido'
+      });
+      return;
+    }
+
+    const totalStock = STORES_LIST.reduce((acc, s) => acc + (product.stocks[s.id] || 0), 0);
+    const storeBreakdown = STORES_LIST.map(s => `<b>${s.shortName}:</b> ${product.stocks[s.id] || 0} u`).join(' | ');
+
     Swal.fire({
-      title: '¿Eliminar del inventario?',
-      text: `Se eliminará ${productName} del inventario de todas las sedes.`,
+      title: '⚠️ ¿Confirmar eliminación definitiva?',
+      html: `
+        <div style="text-align: left; font-size: 13px; line-height: 1.5; color: #374151;">
+          <div style="background-color: #fef2f2; border: 1px solid #fee2e2; border-radius: 12px; padding: 12px; margin-bottom: 12px;">
+            <p style="font-weight: 900; color: #991b1b; margin: 0 0 4px 0; font-size: 14px;">
+              ${product.name}
+            </p>
+            <p style="margin: 0; color: #b91c1c; font-size: 11px;">
+              Existencias actuales en total: <strong>${totalStock} prendas</strong>
+            </p>
+            <p style="margin: 4px 0 0 0; color: #7f1d1d; font-size: 10px;">
+              ${storeBreakdown}
+            </p>
+          </div>
+          <p style="margin-bottom: 8px; color: #4b5563; font-size: 12px;">
+            Esta acción <strong>eliminará por completo esta referencia</strong> del inventario de todas las 4 sedes y no se puede deshacer.
+          </p>
+          <p style="font-weight: 700; color: #111827; margin-bottom: 6px; font-size: 12px;">
+            Para autorizar el borrado, escribe la palabra <span style="background-color: #fee2e2; color: #dc2626; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-weight: 900;">ELIMINAR</span>:
+          </p>
+        </div>
+      `,
+      input: 'text',
+      inputPlaceholder: 'Escribe ELIMINAR',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonText: 'Sí, eliminar',
+      confirmButtonText: 'Sí, eliminar definitivamente',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#dc2626'
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6b7280',
+      focusCancel: true,
+      preConfirm: (inputValue) => {
+        if (!inputValue || inputValue.trim().toUpperCase() !== 'ELIMINAR') {
+          Swal.showValidationMessage('Debes escribir exactamente la palabra "ELIMINAR" para continuar');
+          return false;
+        }
+        return true;
+      }
     }).then(res => {
       if (res.isConfirmed) {
-        CommercialService.deleteProduct(productId);
+        CommercialService.deleteProduct(product.id);
         refreshData();
-        if (selectedProductEdit?.id === productId) {
+        if (selectedProductEdit?.id === product.id) {
           setSelectedProductEdit(null);
           setIsEditProductModalOpen(false);
         }
+        Swal.fire({
+          icon: 'success',
+          title: 'Producto eliminado',
+          text: `La referencia ${product.name} fue removida del inventario de todas las sedes.`,
+          timer: 1800,
+          showConfirmButton: false
+        });
       }
     });
   };
@@ -1977,8 +2127,44 @@ export default function CommercialAdmin() {
                   className="w-full pl-9 pr-3 py-2 bg-gray-50/80 rounded-xl border border-gray-200 text-xs font-medium focus:outline-emerald-600 focus:bg-white transition-all"
                 />
               </div>
-              <div className="text-xs font-medium text-gray-500">
-                Mostrando <strong className="text-gray-900">{filteredInventory.length}</strong> de {data.products.length} productos
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !inventorySecurityLocked;
+                    setInventorySecurityLocked(next);
+                    Swal.fire({
+                      icon: next ? 'warning' : 'success',
+                      title: next ? '🔒 Modo Seguro Activado' : '🔓 Edición Desbloqueada',
+                      text: next 
+                        ? 'Las acciones de modificar y eliminar quedaron bloqueadas contra toques accidentales.' 
+                        : 'Acciones habilitadas. Toda modificación y eliminación requerirá confirmación de seguridad.',
+                      timer: 1600,
+                      showConfirmButton: false
+                    });
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    inventorySecurityLocked 
+                      ? 'bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs hover:bg-amber-200' 
+                      : 'bg-emerald-50 text-emerald-800 border border-emerald-200/80 hover:bg-emerald-100 shadow-2xs'
+                  }`}
+                  title="Alternar bloqueo de seguridad contra clics accidentales"
+                >
+                  {inventorySecurityLocked ? (
+                    <>
+                      <Lock className="w-3.5 h-3.5 text-amber-800" />
+                      <span>Edición Bloqueada 🔒</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>Seguridad Activa 🛡️</span>
+                    </>
+                  )}
+                </button>
+                <div className="text-xs font-medium text-gray-500 hidden sm:block">
+                  Mostrando <strong className="text-gray-900">{filteredInventory.length}</strong> de {data.products.length} productos
+                </div>
               </div>
             </div>
 
@@ -2004,7 +2190,12 @@ export default function CommercialAdmin() {
                         <th className="py-2.5 px-3">Valoración costo</th>
                       </>
                     )}
-                    <th className="py-2.5 px-3 text-center">Acciones</th>
+                    <th className="py-2.5 px-3 text-center">
+                      <span className="inline-flex items-center justify-center gap-1">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                        Acciones
+                      </span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -2037,18 +2228,18 @@ export default function CommercialAdmin() {
                           </>
                         )}
                         <td className="py-2.5 px-3 text-center">
-                          <div className="flex items-center justify-center gap-1">
+                          <div className="flex items-center justify-center gap-1.5">
                             <button
                               onClick={() => handleOpenEditProductModal(p)}
                               className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                              title={`Editar en ${invStoreFilter === 'all' ? 'sede' : STORES_LIST.find(s => s.id === invStoreFilter)?.shortName}`}
+                              title={`Modificar con seguridad en ${invStoreFilter === 'all' ? 'sede' : STORES_LIST.find(s => s.id === invStoreFilter)?.shortName}`}
                             >
                               <Edit3 className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => handleDeleteProduct(p.id, p.name)}
+                              onClick={() => handleDeleteProduct(p)}
                               className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                              title="Eliminar producto"
+                              title="Eliminar con código de seguridad"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -2127,6 +2318,12 @@ export default function CommercialAdmin() {
                 </div>
               </div>
             )}
+
+            {/* Control de seguridad informativo */}
+            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-50/90 border border-amber-200/80 text-amber-900 text-[11px] font-medium">
+              <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0" />
+              <span><strong>Ajuste protegido:</strong> Al guardar, el sistema te mostrará una comparativa de seguridad antes/después para confirmar las existencias.</span>
+            </div>
 
             <form onSubmit={handleSaveProductEdit} className="space-y-3.5 text-xs">
               <div>
