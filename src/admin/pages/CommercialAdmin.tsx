@@ -479,7 +479,65 @@ export default function CommercialAdmin() {
   const [invStoreFilter, setInvStoreFilter] = useState<'republica' | 'modelo' | 'quality' | 'mariano' | 'all'>('republica');
   const [invSearch, setInvSearch] = useState('');
   const [selectedProductEdit, setSelectedProductEdit] = useState<CommercialProduct | null>(null);
+  const [isEditProductModalOpen, setIsEditProductModalOpen] = useState(false);
+  const [editStoreTarget, setEditStoreTarget] = useState<StoreId>('republica');
+  const [editProductForm, setEditProductForm] = useState({
+    name: '',
+    costPrice: 0,
+    stock: 0
+  });
   const [isNewProductModalOpen, setIsNewProductModalOpen] = useState(false);
+
+  const handleOpenEditProductModal = (product: CommercialProduct) => {
+    const targetStore: StoreId = invStoreFilter === 'all' ? 'republica' : (invStoreFilter as StoreId);
+    setSelectedProductEdit(product);
+    setEditStoreTarget(targetStore);
+    setEditProductForm({
+      name: product.name,
+      costPrice: product.costPrice,
+      stock: product.stocks[targetStore] || 0
+    });
+    setIsEditProductModalOpen(true);
+  };
+
+  const handleSwitchEditStoreTarget = (storeId: StoreId) => {
+    setEditStoreTarget(storeId);
+    if (selectedProductEdit) {
+      setEditProductForm(prev => ({
+        ...prev,
+        stock: selectedProductEdit.stocks[storeId] || 0
+      }));
+    }
+  };
+
+  const handleSaveProductEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProductEdit) return;
+
+    const updated: CommercialProduct = {
+      ...selectedProductEdit,
+      name: editProductForm.name.trim().toUpperCase(),
+      costPrice: Number(editProductForm.costPrice),
+      stocks: {
+        ...selectedProductEdit.stocks,
+        [editStoreTarget]: Math.max(0, Number(editProductForm.stock))
+      }
+    };
+
+    CommercialService.saveProduct(updated);
+    refreshData();
+    setIsEditProductModalOpen(false);
+    setSelectedProductEdit(null);
+
+    const storeObj = STORES_LIST.find(s => s.id === editStoreTarget);
+    Swal.fire({
+      icon: 'success',
+      title: 'Producto actualizado',
+      text: `Se actualizaron las existencias de ${updated.name} en ${storeObj?.name || 'la sede seleccionada'}.`,
+      timer: 1500,
+      showConfirmButton: false
+    });
+  };
 
   // Formulario nuevo producto: Solo 1 Nombre/Categoría, Costo de compra y Stock en las 4 sedes
   const [newProductForm, setNewProductForm] = useState({
@@ -541,7 +599,10 @@ export default function CommercialAdmin() {
       if (res.isConfirmed) {
         CommercialService.deleteProduct(productId);
         refreshData();
-        if (selectedProductEdit?.id === productId) setSelectedProductEdit(null);
+        if (selectedProductEdit?.id === productId) {
+          setSelectedProductEdit(null);
+          setIsEditProductModalOpen(false);
+        }
       }
     });
   };
@@ -1890,175 +1951,248 @@ export default function CommercialAdmin() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Tabla de Inventario (SOLO 1 NOMBRE: PRODUCTO/CATEGORÍA, SIN CATEGORÍA NI PRECIO VENTA) */}
-            <div className="lg:col-span-8 bg-white rounded-2xl border border-gray-200/80 p-5 shadow-2xs space-y-4">
-              <div className="flex items-center gap-2 relative">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3" />
+          {/* Tabla de Inventario (Ancho completo, modal emergente por sede) */}
+          <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="relative flex-1 max-w-md">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder="Buscar por nombre de producto / categoría..."
                   value={invSearch}
                   onChange={e => setInvSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-hidden"
+                  className="w-full pl-9 pr-3 py-2 bg-gray-50/80 rounded-xl border border-gray-200 text-xs font-medium focus:outline-emerald-600 focus:bg-white transition-all"
+                />
+              </div>
+              <div className="text-xs font-medium text-gray-500">
+                Mostrando <strong className="text-gray-900">{filteredInventory.length}</strong> de {data.products.length} productos
+              </div>
+            </div>
+
+            <div className="border border-gray-200/80 rounded-xl overflow-hidden shadow-2xs">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase">
+                    <th className="py-2.5 px-3">#</th>
+                    <th className="py-2.5 px-3">Producto / Categoría</th>
+                    <th className="py-2.5 px-3">Costo de compra</th>
+                    {invStoreFilter === 'all' ? (
+                      <>
+                        <th className="py-2.5 px-2 text-center">Rep.</th>
+                        <th className="py-2.5 px-2 text-center">Mod.</th>
+                        <th className="py-2.5 px-2 text-center">Qual.</th>
+                        <th className="py-2.5 px-2 text-center">Mar.</th>
+                        <th className="py-2.5 px-2 text-center">Total Stock</th>
+                        <th className="py-2.5 px-3">Valoración costo</th>
+                      </>
+                    ) : (
+                      <>
+                        <th className="py-2.5 px-3 text-center">Stock ({STORES_LIST.find(s => s.id === invStoreFilter)?.shortName})</th>
+                        <th className="py-2.5 px-3">Valoración costo</th>
+                      </>
+                    )}
+                    <th className="py-2.5 px-3 text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredInventory.map((p, idx) => {
+                    const stockVal = invStoreFilter === 'all' ? 0 : (p.stocks[invStoreFilter] || 0);
+                    const totalAll = STORES_LIST.reduce((acc, s) => acc + (p.stocks[s.id] || 0), 0);
+
+                    return (
+                      <tr key={p.id} className="hover:bg-gray-50/70 transition-colors">
+                        <td className="py-2.5 px-3 font-mono text-gray-400 text-[11px]">{idx + 1}</td>
+                        <td className="py-2.5 px-3 font-bold text-gray-900">{p.name}</td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-gray-700">{formatPrice(p.costPrice)}</td>
+                        {invStoreFilter === 'all' ? (
+                          <>
+                            <td className="py-2.5 px-2 text-center font-bold text-gray-700">{p.stocks.republica || 0}</td>
+                            <td className="py-2.5 px-2 text-center font-bold text-gray-700">{p.stocks.modelo || 0}</td>
+                            <td className="py-2.5 px-2 text-center font-bold text-gray-700">{p.stocks.quality || 0}</td>
+                            <td className="py-2.5 px-2 text-center font-bold text-gray-700">{p.stocks.mariano || 0}</td>
+                            <td className="py-2.5 px-2 text-center font-black text-emerald-800">{totalAll}</td>
+                            <td className="py-2.5 px-3 font-mono font-bold text-gray-800">{formatPrice(totalAll * p.costPrice)}</td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="py-2.5 px-3 text-center">
+                              <span className={`px-2.5 py-0.5 rounded-full font-bold text-xs ${stockVal > 10 ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' : 'bg-amber-50 text-amber-800 border border-amber-100'}`}>
+                                {stockVal}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 font-mono font-bold text-gray-800">{formatPrice(stockVal * p.costPrice)}</td>
+                          </>
+                        )}
+                        <td className="py-2.5 px-3 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => handleOpenEditProductModal(p)}
+                              className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                              title={`Editar en ${invStoreFilter === 'all' ? 'sede' : STORES_LIST.find(s => s.id === invStoreFilter)?.shortName}`}
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteProduct(p.id, p.name)}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                              title="Eliminar producto"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para Editar Producto en la Sede Seleccionada */}
+      {isEditProductModalOpen && selectedProductEdit && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-gray-900">Editar en Sede</h3>
+                  <p className="text-[11px] text-gray-500 font-medium">Modifica costo y existencias en la sede seleccionada</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditProductModalOpen(false);
+                  setSelectedProductEdit(null);
+                }}
+                className="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Sede seleccionada */}
+            {invStoreFilter === 'all' ? (
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                  Selecciona la sede que deseas modificar:
+                </label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {STORES_LIST.map(st => (
+                    <button
+                      key={st.id}
+                      type="button"
+                      onClick={() => handleSwitchEditStoreTarget(st.id)}
+                      className={`py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                        editStoreTarget === st.id
+                          ? 'bg-emerald-700 text-white shadow-xs'
+                          : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200/60'
+                      }`}
+                    >
+                      <span>{st.shortName}</span>
+                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${editStoreTarget === st.id ? 'bg-emerald-800 text-white' : 'bg-gray-200 text-gray-700'}`}>
+                        {selectedProductEdit.stocks[st.id] || 0}u
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-emerald-50/80 border border-emerald-200/60 text-emerald-950">
+                <Store className="w-4 h-4 text-emerald-700 shrink-0" />
+                <div className="text-xs">
+                  <span className="text-[10px] font-bold text-emerald-700 uppercase block tracking-wider">Sede seleccionada</span>
+                  <span className="font-extrabold text-emerald-900">
+                    {STORES_LIST.find(s => s.id === editStoreTarget)?.name}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveProductEdit} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                  Nombre del producto / categoría *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editProductForm.name}
+                  onChange={e => setEditProductForm({ ...editProductForm, name: e.target.value.toUpperCase() })}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 font-bold uppercase text-gray-900 focus:outline-emerald-600 focus:border-emerald-600"
                 />
               </div>
 
-              <div className="border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase">
-                      <th className="py-2.5 px-3">#</th>
-                      <th className="py-2.5 px-3">Producto / Categoría</th>
-                      <th className="py-2.5 px-3">Costo de compra</th>
-                      {invStoreFilter === 'all' ? (
-                        <>
-                          <th className="py-2.5 px-2 text-center">Rep.</th>
-                          <th className="py-2.5 px-2 text-center">Mod.</th>
-                          <th className="py-2.5 px-2 text-center">Qual.</th>
-                          <th className="py-2.5 px-2 text-center">Mar.</th>
-                          <th className="py-2.5 px-2 text-center">Total Stock</th>
-                          <th className="py-2.5 px-3">Valoración costo</th>
-                        </>
-                      ) : (
-                        <>
-                          <th className="py-2.5 px-3 text-center">Stock ({STORES_LIST.find(s => s.id === invStoreFilter)?.shortName})</th>
-                          <th className="py-2.5 px-3">Valoración costo</th>
-                        </>
-                      )}
-                      <th className="py-2.5 px-3 text-center">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredInventory.map((p, idx) => {
-                      const stockVal = invStoreFilter === 'all' ? 0 : (p.stocks[invStoreFilter] || 0);
-                      const totalAll = STORES_LIST.reduce((acc, s) => acc + (p.stocks[s.id] || 0), 0);
-
-                      return (
-                        <tr key={p.id} className="hover:bg-gray-50/70">
-                          <td className="py-2.5 px-3 font-mono text-gray-400 text-[11px]">{idx + 1}</td>
-                          <td className="py-2.5 px-3 font-bold text-gray-900">{p.name}</td>
-                          <td className="py-2.5 px-3 font-mono font-bold text-gray-700">{formatPrice(p.costPrice)}</td>
-                          {invStoreFilter === 'all' ? (
-                            <>
-                              <td className="py-2.5 px-2 text-center font-bold text-gray-700">{p.stocks.republica || 0}</td>
-                              <td className="py-2.5 px-2 text-center font-bold text-gray-700">{p.stocks.modelo || 0}</td>
-                              <td className="py-2.5 px-2 text-center font-bold text-gray-700">{p.stocks.quality || 0}</td>
-                              <td className="py-2.5 px-2 text-center font-bold text-gray-700">{p.stocks.mariano || 0}</td>
-                              <td className="py-2.5 px-2 text-center font-black text-emerald-800">{totalAll}</td>
-                              <td className="py-2.5 px-3 font-mono font-bold text-gray-800">{formatPrice(totalAll * p.costPrice)}</td>
-                            </>
-                          ) : (
-                            <>
-                              <td className="py-2.5 px-3 text-center">
-                                <span className={`px-2 py-0.5 rounded-full font-bold text-xs ${stockVal > 10 ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}>
-                                  {stockVal}
-                                </span>
-                              </td>
-                              <td className="py-2.5 px-3 font-mono font-bold text-gray-800">{formatPrice(stockVal * p.costPrice)}</td>
-                            </>
-                          )}
-                          <td className="py-2.5 px-3 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <button
-                                onClick={() => setSelectedProductEdit(p)}
-                                className="p-1 text-gray-500 hover:text-black cursor-pointer"
-                                title="Editar costo y stock"
-                              >
-                                <Edit3 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteProduct(p.id, p.name)}
-                                className="p-1 text-gray-400 hover:text-red-600 cursor-pointer"
-                                title="Eliminar producto"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                  Costo de compra ($) *
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  value={editProductForm.costPrice || ''}
+                  onChange={e => setEditProductForm({ ...editProductForm, costPrice: Number(e.target.value) })}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 font-mono font-bold text-gray-900 focus:outline-emerald-600 focus:border-emerald-600"
+                />
+                <span className="text-[10px] text-gray-400 mt-1 block">
+                  Valor unitario: {formatPrice(editProductForm.costPrice)}
+                </span>
               </div>
-            </div>
 
-            {/* Panel de edición rápida de costo y stock (1 solo nombre) */}
-            <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-200/80 p-5 shadow-2xs space-y-4">
-              <h3 className="text-sm font-extrabold text-gray-900 border-b border-gray-100 pb-2">
-                {selectedProductEdit ? `Editar: ${selectedProductEdit.name}` : 'Ajustar Inventario'}
-              </h3>
-
-              {selectedProductEdit ? (
-                <div className="space-y-3 text-xs">
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nombre / Categoría</label>
-                    <input
-                      type="text"
-                      value={selectedProductEdit.name}
-                      onChange={e => setSelectedProductEdit({ ...selectedProductEdit, name: e.target.value.toUpperCase() })}
-                      className="w-full px-3 py-1.5 rounded-xl border border-gray-200 font-bold uppercase"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Costo de compra ($) *</label>
-                    <input
-                      type="number"
-                      value={selectedProductEdit.costPrice}
-                      onChange={e => setSelectedProductEdit({ ...selectedProductEdit, costPrice: Number(e.target.value) })}
-                      className="w-full px-3 py-1.5 rounded-xl border border-gray-200 font-bold font-mono"
-                    />
-                  </div>
-
-                  {/* Stock en las 4 sedes */}
-                  <div className="space-y-2 pt-2 border-t border-gray-100">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Stock en las 4 Sedes</span>
-                    <div className="grid grid-cols-2 gap-2">
-                      {STORES_LIST.map(st => (
-                        <div key={st.id} className="p-2 rounded-lg bg-gray-50 border border-gray-100">
-                          <label className="text-[10px] font-bold text-gray-600 block">{st.shortName}</label>
-                          <input
-                            type="number"
-                            value={selectedProductEdit.stocks[st.id] || 0}
-                            onChange={e => setSelectedProductEdit({
-                              ...selectedProductEdit,
-                              stocks: { ...selectedProductEdit.stocks, [st.id]: Number(e.target.value) }
-                            })}
-                            className="w-full mt-1 px-2 py-1 bg-white rounded border border-gray-200 font-mono font-bold text-center"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-2">
-                    <button
-                      onClick={() => {
-                        CommercialService.saveProduct(selectedProductEdit);
-                        refreshData();
-                        setSelectedProductEdit(null);
-                        Swal.fire({ icon: 'success', title: 'Guardado', text: 'Inventario y costos actualizados.', timer: 1200 });
-                      }}
-                      className="flex-1 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-bold cursor-pointer"
-                    >
-                      Guardar cambios
-                    </button>
-                    <button
-                      onClick={() => setSelectedProductEdit(null)}
-                      className="px-3 py-2 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50 cursor-pointer"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
+              {/* ÚNICO CAMPO DE STOCK: SOLO PARA LA SEDE SELECCIONADA */}
+              <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-200/80 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-extrabold text-gray-700 uppercase">
+                    Stock en {STORES_LIST.find(s => s.id === editStoreTarget)?.shortName} *
+                  </label>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                    Solo esta sede
+                  </span>
                 </div>
-              ) : (
-                <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 text-center text-gray-400 text-xs">
-                  Selecciona el lápiz en cualquier producto para modificar su costo de compra o existencias en cada una de las 4 sedes.
+                <p className="text-[10px] text-gray-400">
+                  Existencias físicas disponibles en esta sede seleccionada.
+                </p>
+                <div className="relative mt-2">
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={editProductForm.stock}
+                    onChange={e => setEditProductForm({ ...editProductForm, stock: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 bg-white rounded-xl border-2 border-emerald-600 font-mono font-black text-gray-900 text-base text-center focus:outline-hidden shadow-2xs"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
+                    unidades
+                  </span>
                 </div>
-              )}
-            </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditProductModalOpen(false);
+                    setSelectedProductEdit(null);
+                  }}
+                  className="px-4 py-2 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <CheckCircle2 className="w-4 h-4" /> Guardar cambios
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
