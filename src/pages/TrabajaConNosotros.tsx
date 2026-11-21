@@ -619,17 +619,40 @@ export default function TrabajaConNosotros() {
                                   <div key={idx} className="p-3 rounded-xl bg-white border border-gray-200 shadow-2xs hover:border-emerald-300 transition-all flex items-start justify-between gap-2">
                                     <div>
                                       <span className="font-extrabold text-gray-900 text-xs block">📅 {s.date}</span>
+                                      {s.dayName && (
+                                        <span className="text-[10px] text-gray-500 font-semibold block mt-0.5">
+                                          {s.dayName}
+                                        </span>
+                                      )}
                                       {s.label && (
                                         <span className="text-[10px] text-emerald-800 font-semibold block mt-0.5">
                                           {s.label}
                                         </span>
                                       )}
                                     </div>
-                                    <span className="inline-block px-2.5 py-1 bg-gray-900 text-white font-bold text-[11px] rounded-lg shrink-0 shadow-2xs">
-                                      ⏰ {s.hours}
-                                    </span>
+                                    <div className="text-right shrink-0">
+                                      <span className="inline-block px-2.5 py-1 bg-gray-900 text-white font-bold text-[11px] rounded-lg shadow-2xs">
+                                        ⏰ {s.hours}
+                                      </span>
+                                      <span className="block text-emerald-700 font-black text-xs mt-1">
+                                        💰 {s.dailyPay || '$40.000'} / día
+                                      </span>
+                                    </div>
                                   </div>
                                 ))}
+                              </div>
+                              <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                  <span className="text-base">💰</span>
+                                  <div>
+                                    <span className="text-xs font-black text-emerald-950 block">
+                                      Pago total estimado: ${publishedShifts.reduce((acc, c) => acc + (parseInt((c.dailyPay || '40000').replace(/\D/g, ''), 10) || 40000), 0).toLocaleString('es-CO')}
+                                    </span>
+                                    <span className="text-[10px] text-emerald-700 font-medium">
+                                      ({publishedShifts.length} jornadas × {publishedShifts[0]?.dailyPay || '$40.000'})
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           );
@@ -1257,12 +1280,20 @@ export default function TrabajaConNosotros() {
                                           }}
                                           className="text-emerald-600 rounded focus:ring-emerald-500"
                                         />
-                                        <span>📅 {s.date}</span>
-                                        {s.label && <span className="text-[10px] text-emerald-800 font-normal">({s.label})</span>}
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span>📅 {s.date}</span>
+                                          {s.dayName && <span className="text-[10px] text-gray-500 font-semibold">({s.dayName})</span>}
+                                          {s.label && <span className="text-[10px] text-emerald-800 font-normal">({s.label})</span>}
+                                        </div>
                                       </div>
-                                      <span className="px-2 py-0.5 bg-gray-900 text-white rounded text-[10px] font-bold">
-                                        ⏰ {s.hours}
-                                      </span>
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        <span className="px-2 py-0.5 bg-gray-900 text-white rounded text-[10px] font-bold">
+                                          ⏰ {s.hours}
+                                        </span>
+                                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-900 rounded text-[10px] font-black">
+                                          {s.dailyPay || '$40.000'}
+                                        </span>
+                                      </div>
                                     </label>
                                   );
                                 })}

@@ -44,10 +44,11 @@ import {
   Play,
   Share2,
   Sparkles,
-  Copy
+  Copy,
+  Edit2
 } from 'lucide-react';
 import { RecruitmentService, StoreService } from '../../services/api';
-import { JobVacancy, JobApplication, JobInterview, RecruitmentSummary, Store, ShiftDateItem, defaultDecemberShifts, serializeShiftDates, parseShiftDates } from '../../types';
+import { JobVacancy, JobApplication, JobInterview, RecruitmentSummary, Store, ShiftDateItem, defaultDecemberShifts, serializeShiftDates, parseShiftDates, formatShiftDateFromRaw } from '../../types';
 import Swal from 'sweetalert2';
 
 export default function RecruitmentAdmin() {
@@ -179,9 +180,37 @@ export default function RecruitmentAdmin() {
 
   const [vacancyForm, setVacancyForm] = useState<JobVacancy>(createEmptyVacancy());
   const [shiftDates, setShiftDates] = useState<ShiftDateItem[]>([]);
-  const [newShiftDate, setNewShiftDate] = useState('');
-  const [newShiftLabel, setNewShiftLabel] = useState('');
-  const [newShiftHours, setNewShiftHours] = useState('9:00 a. m. - 9:00 p. m.');
+  const [scheduleMode, setScheduleMode] = useState<'FIJO' | 'ESPECIFICO'>('ESPECIFICO');
+  const [newShiftRawDate, setNewShiftRawDate] = useState('');
+  const [newShiftDayName, setNewShiftDayName] = useState('—');
+  const [newShiftHours, setNewShiftHours] = useState('10:00 a. m. – 8:00 p. m.');
+  const [newShiftDailyPay, setNewShiftDailyPay] = useState('40.000');
+  const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
+
+  const formatShortShiftDate = (dateStr: string, rawDate?: string) => {
+    if (rawDate) {
+      const { shortDate } = formatShiftDateFromRaw(rawDate);
+      if (shortDate) return shortDate;
+    }
+    return dateStr
+      .replace('diciembre', 'dic.')
+      .replace('enero', 'ene.')
+      .replace('febrero', 'feb.');
+  };
+
+  const estimatedTotalPay = useMemo(() => {
+    return shiftDates.reduce((acc, curr) => {
+      const num = parseInt((curr.dailyPay || '40000').replace(/\D/g, ''), 10) || 40000;
+      return acc + num;
+    }, 0);
+  }, [shiftDates]);
+
+  const sampleDailyPay = useMemo(() => {
+    if (shiftDates.length > 0 && shiftDates[0].dailyPay) {
+      return shiftDates[0].dailyPay;
+    }
+    return '$40.000';
+  }, [shiftDates]);
 
   const updateShiftDatesAndForm = (newDates: ShiftDateItem[]) => {
     setShiftDates(newDates);
@@ -196,6 +225,78 @@ export default function RecruitmentAdmin() {
         ? newDates.map(d => d.date).join(', ')
         : prev.workDays
     }));
+  };
+
+  const handleDateSelect = (rawVal: string) => {
+    setNewShiftRawDate(rawVal);
+    const { dayName } = formatShiftDateFromRaw(rawVal);
+    setNewShiftDayName(dayName);
+  };
+
+  const handleAddOrUpdateShift = () => {
+    if (!newShiftRawDate) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Fecha requerida',
+        text: 'Por favor selecciona la fecha de la jornada en el calendario.',
+        confirmButtonColor: '#10b981'
+      });
+      return;
+    }
+    if (!newShiftHours.trim()) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Horario requerido',
+        text: 'Por favor indica el horario para este día (ej. 10:00 a. m. – 8:00 p. m.).',
+        confirmButtonColor: '#10b981'
+      });
+      return;
+    }
+    const { fullDate, dayName } = formatShiftDateFromRaw(newShiftRawDate);
+    const cleanPay = newShiftDailyPay.trim()
+      ? (newShiftDailyPay.trim().startsWith('$') ? newShiftDailyPay.trim() : `$${newShiftDailyPay.trim()}`)
+      : '$40.000';
+
+    if (editingShiftId) {
+      const updated = shiftDates.map(item => {
+        if (item.id === editingShiftId) {
+          return {
+            ...item,
+            date: fullDate,
+            rawDate: newShiftRawDate,
+            dayName,
+            hours: newShiftHours.trim(),
+            dailyPay: cleanPay
+          };
+        }
+        return item;
+      });
+      updateShiftDatesAndForm(updated);
+      setEditingShiftId(null);
+    } else {
+      const newItem: ShiftDateItem = {
+        id: Date.now().toString(),
+        date: fullDate,
+        rawDate: newShiftRawDate,
+        dayName,
+        hours: newShiftHours.trim(),
+        dailyPay: cleanPay
+      };
+      updateShiftDatesAndForm([...shiftDates, newItem]);
+    }
+
+    setNewShiftRawDate('');
+    setNewShiftDayName('—');
+    setNewShiftHours('10:00 a. m. – 8:00 p. m.');
+    setNewShiftDailyPay('40.000');
+  };
+
+  const handleEditShift = (item: ShiftDateItem) => {
+    setEditingShiftId(item.id);
+    setNewShiftRawDate(item.rawDate || '');
+    setNewShiftDayName(item.dayName || '—');
+    setNewShiftHours(item.hours);
+    setNewShiftDailyPay((item.dailyPay || '$40.000').replace('$', '').trim());
   };
 
   const defaultRequirements = [
@@ -395,31 +496,37 @@ export default function RecruitmentAdmin() {
   // --- Helper: Load Recommended December Seasonal Vacancy Template ---
   const loadDecemberTemplate = () => {
     setShiftDates(defaultDecemberShifts);
+    setScheduleMode('ESPECIFICO');
+    setNewShiftRawDate('');
+    setNewShiftDayName('—');
+    setNewShiftHours('10:00 a. m. – 8:00 p. m.');
+    setNewShiftDailyPay('40.000');
+    setEditingShiftId(null);
     const serializedShifts = serializeShiftDates(defaultDecemberShifts);
     setVacancyForm({
       company: "JUAND STORE y QUALITY STORE",
       sede: "Todas las sedes (Cali)",
-      position: "Personal de apoyo - Temporada Decembrina",
-      employmentType: "Temporada Decembrina",
+      position: "Asesor Comercial y Vendedor",
+      employmentType: "Temporada decembrina",
       contractType: "Pago por día trabajado",
-      title: "Personal de apoyo - Temporada Decembrina Cali",
+      title: "Asesor Comercial y Vendedor - Personal de Apoyo",
       description: "Buscamos personal con excelente energía y actitud comercial para trabajar como apoyo en fechas clave de diciembre en las sedes de JUAND STORE y QUALITY STORE en Cali. Se paga directamente el día trabajado según los turnos asignados por la administración de la tienda.",
       workScheduleType: "Por turnos",
-      workScheduleHours: "Horario variable según fecha (10 fechas programadas)",
-      saturdayHours: "Según fecha programada",
-      workDays: "6, 7, 15, 20, 21, 22, 23, 24, 30, 31 Dic",
-      sundayPolicy: "Según fechas asignadas",
-      sundayHours: "Según turno programado",
+      workScheduleHours: "Horario variable según fecha (9 fechas programadas)",
+      saturdayHours: "10:00 a. m. – 8:00 p. m.",
+      workDays: "6, 7, 13, 14, 20, 21, 24, 31 Dic y 1 Ene",
+      sundayPolicy: "10:00 a. m. – 8:00 p. m.",
+      sundayHours: "10:00 a. m. – 8:00 p. m.",
       holidayPolicy: "Sí, se trabajan",
       holidayHours: "Según turno programado",
       scheduleObservations: serializedShifts,
       remunerationType: "Pago por día trabajado",
-      baseSalary: "$ 60.000 / día trabajado",
-      transportAid: "No aplica (se paga el día trabajado)",
-      sundayHolidaySurcharge: "No aplica (tarifa por día)",
+      baseSalary: "$ 40.000 / día trabajado",
+      transportAid: "No aplica (se cancela tarifa directa por día)",
+      sundayHolidaySurcharge: "No aplica (tarifa integral por día)",
       benefits: "Pago directo por día laborado en sede asignada",
-      salaryObservations: "Para esta vacante no hay salario mensual fijo, auxilio de transporte ni recargos adicionales: se cancela directamente el valor de cada día trabajado.",
-      requirements: "Mayor de 18 años, Bachiller o actitud comercial, Disponibilidad para presentarse en las fechas asignadas de diciembre (ej. 6, 7, 20, 21, 22, 23, 24 dic) en cualquiera de nuestras sedes (Villacolombia, República de Israel, Ciudad Modelo, Mariano Ramos), Puntualidad, buena presentación y trabajo en equipo.",
+      salaryObservations: "Se cancela directamente el valor de cada día trabajado ($40.000 por jornada). Pago total estimado: $360.000 para las 9 fechas.",
+      requirements: "Mayor de 18 años, Bachiller o actitud comercial, Disponibilidad para presentarse en las fechas asignadas de diciembre y fin de año (ej. 6, 7, 13, 14, 20, 21, 24, 31 dic y 1 ene) en las sedes de Cali (Villacolombia, República de Israel, Ciudad Modelo, Mariano Ramos), Puntualidad, buena presentación y trabajo en equipo.",
       paymentFrequency: "Diario / Por día trabajado",
       paymentDates: "Al terminar el día laborado",
       probationPeriod: "No aplica",
@@ -430,17 +537,17 @@ export default function RecruitmentAdmin() {
     const decReqs = [
       'Mayor de 18 años.',
       'Excelente actitud de servicio y atención al cliente.',
-      'Disponibilidad para trabajar en las fechas de diciembre asignadas por la tienda (ej. 6, 7, 20, 21, 22, 23, 24 dic).',
+      'Disponibilidad para trabajar en las fechas de diciembre asignadas por la tienda (ej. 6, 7, 13, 14, 20, 21, 24, 31 dic y 1 ene).',
       'Disponibilidad para presentarse en cualquiera de las sedes de Cali (JUAND STORE / QUALITY STORE).',
       'Puntualidad, buena presentación y compromiso.',
-      'Aceptación de modalidad de pago por día trabajado.'
+      'Aceptación de modalidad de pago por día trabajado ($40.000 / jornada).'
     ];
     setAvailableReqs(prev => Array.from(new Set([...prev, ...decReqs])));
     setSelectedReqs(decReqs);
     Swal.fire({
       icon: 'success',
       title: '¡Plantilla Decembrina Cargada!',
-      text: 'Configurada para TODAS LAS SEDES (Villacolombia, República, Ciudad Modelo, Mariano Ramos) para JUAND STORE y QUALITY STORE con las 10 fechas y horarios variables programados.',
+      text: 'Configurada para TODAS LAS SEDES en Cali para JUAND STORE y QUALITY STORE con las 9 fechas y horarios variables programados ($40.000 / día).',
       timer: 2800,
       showConfirmButton: false
     });
@@ -448,11 +555,24 @@ export default function RecruitmentAdmin() {
 
   // --- Vacancy Operations ---
   const openNewVacancyModal = () => {
-    setShiftDates([]);
-    setNewShiftDate('');
-    setNewShiftLabel('');
-    setNewShiftHours('9:00 a. m. - 9:00 p. m.');
-    setVacancyForm(createEmptyVacancy());
+    setShiftDates(defaultDecemberShifts);
+    setScheduleMode('ESPECIFICO');
+    setNewShiftRawDate('');
+    setNewShiftDayName('—');
+    setNewShiftHours('10:00 a. m. – 8:00 p. m.');
+    setNewShiftDailyPay('40.000');
+    setEditingShiftId(null);
+    const empty = createEmptyVacancy();
+    empty.company = "JUAND STORE y QUALITY STORE";
+    empty.sede = "Todas las sedes (Cali)";
+    empty.position = "Asesor Comercial y Vendedor";
+    empty.title = "Asesor Comercial y Vendedor - Personal de Apoyo";
+    empty.employmentType = "Temporada decembrina";
+    empty.contractType = "Pago por día trabajado";
+    empty.baseSalary = "$ 40.000 / día trabajado";
+    empty.workScheduleType = "Por turnos";
+    empty.scheduleObservations = serializeShiftDates(defaultDecemberShifts);
+    setVacancyForm(empty);
     setAvailableReqs(defaultRequirements);
     setSelectedReqs([]);
     setWizardStep(1);
@@ -463,9 +583,12 @@ export default function RecruitmentAdmin() {
     setVacancyForm(v);
     const parsedShifts = parseShiftDates(v.scheduleObservations);
     setShiftDates(parsedShifts);
-    setNewShiftDate('');
-    setNewShiftLabel('');
-    setNewShiftHours('9:00 a. m. - 9:00 p. m.');
+    setScheduleMode(parsedShifts.length > 0 ? 'ESPECIFICO' : 'FIJO');
+    setNewShiftRawDate('');
+    setNewShiftDayName('—');
+    setNewShiftHours('10:00 a. m. – 8:00 p. m.');
+    setNewShiftDailyPay('40.000');
+    setEditingShiftId(null);
     const parsed = v.requirements ? v.requirements.split(',').map(r => r.trim()).filter(Boolean) : [];
     setSelectedReqs(parsed);
     setAvailableReqs(prev => {
@@ -3587,7 +3710,7 @@ export default function RecruitmentAdmin() {
               <div className="flex items-center justify-between min-w-[550px]">
                 {[
                   { num: 1, label: 'Información general' },
-                  { num: 2, label: 'Horarios y descansos' },
+                  { num: 2, label: 'Fechas y horarios' },
                   { num: 3, label: 'Salario y beneficios' },
                   { num: 4, label: 'Requisitos y condiciones' },
                   { num: 5, label: 'Revisión y publicación' }
@@ -3842,359 +3965,371 @@ export default function RecruitmentAdmin() {
 
                 {wizardStep === 2 && (
                   <div className="space-y-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Clock className="w-4 h-4 text-emerald-600" />
-                      <h3 className="text-sm font-extrabold text-gray-900">2. Horarios y descansos</h3>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Tipo de jornada *</label>
-                      <div className="grid grid-cols-3 gap-2 text-xs">
-                        {['Tiempo completo', 'Medio tiempo', 'Por turnos'].map(jt => (
-                          <button
-                            key={jt}
-                            type="button"
-                            onClick={() => setVacancyForm({ ...vacancyForm, workScheduleType: jt })}
-                            className={`py-2 px-3 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                              vacancyForm.workScheduleType === jt
-                                ? 'border-emerald-500 bg-emerald-50 text-emerald-900 font-bold shadow-2xs'
-                                : 'border-gray-200 text-gray-600'
-                            }`}
-                          >
-                            {jt}
-                            {vacancyForm.workScheduleType === jt && <Check className="w-3.5 h-3.5 text-emerald-600" />}
-                          </button>
-                        ))}
+                    {/* Header matching user image */}
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center text-base shrink-0 shadow-2xs">
+                        📅
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-extrabold text-gray-900">
+                          2. Fechas y horarios de trabajo
+                        </h3>
+                        <p className="text-xs text-gray-500">
+                          Programa las fechas, el horario y el pago por día de esta vacante.
+                        </p>
                       </div>
                     </div>
 
-                    {/* SECTION: PLANIFICADOR DE FECHAS ESPECÍFICAS Y HORARIOS VARIABLES */}
-                    <div className="p-4 bg-gradient-to-br from-emerald-50/80 via-teal-50/50 to-green-50/80 rounded-xl border-2 border-emerald-400 shadow-2xs space-y-3.5">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-start gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-base shrink-0 shadow-xs">
+                    {/* Modalidad de programación * (Radio cards) */}
+                    <div>
+                      <label className="block text-xs font-bold text-gray-800 mb-1.5">
+                        Modalidad de programación *
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* Option 1: Horario fijo semanal */}
+                        <div
+                          onClick={() => setScheduleMode('FIJO')}
+                          className={`p-3 rounded-xl border-2 cursor-pointer transition-all flex items-start gap-3 ${
+                            scheduleMode === 'FIJO'
+                              ? 'border-emerald-500 bg-emerald-50/40 ring-1 ring-emerald-500 shadow-2xs'
+                              : 'border-gray-200 bg-white hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="pt-0.5">
+                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                              scheduleMode === 'FIJO' ? 'border-emerald-600' : 'border-gray-300'
+                            }`}>
+                              {scheduleMode === 'FIJO' && <div className="w-2 h-2 rounded-full bg-emerald-600" />}
+                            </div>
+                          </div>
+                          <div className="w-7 h-7 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center text-xs shrink-0">
                             📅
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="text-xs font-black text-emerald-950">
-                                Fechas y horarios específicos de la vacante
-                              </h4>
-                              <span className="px-2 py-0.5 bg-emerald-200 text-emerald-900 font-black text-[10px] rounded-full">
-                                {shiftDates.length} {shiftDates.length === 1 ? 'fecha' : 'fechas'} programadas
-                              </span>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-xs font-bold text-gray-900">Horario fijo semanal</h4>
+                            <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">
+                              Mismo horario por días de la semana (Lun – Vie, Sáb, Dom y Festivos).
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Option 2: Fechas específicas / Temporada */}
+                        <div
+                          onClick={() => setScheduleMode('ESPECIFICO')}
+                          className={`p-3 rounded-xl border-2 cursor-pointer transition-all flex items-start gap-3 ${
+                            scheduleMode === 'ESPECIFICO'
+                              ? 'border-emerald-500 bg-emerald-50/40 ring-1 ring-emerald-500 shadow-2xs'
+                              : 'border-gray-200 bg-white hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="pt-0.5">
+                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                              scheduleMode === 'ESPECIFICO' ? 'border-emerald-600' : 'border-gray-300'
+                            }`}>
+                              {scheduleMode === 'ESPECIFICO' && <div className="w-2 h-2 rounded-full bg-emerald-600" />}
                             </div>
-                            <p className="text-[11px] text-emerald-800 leading-tight mt-0.5">
-                              Elige las fechas disponibles para esta vacante y asigna un <b>horario distinto a cada día</b> según la jornada comercial.
+                          </div>
+                          <div className="w-7 h-7 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center text-xs shrink-0">
+                            📅
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-xs font-bold text-gray-900">Fechas específicas / Temporada</h4>
+                            <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">
+                              Selecciona las fechas y define un horario diferente para cada una.
                             </p>
                           </div>
                         </div>
                       </div>
+                    </div>
 
-                      {/* Quick Presets Buttons */}
-                      <div className="pt-1 border-t border-emerald-200/60 space-y-1.5">
-                        <span className="text-[10px] font-bold text-emerald-900 block uppercase tracking-wider">
-                          ⚡ Presets rápidos de Diciembre (1 clic para cargar fechas):
-                        </span>
-                        <div className="flex flex-wrap gap-1.5 text-[11px]">
-                          <button
-                            type="button"
-                            onClick={() => updateShiftDatesAndForm(defaultDecemberShifts)}
-                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-all cursor-pointer shadow-xs"
-                          >
-                            🎄 Todas las 10 fechas clave de Diciembre
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const velitas = [
-                                { id: Date.now().toString() + '-1', date: 'Sábado 06 Dic', label: 'Día de Velitas / Apertura', hours: '9:00 a. m. - 9:00 p. m.' },
-                                { id: Date.now().toString() + '-2', date: 'Domingo 07 Dic', label: 'Velitas (Domingo comercial)', hours: '10:00 a. m. - 8:00 p. m.' }
-                              ];
-                              const merged = [...shiftDates, ...velitas.filter(v => !shiftDates.some(s => s.date === v.date))];
-                              updateShiftDatesAndForm(merged);
-                            }}
-                            className="px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold rounded-lg transition-all cursor-pointer"
-                          >
-                            + Velitas (6 y 7 Dic)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const quincena = [
-                                { id: Date.now().toString() + '-3', date: 'Lunes 15 Dic', label: 'Primera Quincena', hours: '9:30 a. m. - 8:30 p. m.' },
-                                { id: Date.now().toString() + '-4', date: 'Sábado 20 Dic', label: 'Pico fin de semana navideño', hours: '9:00 a. m. - 10:00 p. m.' }
-                              ];
-                              const merged = [...shiftDates, ...quincena.filter(v => !shiftDates.some(s => s.date === v.date))];
-                              updateShiftDatesAndForm(merged);
-                            }}
-                            className="px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold rounded-lg transition-all cursor-pointer"
-                          >
-                            + Quincena (15 y 20 Dic)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const navidad = [
-                                { id: Date.now().toString() + '-5', date: 'Lunes 22 Dic', label: 'Semana de Navidad', hours: '9:00 a. m. - 9:30 p. m.' },
-                                { id: Date.now().toString() + '-6', date: 'Martes 23 Dic', label: 'Víspera de Navidad', hours: '8:30 a. m. - 10:30 p. m.' },
-                                { id: Date.now().toString() + '-7', date: 'Miércoles 24 Dic', label: 'Día de Navidad', hours: '8:00 a. m. - 7:00 p. m.' }
-                              ];
-                              const merged = [...shiftDates, ...navidad.filter(v => !shiftDates.some(s => s.date === v.date))];
-                              updateShiftDatesAndForm(merged);
-                            }}
-                            className="px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold rounded-lg transition-all cursor-pointer"
-                          >
-                            + Semana Navidad (22 al 24 Dic)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const finAno = [
-                                { id: Date.now().toString() + '-8', date: 'Martes 30 Dic', label: 'Temporada de Fin de Año', hours: '9:30 a. m. - 8:30 p. m.' },
-                                { id: Date.now().toString() + '-9', date: 'Miércoles 31 Dic', label: 'Cierre de Fin de Año', hours: '8:30 a. m. - 6:00 p. m.' }
-                              ];
-                              const merged = [...shiftDates, ...finAno.filter(v => !shiftDates.some(s => s.date === v.date))];
-                              updateShiftDatesAndForm(merged);
-                            }}
-                            className="px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold rounded-lg transition-all cursor-pointer"
-                          >
-                            + Fin de Año (30 y 31 Dic)
-                          </button>
-                          {shiftDates.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => updateShiftDatesAndForm([])}
-                              className="px-2 py-1 text-red-600 hover:bg-red-50 text-[10px] font-bold rounded transition-all cursor-pointer ml-auto"
-                            >
-                              Limpiar lista
-                            </button>
-                          )}
-                        </div>
-                      </div>
+                    {scheduleMode === 'ESPECIFICO' ? (
+                      <>
+                        {/* Section: Agregar jornada */}
+                        <div className="pt-1 space-y-2">
+                          <h4 className="text-xs font-bold text-gray-900">Agregar jornada</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                            {/* Fecha * */}
+                            <div>
+                              <label className="block text-[11px] font-semibold text-gray-700 mb-1">Fecha *</label>
+                              <div className="relative">
+                                <input
+                                  type="date"
+                                  value={newShiftRawDate}
+                                  onChange={e => handleDateSelect(e.target.value)}
+                                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white text-gray-800"
+                                />
+                              </div>
+                            </div>
 
-                      {/* Add Custom Date Form */}
-                      <div className="bg-white p-3 rounded-xl border border-emerald-300 shadow-2xs space-y-2">
-                        <span className="text-[11px] font-extrabold text-gray-800 flex items-center gap-1.5">
-                          <Plus className="w-3.5 h-3.5 text-emerald-600" />
-                          Agregar fecha y horario personalizado:
-                        </span>
-                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 text-xs">
-                          <div className="sm:col-span-4">
-                            <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Fecha / Día *</label>
-                            <input
-                              type="text"
-                              placeholder="Ej. Sábado 06 Dic o 2026-12-06"
-                              value={newShiftDate}
-                              onChange={e => setNewShiftDate(e.target.value)}
-                              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                            />
-                          </div>
-                          <div className="sm:col-span-4">
-                            <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Motivo / Jornada (opcional)</label>
-                            <input
-                              type="text"
-                              placeholder="Ej. Día de Velitas, Trasnochón, etc."
-                              value={newShiftLabel}
-                              onChange={e => setNewShiftLabel(e.target.value)}
-                              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                            />
-                          </div>
-                          <div className="sm:col-span-4">
-                            <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Horario para este día *</label>
-                            <div className="flex gap-1.5">
+                            {/* Día */}
+                            <div>
+                              <label className="block text-[11px] font-semibold text-gray-700 mb-1">Día</label>
                               <input
                                 type="text"
-                                placeholder="Ej. 9:00 a. m. - 9:00 p. m."
-                                value={newShiftHours}
-                                onChange={e => setNewShiftHours(e.target.value)}
-                                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none font-semibold text-emerald-950"
+                                readOnly
+                                disabled
+                                value={newShiftDayName || '—'}
+                                className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg bg-gray-100 text-gray-700 font-semibold text-center cursor-not-allowed"
                               />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (!newShiftDate.trim()) {
-                                    Swal.fire({ icon: 'warning', title: 'Falta la fecha', text: 'Por favor ingresa la fecha (ej. Sábado 06 Dic).', confirmButtonColor: '#10b981' });
-                                    return;
-                                  }
-                                  if (!newShiftHours.trim()) {
-                                    Swal.fire({ icon: 'warning', title: 'Falta el horario', text: 'Por favor indica el horario para ese día.', confirmButtonColor: '#10b981' });
-                                    return;
-                                  }
-                                  const item: ShiftDateItem = {
-                                    id: Date.now().toString(),
-                                    date: newShiftDate.trim(),
-                                    label: newShiftLabel.trim(),
-                                    hours: newShiftHours.trim()
-                                  };
-                                  updateShiftDatesAndForm([...shiftDates, item]);
-                                  setNewShiftDate('');
-                                  setNewShiftLabel('');
-                                }}
-                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-lg transition-all shrink-0 cursor-pointer flex items-center gap-1 shadow-xs"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                                Agregar
-                              </button>
                             </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-gray-500 pt-1">
-                          <span className="font-semibold text-gray-700">Horarios rápidos:</span>
-                          {['9:00 a. m. - 9:00 p. m.', '10:00 a. m. - 8:00 p. m.', '8:30 a. m. - 10:30 p. m.', '8:00 a. m. - 7:00 p. m.', '8:30 a. m. - 6:00 p. m.'].map(h => (
-                            <button
-                              key={h}
-                              type="button"
-                              onClick={() => setNewShiftHours(h)}
-                              className="px-2 py-0.5 bg-gray-100 hover:bg-emerald-100 rounded text-[10px] text-gray-700 hover:text-emerald-900 font-medium cursor-pointer"
-                            >
-                              {h}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
 
-                      {/* Scheduled Dates List with Inline Hours Editor */}
-                      {shiftDates.length > 0 ? (
-                        <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
-                          <div className="flex items-center justify-between text-[11px] font-black text-emerald-950 px-1">
-                            <span>Fechas publicadas con horario ({shiftDates.length}):</span>
-                            <span className="text-[10px] text-emerald-800 font-normal">Puedes editar el horario directamente en la casilla de cada fecha</span>
-                          </div>
-                          {shiftDates.map((s, idx) => (
-                            <div
-                              key={s.id || idx}
-                              className="p-2.5 bg-white rounded-xl border border-emerald-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hover:border-emerald-400 transition-all"
-                            >
-                              <div className="flex items-center gap-2.5">
-                                <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black flex items-center justify-center shrink-0">
-                                  {idx + 1}
-                                </span>
-                                <div>
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-black text-gray-900 text-xs">{s.date}</span>
-                                    {s.label && (
-                                      <span className="px-1.5 py-0.2 bg-emerald-50 text-emerald-800 text-[10px] font-semibold rounded border border-emerald-100">
-                                        {s.label}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-gray-500 font-bold shrink-0">Horario para este día:</span>
+                            {/* Horario * */}
+                            <div>
+                              <label className="block text-[11px] font-semibold text-gray-700 mb-1">Horario *</label>
+                              <div className="relative">
+                                <Clock className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                                 <input
                                   type="text"
-                                  value={s.hours}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    const updated = shiftDates.map(item => item.id === s.id ? { ...item, hours: val } : item);
-                                    updateShiftDatesAndForm(updated);
-                                  }}
-                                  className="px-2.5 py-1 text-xs border border-emerald-300 rounded-lg bg-emerald-50/50 text-emerald-950 font-bold w-48 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                                  value={newShiftHours}
+                                  onChange={e => setNewShiftHours(e.target.value)}
+                                  placeholder="Ej. 10:00 a. m. – 8:00 p. m."
+                                  className="w-full pl-8 pr-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white font-medium text-gray-800"
                                 />
+                              </div>
+                            </div>
+
+                            {/* Pago por día * */}
+                            <div>
+                              <label className="block text-[11px] font-semibold text-gray-700 mb-1">Pago por día *</label>
+                              <div className="relative">
+                                <span className="text-gray-400 font-bold absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-xs">$</span>
+                                <input
+                                  type="text"
+                                  value={newShiftDailyPay}
+                                  onChange={e => setNewShiftDailyPay(e.target.value)}
+                                  placeholder="Ej. 40.000"
+                                  className="w-full pl-6 pr-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white font-medium text-gray-800"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end pt-1">
+                            <button
+                              type="button"
+                              onClick={handleAddOrUpdateShift}
+                              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                            >
+                              <Plus className="w-4 h-4" />
+                              {editingShiftId ? 'Guardar cambios' : 'Agregar fecha'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Section: Jornadas programadas (N) */}
+                        <div className="space-y-2 pt-2">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-xs font-bold text-gray-900">
+                              Jornadas programadas ({shiftDates.length})
+                            </h4>
+                            <div className="flex items-center gap-2">
+                              {shiftDates.length === 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => updateShiftDatesAndForm(defaultDecemberShifts)}
+                                  className="text-[11px] text-emerald-700 hover:text-emerald-800 font-bold cursor-pointer"
+                                >
+                                  Restablecer 9 fechas clave
+                                </button>
+                              )}
+                              {shiftDates.length > 0 && (
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const filtered = shiftDates.filter(item => item.id !== s.id);
-                                    updateShiftDatesAndForm(filtered);
+                                    Swal.fire({
+                                      title: '¿Limpiar jornadas?',
+                                      text: 'Se eliminarán las fechas programadas de la lista.',
+                                      icon: 'warning',
+                                      showCancelButton: true,
+                                      confirmButtonColor: '#ef4444',
+                                      confirmButtonText: 'Sí, limpiar',
+                                      cancelButtonText: 'Cancelar'
+                                    }).then((res) => {
+                                      if (res.isConfirmed) updateShiftDatesAndForm([]);
+                                    });
                                   }}
-                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                                  title="Eliminar esta fecha"
+                                  className="text-[11px] text-red-600 hover:text-red-700 font-semibold cursor-pointer"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  Limpiar lista
                                 </button>
-                              </div>
+                              )}
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="p-4 bg-white/80 rounded-xl border border-dashed border-emerald-300 text-center text-xs text-emerald-900 space-y-1">
-                          <p className="font-bold">Aún no has agregado fechas específicas.</p>
-                          <p className="text-[11px] text-gray-500">Haz clic en <b>"🎄 Todas las 10 fechas clave de Diciembre"</b> o agrega fechas individuales arriba con su horario.</p>
-                        </div>
-                      )}
-                    </div>
+                          </div>
 
-                    {/* Standard Weekly Schedule Fields (Collapsible / Secondary) */}
-                    <details className="bg-gray-50 p-3.5 rounded-xl border border-gray-200 text-xs">
-                      <summary className="font-bold text-gray-700 cursor-pointer flex items-center justify-between">
-                        <span>Horarios estándar de referencia (Lunes a viernes, sábados, domingos)</span>
-                        <span className="text-[10px] text-gray-400 font-normal">Opcional si usas fechas específicas</span>
-                      </summary>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3 pt-3 border-t border-gray-200">
+                          {/* Table matching user mockup */}
+                          <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-left text-xs">
+                                <thead className="bg-gray-50/90 text-gray-600 border-b border-gray-200 text-[11px]">
+                                  <tr>
+                                    <th className="py-2 px-3 font-semibold whitespace-nowrap">
+                                      📅 Fecha
+                                    </th>
+                                    <th className="py-2 px-3 font-semibold whitespace-nowrap">
+                                      📅 Día
+                                    </th>
+                                    <th className="py-2 px-3 font-semibold whitespace-nowrap">
+                                      🕒 Horario
+                                    </th>
+                                    <th className="py-2 px-3 font-semibold whitespace-nowrap">
+                                      💰 Pago por día
+                                    </th>
+                                    <th className="py-2 px-3 font-semibold text-right whitespace-nowrap">
+                                      Acciones
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {shiftDates.length > 0 ? (
+                                    shiftDates.map((item, idx) => (
+                                      <tr key={item.id || idx} className="hover:bg-gray-50/70 transition-colors">
+                                        <td className="py-2 px-3 font-medium text-gray-900 whitespace-nowrap">
+                                          {item.date}
+                                        </td>
+                                        <td className="py-2 px-3 text-gray-700 whitespace-nowrap">
+                                          {item.dayName || '—'}
+                                        </td>
+                                        <td className="py-2 px-3 text-gray-700 whitespace-nowrap font-medium">
+                                          {item.hours}
+                                        </td>
+                                        <td className="py-2 px-3 font-bold text-gray-900 whitespace-nowrap">
+                                          {item.dailyPay || '$40.000'}
+                                        </td>
+                                        <td className="py-2 px-3 text-right whitespace-nowrap">
+                                          <div className="flex items-center justify-end gap-1.5">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleEditShift(item)}
+                                              className="p-1 text-gray-400 hover:text-emerald-600 rounded transition-colors cursor-pointer"
+                                              title="Editar jornada"
+                                            >
+                                              <Edit2 className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                const filtered = shiftDates.filter(s => s.id !== item.id);
+                                                updateShiftDatesAndForm(filtered);
+                                              }}
+                                              className="p-1 text-gray-400 hover:text-red-600 rounded transition-colors cursor-pointer"
+                                              title="Eliminar jornada"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    ))
+                                  ) : (
+                                    <tr>
+                                      <td colSpan={5} className="py-6 text-center text-gray-400 text-xs">
+                                        No hay jornadas programadas. Agrega una arriba o haz clic en "Restablecer 9 fechas clave".
+                                      </td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      /* Weekly Fixed Schedule */
+                      <div className="space-y-3 pt-1">
                         <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Horario laboral (lunes a viernes)</label>
-                          <input
-                            type="text"
-                            placeholder="Ej. 10:00 a. m. - 8:00 p. m."
-                            value={vacancyForm.workScheduleHours}
-                            onChange={e => setVacancyForm({ ...vacancyForm, workScheduleHours: e.target.value })}
-                            className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg bg-white"
-                          />
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">Tipo de jornada *</label>
+                          <div className="grid grid-cols-3 gap-2 text-xs">
+                            {['Tiempo completo', 'Medio tiempo', 'Por turnos'].map(jt => (
+                              <button
+                                key={jt}
+                                type="button"
+                                onClick={() => setVacancyForm({ ...vacancyForm, workScheduleType: jt })}
+                                className={`py-2 px-3 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                                  vacancyForm.workScheduleType === jt
+                                    ? 'border-emerald-500 bg-emerald-50 text-emerald-900 font-bold shadow-2xs'
+                                    : 'border-gray-200 text-gray-600'
+                                }`}
+                              >
+                                {jt}
+                                {vacancyForm.workScheduleType === jt && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                              </button>
+                            ))}
+                          </div>
                         </div>
 
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Horario del sábado</label>
-                          <input
-                            type="text"
-                            placeholder="Ej. 9:00 a. m. - 8:30 p. m."
-                            value={vacancyForm.saturdayHours || ''}
-                            onChange={e => setVacancyForm({ ...vacancyForm, saturdayHours: e.target.value })}
-                            className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg bg-white"
-                          />
-                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">Horario laboral (lunes a viernes) *</label>
+                            <input
+                              type="text"
+                              placeholder="Ej. 10:00 a. m. - 8:00 p. m."
+                              value={vacancyForm.workScheduleHours}
+                              onChange={e => setVacancyForm({ ...vacancyForm, workScheduleHours: e.target.value })}
+                              className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg bg-white"
+                            />
+                          </div>
 
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Domingos</label>
-                          <select
-                            value={vacancyForm.sundayPolicy}
-                            onChange={e => setVacancyForm({ ...vacancyForm, sundayPolicy: e.target.value })}
-                            className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg bg-white"
-                          >
-                            <option value="Domingos intercalados">Domingos intercalados</option>
-                            <option value="Todos los domingos">Todos los domingos</option>
-                            <option value="Según fechas asignadas">Según fechas asignadas</option>
-                            <option value="No aplica">No aplica</option>
-                          </select>
-                        </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">Horario del sábado *</label>
+                            <input
+                              type="text"
+                              placeholder="Ej. 9:00 a. m. - 8:30 p. m."
+                              value={vacancyForm.saturdayHours || ''}
+                              onChange={e => setVacancyForm({ ...vacancyForm, saturdayHours: e.target.value })}
+                              className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg bg-white"
+                            />
+                          </div>
 
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Horario de domingos trabajados</label>
-                          <input
-                            type="text"
-                            placeholder="Ej. 10:00 a. m. - 8:00 p. m."
-                            value={vacancyForm.sundayHours}
-                            onChange={e => setVacancyForm({ ...vacancyForm, sundayHours: e.target.value })}
-                            className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg bg-white"
-                          />
-                        </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">Domingos *</label>
+                            <select
+                              value={vacancyForm.sundayPolicy}
+                              onChange={e => setVacancyForm({ ...vacancyForm, sundayPolicy: e.target.value })}
+                              className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg bg-white"
+                            >
+                              <option value="Domingos intercalados">Domingos intercalados</option>
+                              <option value="Todos los domingos">Todos los domingos</option>
+                              <option value="No aplica">No aplica</option>
+                            </select>
+                          </div>
 
-                        <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Festivos</label>
-                          <select
-                            value={vacancyForm.holidayPolicy}
-                            onChange={e => setVacancyForm({ ...vacancyForm, holidayPolicy: e.target.value })}
-                            className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg bg-white"
-                          >
-                            <option value="Sí, se trabajan">Sí, se trabajan</option>
-                            <option value="No se trabajan">No se trabajan</option>
-                          </select>
-                        </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">Horario de domingos trabajados *</label>
+                            <input
+                              type="text"
+                              placeholder="Ej. 10:00 a. m. - 8:00 p. m."
+                              value={vacancyForm.sundayHours}
+                              onChange={e => setVacancyForm({ ...vacancyForm, sundayHours: e.target.value })}
+                              className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg bg-white"
+                            />
+                          </div>
 
-                        <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Observaciones generales del horario</label>
-                          <textarea
-                            rows={2}
-                            maxLength={300}
-                            placeholder="Ej. Los días y turnos se asignan previamente según necesidad comercial..."
-                            value={vacancyForm.scheduleObservations || ''}
-                            onChange={e => setVacancyForm({ ...vacancyForm, scheduleObservations: e.target.value })}
-                            className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg bg-white"
-                          />
+                          <div className="sm:col-span-2">
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">Festivos *</label>
+                            <select
+                              value={vacancyForm.holidayPolicy}
+                              onChange={e => setVacancyForm({ ...vacancyForm, holidayPolicy: e.target.value })}
+                              className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg bg-white"
+                            >
+                              <option value="Sí, se trabajan">Sí, se trabajan</option>
+                              <option value="No se trabajan">No se trabajan</option>
+                            </select>
+                          </div>
+
+                          <div className="sm:col-span-2">
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">Observaciones generales del horario (opcional)</label>
+                            <textarea
+                              rows={2}
+                              maxLength={300}
+                              placeholder="Ej. Los días y horarios varían dependiendo las fechas que elija la tienda..."
+                              value={vacancyForm.scheduleObservations || ''}
+                              onChange={e => setVacancyForm({ ...vacancyForm, scheduleObservations: e.target.value })}
+                              className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg bg-white"
+                            />
+                          </div>
                         </div>
                       </div>
-                    </details>
+                    )}
                   </div>
                 )}
 
@@ -4441,11 +4576,21 @@ export default function RecruitmentAdmin() {
                         <button type="button" onClick={() => setWizardStep(2)} className="absolute top-2 right-2 text-gray-400 hover:text-emerald-700">
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
-                        <strong className="block text-gray-900 mb-1">Horarios y descansos</strong>
-                        <p>Jornada: {vacancyForm.workScheduleType}</p>
-                        <p>L-V: {vacancyForm.workScheduleHours || 'Por definir'}</p>
-                        <p>Sábado: {vacancyForm.saturdayHours || 'Por definir'}</p>
-                        <p>Dom/Lun: {vacancyForm.sundayHours || 'Por definir'}</p>
+                        <strong className="block text-gray-900 mb-1">Fechas y horarios</strong>
+                        {shiftDates.length > 0 ? (
+                          <>
+                            <p className="font-semibold text-emerald-900">{shiftDates.length} jornadas programadas</p>
+                            <p className="text-gray-500">Pago total estimado: <b>${estimatedTotalPay.toLocaleString('es-CO')}</b></p>
+                            <p className="text-gray-500">Tarifa por día: <b>{sampleDailyPay}</b></p>
+                          </>
+                        ) : (
+                          <>
+                            <p>Jornada: {vacancyForm.workScheduleType}</p>
+                            <p>L-V: {vacancyForm.workScheduleHours || 'Por definir'}</p>
+                            <p>Sábado: {vacancyForm.saturdayHours || 'Por definir'}</p>
+                            <p>Dom/Lun: {vacancyForm.sundayHours || 'Por definir'}</p>
+                          </>
+                        )}
                       </div>
 
                       <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 relative">
@@ -4504,43 +4649,65 @@ export default function RecruitmentAdmin() {
                     <p className="text-xs text-gray-500">{vacancyForm.title || `${vacancyForm.position || 'Cargo'} - ${vacancyForm.company}`}</p>
                   </div>
 
-                  <div className="flex flex-wrap gap-2 text-[10px] text-gray-500">
-                    <span className="flex items-center gap-1 font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                  <div className="flex flex-wrap gap-2 text-[11px]">
+                    <span className="flex items-center gap-1 font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
                       <MapPin className="w-3 h-3 text-emerald-600" /> {vacancyForm.sede}
                     </span>
-                    <span className="flex items-center gap-1">
-                      <Briefcase className="w-3 h-3" /> {vacancyForm.employmentType}
+                    <span className="flex items-center gap-1 font-semibold text-gray-700 bg-gray-100 px-2.5 py-0.5 rounded-full">
+                      <Calendar className="w-3 h-3 text-gray-500" /> {vacancyForm.employmentType}
                     </span>
                   </div>
 
-                  <p className="text-xs text-gray-600 line-clamp-3">
-                    {vacancyForm.description || 'Sin descripción todavía...'}
-                  </p>
+                  {/* Section: Fechas y horarios de trabajo matching mockup */}
+                  <div className="pt-2 border-t border-gray-100 space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900">
+                      <span>📅</span>
+                      <span>Fechas y horarios de trabajo</span>
+                    </div>
 
-                  <div className="pt-2 border-t border-gray-100 text-[11px] space-y-1">
-                    <p><strong className="text-gray-900">Salario / Pago:</strong> {vacancyForm.baseSalary || 'Por definir'}</p>
                     {shiftDates.length > 0 ? (
-                      <div className="pt-1">
-                        <div className="flex items-center justify-between text-[10px] font-black uppercase text-gray-800 mb-1">
-                          <span>📅 Fechas y horarios ({shiftDates.length}):</span>
-                          <span className="text-emerald-700 font-bold">Variables</span>
-                        </div>
-                        <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
-                          {shiftDates.map((s, idx) => (
-                            <div key={idx} className="flex items-center justify-between bg-emerald-50/70 px-2 py-1 rounded border border-emerald-100 text-[10px]">
-                              <span className="font-bold text-emerald-950 truncate max-w-[130px]">{s.date}</span>
-                              <span className="text-emerald-800 font-bold shrink-0">{s.hours}</span>
+                      <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                        {shiftDates.map((s, idx) => {
+                          const shortDate = formatShortShiftDate(s.date, s.rawDate);
+                          return (
+                            <div key={s.id || idx} className="flex items-center justify-between text-xs py-1 border-b border-gray-50 last:border-b-0">
+                              <span className="font-semibold text-gray-800 text-[11px] truncate max-w-[130px]">
+                                {shortDate}
+                              </span>
+                              <span className="text-[11px] text-gray-600 font-medium">
+                                {s.hours}
+                              </span>
+                              <span className="text-[11px] font-bold text-gray-900 shrink-0">
+                                {s.dailyPay || '$40.000'}
+                              </span>
                             </div>
-                          ))}
-                        </div>
+                          );
+                        })}
                       </div>
                     ) : (
-                      <>
+                      <div className="text-[11px] text-gray-500 space-y-1">
                         <p><strong className="text-gray-900">Horario L-V:</strong> {vacancyForm.workScheduleHours || 'Por definir'}</p>
                         {vacancyForm.saturdayHours && <p><strong className="text-gray-900">Horario Sábado:</strong> {vacancyForm.saturdayHours}</p>}
                         {vacancyForm.sundayHours && <p><strong className="text-gray-900">Dom/Lun trabajado:</strong> {vacancyForm.sundayHours}</p>}
-                      </>
+                      </div>
                     )}
+
+                    {/* Pago total estimado card */}
+                    <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl flex items-center justify-between mt-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                          💰
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-emerald-950">
+                            Pago total estimado: ${estimatedTotalPay.toLocaleString('es-CO')}
+                          </p>
+                          <p className="text-[10px] text-emerald-700 font-medium">
+                            ({shiftDates.length} {shiftDates.length === 1 ? 'jornada' : 'jornadas'} × {sampleDailyPay})
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

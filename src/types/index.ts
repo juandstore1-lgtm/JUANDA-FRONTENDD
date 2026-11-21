@@ -272,26 +272,54 @@ export interface HomeCategoryCollection {
 export interface ShiftDateItem {
   id: string;
   date: string;
+  rawDate?: string;
+  dayName?: string;
   label?: string;
   hours: string;
+  dailyPay?: string;
+}
+
+export function formatShiftDateFromRaw(rawDateStr: string): { fullDate: string; dayName: string; shortDate: string } {
+  if (!rawDateStr) return { fullDate: '', dayName: '—', shortDate: '' };
+  const parts = rawDateStr.split('-');
+  if (parts.length !== 3) return { fullDate: rawDateStr, dayName: '—', shortDate: rawDateStr };
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10) - 1;
+  const d = parseInt(parts[2], 10);
+  const dt = new Date(y, m, d);
+
+  const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  const dayShortNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  const monthShortNames = ['ene.', 'feb.', 'mar.', 'abr.', 'may.', 'jun.', 'jul.', 'ago.', 'sep.', 'oct.', 'nov.', 'dic.'];
+
+  const dayIndex = dt.getDay();
+  const dayName = dayNames[dayIndex] || '—';
+  const dayShort = dayShortNames[dayIndex] || '';
+  const monthName = monthNames[m] || '';
+  const monthShort = monthShortNames[m] || '';
+
+  const fullDate = `${dayShort}, ${d} de ${monthName} de ${y}`;
+  const shortDate = `${dayShort}, ${d} de ${monthShort} de ${y}`;
+
+  return { fullDate, dayName, shortDate };
 }
 
 export const defaultDecemberShifts: ShiftDateItem[] = [
-  { id: '1', date: 'Sábado 06 Dic', label: 'Día de Velitas / Apertura temporada', hours: '9:00 a. m. - 9:00 p. m.' },
-  { id: '2', date: 'Domingo 07 Dic', label: 'Velitas (Domingo comercial)', hours: '10:00 a. m. - 8:00 p. m.' },
-  { id: '3', date: 'Lunes 15 Dic', label: 'Primera Quincena de Diciembre', hours: '9:30 a. m. - 8:30 p. m.' },
-  { id: '4', date: 'Sábado 20 Dic', label: 'Pico fin de semana navideño / Trasnochón', hours: '9:00 a. m. - 10:00 p. m.' },
-  { id: '5', date: 'Domingo 21 Dic', label: 'Domingo previo a Navidad', hours: '9:30 a. m. - 9:00 p. m.' },
-  { id: '6', date: 'Lunes 22 Dic', label: 'Semana de Navidad', hours: '9:00 a. m. - 9:30 p. m.' },
-  { id: '7', date: 'Martes 23 Dic', label: 'Víspera de Navidad / Horario extendido', hours: '8:30 a. m. - 10:30 p. m.' },
-  { id: '8', date: 'Miércoles 24 Dic', label: 'Día de Navidad', hours: '8:00 a. m. - 7:00 p. m.' },
-  { id: '9', date: 'Martes 30 Dic', label: 'Temporada de Fin de Año', hours: '9:30 a. m. - 8:30 p. m.' },
-  { id: '10', date: 'Miércoles 31 Dic', label: 'Cierre de Fin de Año', hours: '8:30 a. m. - 6:00 p. m.' },
+  { id: '1', date: 'Sáb, 6 de diciembre de 2026', rawDate: '2026-12-06', dayName: 'Sábado', hours: '10:00 a. m. – 8:00 p. m.', dailyPay: '$40.000' },
+  { id: '2', date: 'Dom, 7 de diciembre de 2026', rawDate: '2026-12-07', dayName: 'Domingo', hours: '10:00 a. m. – 8:00 p. m.', dailyPay: '$40.000' },
+  { id: '3', date: 'Sáb, 13 de diciembre de 2026', rawDate: '2026-12-13', dayName: 'Sábado', hours: '10:00 a. m. – 8:00 p. m.', dailyPay: '$40.000' },
+  { id: '4', date: 'Dom, 14 de diciembre de 2026', rawDate: '2026-12-14', dayName: 'Domingo', hours: '10:00 a. m. – 8:00 p. m.', dailyPay: '$40.000' },
+  { id: '5', date: 'Sáb, 20 de diciembre de 2026', rawDate: '2026-12-20', dayName: 'Sábado', hours: '10:00 a. m. – 8:00 p. m.', dailyPay: '$40.000' },
+  { id: '6', date: 'Dom, 21 de diciembre de 2026', rawDate: '2026-12-21', dayName: 'Domingo', hours: '10:00 a. m. – 8:00 p. m.', dailyPay: '$40.000' },
+  { id: '7', date: 'Mié, 24 de diciembre de 2026', rawDate: '2026-12-24', dayName: 'Miércoles', hours: '10:00 a. m. – 6:00 p. m.', dailyPay: '$40.000' },
+  { id: '8', date: 'Jue, 31 de diciembre de 2026', rawDate: '2026-12-31', dayName: 'Jueves', hours: '10:00 a. m. – 5:00 p. m.', dailyPay: '$40.000' },
+  { id: '9', date: 'Jue, 1 de enero de 2027', rawDate: '2027-01-01', dayName: 'Jueves', hours: '12:00 m. – 6:00 p. m.', dailyPay: '$40.000' }
 ];
 
 export const serializeShiftDates = (dates: ShiftDateItem[]): string => {
   if (!dates || dates.length === 0) return '';
-  const lines = dates.map(d => `• ${d.date}${d.label ? ` (${d.label})` : ''}: ${d.hours}`);
+  const lines = dates.map(d => `• ${d.date}${d.dayName ? ` (${d.dayName})` : ''}: ${d.hours} - Pago: ${d.dailyPay || '$40.000'}`);
   return `📅 FECHAS Y HORARIOS ASIGNADOS:\n${lines.join('\n')}\n\n[DATOS_TURNOS_JSON:${JSON.stringify(dates)}]`;
 };
 
@@ -317,8 +345,10 @@ export const parseShiftDates = (text?: string): ShiftDateItem[] => {
         items.push({
           id: `shift-${i}`,
           date: datePart,
+          dayName: '',
           label: '',
-          hours: hoursPart
+          hours: hoursPart,
+          dailyPay: '$40.000'
         });
       }
     }
