@@ -45,6 +45,7 @@ import RecruitmentAdmin from "./admin/pages/RecruitmentAdmin";
 import TikTokAdmin from "./admin/pages/TikTokAdmin";
 import TikTokCallback from "./admin/pages/TikTokCallback";
 import CommercialAdmin from "./admin/pages/CommercialAdmin";
+import FinancialAdmin from "./admin/pages/FinancialAdmin";
 import Logo from "./components/Logo";
 import SmokeBackground from "./components/SmokeBackground";
 
@@ -145,6 +146,7 @@ function MainApp() {
             <Route path="tiktok/callback" element={<TikTokCallback />} />
             <Route path="audit" element={<AuditAdmin />} />
             <Route path="commercial" element={<CommercialAdmin />} />
+            <Route path="financial" element={<FinancialAdmin />} />
             <Route path="contests" element={<ContestsAdmin />} />
             <Route path="raffles" element={<RafflesAdmin />} />
             <Route path="raffles/:id" element={<RaffleDashboardAdmin />} />

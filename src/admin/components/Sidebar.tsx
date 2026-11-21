@@ -27,7 +27,9 @@ import {
   ArrowLeftRight,
   CalendarCheck,
   DollarSign,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Landmark,
+  HandCoins
 } from 'lucide-react';
 
 import Logo from '../../components/Logo';
@@ -53,11 +55,20 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const isCommercialActive = location.pathname.startsWith('/admin/commercial');
   const [commercialOpen, setCommercialOpen] = useState(isCommercialActive);
 
+  const isFinancialActive = location.pathname.startsWith('/admin/financial');
+  const [financialOpen, setFinancialOpen] = useState(isFinancialActive);
+
   useEffect(() => {
     if (isCommercialActive) {
       setCommercialOpen(true);
     }
   }, [isCommercialActive]);
+
+  useEffect(() => {
+    if (isFinancialActive) {
+      setFinancialOpen(true);
+    }
+  }, [isFinancialActive]);
 
   const currentTab = new URLSearchParams(location.search).get('tab') || 'resumen';
 
@@ -86,8 +97,17 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
     { name: 'Inventario y costos', tab: 'inventario', icon: Boxes },
     { name: 'Movimientos (Entradas/Salidas)', tab: 'movimientos', icon: ArrowLeftRight },
     { name: 'Cuadres de ventas', tab: 'cuadres', icon: CalendarCheck },
-    { name: 'Gastos y deudas', tab: 'gastos-deudas', icon: DollarSign },
     { name: 'Importar Excel', tab: 'importar', icon: FileSpreadsheet },
+    { name: 'Reportes', tab: 'reportes', icon: BarChart3 },
+  ];
+
+  const financialSubItems = [
+    { name: 'Resumen financiero', tab: 'resumen', icon: LayoutDashboard },
+    { name: 'Gastos mensuales', tab: 'gastos', icon: DollarSign },
+    { name: 'Deudas proveedores', tab: 'proveedores', icon: Package },
+    { name: 'Deudas bancarias', tab: 'bancos', icon: Landmark },
+    { name: 'Cuentas por cobrar', tab: 'cobrar', icon: HandCoins },
+    { name: 'Calendario de pagos', tab: 'calendario', icon: CalendarCheck },
     { name: 'Reportes', tab: 'reportes', icon: BarChart3 },
   ];
 
@@ -156,6 +176,53 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                     <Link
                       key={sub.tab}
                       to={`/admin/commercial?tab=${sub.tab}`}
+                      onClick={() => setIsOpen(false)}
+                      className={`flex items-center space-x-2.5 px-3 py-1.5 rounded-md text-xs transition-colors ${
+                        isSubActive 
+                          ? 'bg-emerald-950/80 text-emerald-300 font-bold border-l-2 border-emerald-400' 
+                          : 'text-gray-400 hover:text-white hover:bg-gray-900/60'
+                      }`}
+                    >
+                      <sub.icon className={`w-3.5 h-3.5 flex-shrink-0 ${isSubActive ? 'text-emerald-400' : 'text-gray-500'}`} />
+                      <span className="truncate">{sub.name}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Módulo Control Financiero (Solo Administrador Global) */}
+        {isGlobal && (
+          <div className="pt-2 border-t border-gray-800/80">
+            <div
+              onClick={() => setFinancialOpen(!financialOpen)}
+              className={`flex items-center justify-between px-3.5 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                isFinancialActive 
+                  ? 'bg-emerald-700 text-white font-bold shadow-md shadow-emerald-900/30' 
+                  : 'text-gray-300 hover:bg-gray-900 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                <Landmark className="w-4 h-4 text-emerald-300 flex-shrink-0" />
+                <span className="text-xs uppercase tracking-wider">Control Financiero</span>
+              </div>
+              {financialOpen ? (
+                <ChevronDown className="w-4 h-4 text-gray-400" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-gray-400" />
+              )}
+            </div>
+
+            {financialOpen && (
+              <div className="ml-3 pl-2 border-l border-emerald-900/40 space-y-1 mt-1.5 pb-2">
+                {financialSubItems.map((sub) => {
+                  const isSubActive = isFinancialActive && currentTab === sub.tab;
+                  return (
+                    <Link
+                      key={sub.tab}
+                      to={`/admin/financial?tab=${sub.tab}`}
                       onClick={() => setIsOpen(false)}
                       className={`flex items-center space-x-2.5 px-3 py-1.5 rounded-md text-xs transition-colors ${
                         isSubActive 
