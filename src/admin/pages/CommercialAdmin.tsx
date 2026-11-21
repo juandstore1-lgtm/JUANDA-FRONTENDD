@@ -481,10 +481,14 @@ export default function CommercialAdmin() {
   const [selectedProductEdit, setSelectedProductEdit] = useState<CommercialProduct | null>(null);
   const [isEditProductModalOpen, setIsEditProductModalOpen] = useState(false);
   const [editStoreTarget, setEditStoreTarget] = useState<StoreId>('republica');
-  const [editProductForm, setEditProductForm] = useState({
+  const [editProductForm, setEditProductForm] = useState<{
+    name: string;
+    costPrice: string | number;
+    stock: string | number;
+  }>({
     name: '',
-    costPrice: 0,
-    stock: 0
+    costPrice: '',
+    stock: ''
   });
   const [isNewProductModalOpen, setIsNewProductModalOpen] = useState(false);
 
@@ -492,10 +496,11 @@ export default function CommercialAdmin() {
     const targetStore: StoreId = invStoreFilter === 'all' ? 'republica' : (invStoreFilter as StoreId);
     setSelectedProductEdit(product);
     setEditStoreTarget(targetStore);
+    const storeStock = product.stocks[targetStore];
     setEditProductForm({
       name: product.name,
-      costPrice: product.costPrice,
-      stock: product.stocks[targetStore] || 0
+      costPrice: product.costPrice > 0 ? String(product.costPrice) : '',
+      stock: (storeStock !== undefined && storeStock !== null && storeStock > 0) ? String(storeStock) : ''
     });
     setIsEditProductModalOpen(true);
   };
@@ -503,9 +508,10 @@ export default function CommercialAdmin() {
   const handleSwitchEditStoreTarget = (storeId: StoreId) => {
     setEditStoreTarget(storeId);
     if (selectedProductEdit) {
+      const storeStock = selectedProductEdit.stocks[storeId];
       setEditProductForm(prev => ({
         ...prev,
-        stock: selectedProductEdit.stocks[storeId] || 0
+        stock: (storeStock !== undefined && storeStock !== null && storeStock > 0) ? String(storeStock) : ''
       }));
     }
   };
@@ -517,10 +523,10 @@ export default function CommercialAdmin() {
     const updated: CommercialProduct = {
       ...selectedProductEdit,
       name: editProductForm.name.trim().toUpperCase(),
-      costPrice: Number(editProductForm.costPrice),
+      costPrice: Number(editProductForm.costPrice) || 0,
       stocks: {
         ...selectedProductEdit.stocks,
-        [editStoreTarget]: Math.max(0, Number(editProductForm.stock))
+        [editStoreTarget]: Math.max(0, Number(editProductForm.stock) || 0)
       }
     };
 
@@ -540,13 +546,20 @@ export default function CommercialAdmin() {
   };
 
   // Formulario nuevo producto: Solo 1 Nombre/Categoría, Costo de compra y Stock en las 4 sedes
-  const [newProductForm, setNewProductForm] = useState({
+  const [newProductForm, setNewProductForm] = useState<{
+    name: string;
+    costPrice: string | number;
+    stockRepublica: string | number;
+    stockModelo: string | number;
+    stockQuality: string | number;
+    stockMariano: string | number;
+  }>({
     name: '',
-    costPrice: 0,
-    stockRepublica: 0,
-    stockModelo: 0,
-    stockQuality: 0,
-    stockMariano: 0
+    costPrice: '',
+    stockRepublica: '',
+    stockModelo: '',
+    stockQuality: '',
+    stockMariano: ''
   });
 
   const handleCreateProduct = (e: React.FormEvent) => {
@@ -556,12 +569,12 @@ export default function CommercialAdmin() {
     const prod: CommercialProduct = {
       id: `prod-${Date.now()}`,
       name: newProductForm.name.trim().toUpperCase(),
-      costPrice: Number(newProductForm.costPrice),
+      costPrice: Number(newProductForm.costPrice) || 0,
       stocks: {
-        republica: Number(newProductForm.stockRepublica),
-        modelo: Number(newProductForm.stockModelo),
-        quality: Number(newProductForm.stockQuality),
-        mariano: Number(newProductForm.stockMariano)
+        republica: Number(newProductForm.stockRepublica) || 0,
+        modelo: Number(newProductForm.stockModelo) || 0,
+        quality: Number(newProductForm.stockQuality) || 0,
+        mariano: Number(newProductForm.stockMariano) || 0
       }
     };
 
@@ -570,11 +583,11 @@ export default function CommercialAdmin() {
     setIsNewProductModalOpen(false);
     setNewProductForm({
       name: '',
-      costPrice: 0,
-      stockRepublica: 0,
-      stockModelo: 0,
-      stockQuality: 0,
-      stockMariano: 0
+      costPrice: '',
+      stockRepublica: '',
+      stockModelo: '',
+      stockQuality: '',
+      stockMariano: ''
     });
 
     Swal.fire({
@@ -2134,15 +2147,21 @@ export default function CommercialAdmin() {
                   Costo de compra ($) *
                 </label>
                 <input
-                  type="number"
-                  min="0"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="0"
                   required
-                  value={editProductForm.costPrice || ''}
-                  onChange={e => setEditProductForm({ ...editProductForm, costPrice: Number(e.target.value) })}
+                  value={editProductForm.costPrice}
+                  onFocus={e => e.target.select()}
+                  onChange={e => {
+                    const clean = e.target.value.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+                    setEditProductForm({ ...editProductForm, costPrice: clean });
+                  }}
                   className="w-full px-3 py-2 rounded-xl border border-gray-200 font-mono font-bold text-gray-900 focus:outline-emerald-600 focus:border-emerald-600"
                 />
                 <span className="text-[10px] text-gray-400 mt-1 block">
-                  Valor unitario: {formatPrice(editProductForm.costPrice)}
+                  Valor unitario: {formatPrice(Number(editProductForm.costPrice) || 0)}
                 </span>
               </div>
 
@@ -2161,11 +2180,17 @@ export default function CommercialAdmin() {
                 </p>
                 <div className="relative mt-2">
                   <input
-                    type="number"
-                    min="0"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="0"
                     required
                     value={editProductForm.stock}
-                    onChange={e => setEditProductForm({ ...editProductForm, stock: Number(e.target.value) })}
+                    onFocus={e => e.target.select()}
+                    onChange={e => {
+                      const clean = e.target.value.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+                      setEditProductForm({ ...editProductForm, stock: clean });
+                    }}
                     className="w-full px-3.5 py-2.5 bg-white rounded-xl border-2 border-emerald-600 font-mono font-black text-gray-900 text-base text-center focus:outline-hidden shadow-2xs"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
@@ -2224,11 +2249,17 @@ export default function CommercialAdmin() {
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Costo de compra ($) *</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   required
-                  placeholder="Ej: 35000"
-                  value={newProductForm.costPrice || ''}
-                  onChange={e => setNewProductForm({ ...newProductForm, costPrice: Number(e.target.value) })}
+                  placeholder="0"
+                  value={newProductForm.costPrice}
+                  onFocus={e => e.target.select()}
+                  onChange={e => {
+                    const clean = e.target.value.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+                    setNewProductForm({ ...newProductForm, costPrice: clean });
+                  }}
                   className="w-full px-2.5 py-2 rounded-xl border border-gray-200 font-mono font-bold"
                 />
               </div>
@@ -2240,40 +2271,64 @@ export default function CommercialAdmin() {
                   <div className="p-2 rounded-lg bg-gray-50 border border-gray-100">
                     <label className="text-[10px] font-bold text-gray-600 block">Sede República</label>
                     <input
-                      type="number"
-                      min="0"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      placeholder="0"
                       value={newProductForm.stockRepublica}
-                      onChange={e => setNewProductForm({ ...newProductForm, stockRepublica: Number(e.target.value) })}
+                      onFocus={e => e.target.select()}
+                      onChange={e => {
+                        const clean = e.target.value.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+                        setNewProductForm({ ...newProductForm, stockRepublica: clean });
+                      }}
                       className="w-full mt-1 px-2 py-1 bg-white rounded border border-gray-200 font-mono font-bold text-center"
                     />
                   </div>
                   <div className="p-2 rounded-lg bg-gray-50 border border-gray-100">
                     <label className="text-[10px] font-bold text-gray-600 block">Sede Ciudad Modelo</label>
                     <input
-                      type="number"
-                      min="0"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      placeholder="0"
                       value={newProductForm.stockModelo}
-                      onChange={e => setNewProductForm({ ...newProductForm, stockModelo: Number(e.target.value) })}
+                      onFocus={e => e.target.select()}
+                      onChange={e => {
+                        const clean = e.target.value.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+                        setNewProductForm({ ...newProductForm, stockModelo: clean });
+                      }}
                       className="w-full mt-1 px-2 py-1 bg-white rounded border border-gray-200 font-mono font-bold text-center"
                     />
                   </div>
                   <div className="p-2 rounded-lg bg-gray-50 border border-gray-100">
                     <label className="text-[10px] font-bold text-gray-600 block">Sede Quality Store</label>
                     <input
-                      type="number"
-                      min="0"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      placeholder="0"
                       value={newProductForm.stockQuality}
-                      onChange={e => setNewProductForm({ ...newProductForm, stockQuality: Number(e.target.value) })}
+                      onFocus={e => e.target.select()}
+                      onChange={e => {
+                        const clean = e.target.value.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+                        setNewProductForm({ ...newProductForm, stockQuality: clean });
+                      }}
                       className="w-full mt-1 px-2 py-1 bg-white rounded border border-gray-200 font-mono font-bold text-center"
                     />
                   </div>
                   <div className="p-2 rounded-lg bg-gray-50 border border-gray-100">
                     <label className="text-[10px] font-bold text-gray-600 block">Sede Mariano Ramos</label>
                     <input
-                      type="number"
-                      min="0"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      placeholder="0"
                       value={newProductForm.stockMariano}
-                      onChange={e => setNewProductForm({ ...newProductForm, stockMariano: Number(e.target.value) })}
+                      onFocus={e => e.target.select()}
+                      onChange={e => {
+                        const clean = e.target.value.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+                        setNewProductForm({ ...newProductForm, stockMariano: clean });
+                      }}
                       className="w-full mt-1 px-2 py-1 bg-white rounded border border-gray-200 font-mono font-bold text-center"
                     />
                   </div>
