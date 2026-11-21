@@ -143,16 +143,31 @@ export default function FinancialAdmin() {
     return '$' + Math.round(val).toLocaleString('es-CO');
   };
 
+  const getMonthYearKey = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length < 2) return '';
+    const y = parts[0];
+    const m = parts[1];
+    const monthMap: Record<string, string> = {
+      '01': 'Enero', '02': 'Febrero', '03': 'Marzo', '04': 'Abril',
+      '05': 'Mayo', '06': 'Junio', '07': 'Julio', '08': 'Agosto',
+      '09': 'Septiembre', '10': 'Octubre', '11': 'Noviembre', '12': 'Diciembre'
+    };
+    return `${monthMap[m] || m} ${y}`;
+  };
+
   // Filtered Expenses by Store & Month
   const filteredExpenses = useMemo(() => {
     return data.expenses.filter(exp => {
+      const matchMonth = !exp.date || getMonthYearKey(exp.date) === selectedMonth;
       const matchStore = selectedStore === 'Todas las sedes' || exp.store === selectedStore || exp.store === 'Todas las sedes';
       const matchSearch = exp.concept.toLowerCase().includes(expenseSearch.toLowerCase()) ||
                           exp.category.toLowerCase().includes(expenseSearch.toLowerCase());
       const matchCategory = expenseFilterCategory === 'Todas' || exp.category === expenseFilterCategory;
-      return matchStore && matchSearch && matchCategory;
+      return matchMonth && matchStore && matchSearch && matchCategory;
     });
-  }, [data.expenses, selectedStore, expenseSearch, expenseFilterCategory]);
+  }, [data.expenses, selectedMonth, selectedStore, expenseSearch, expenseFilterCategory]);
 
   // Expenses KPIs
   const totalExpenses = useMemo(() => {
