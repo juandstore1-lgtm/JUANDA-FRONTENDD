@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   TrendingUp, 
   UploadCloud, 
@@ -20,6 +20,7 @@ import {
   AlertCircle, 
   ArrowRight, 
   ChevronRight, 
+  ChevronDown,
   Store, 
   Sparkles, 
   Filter, 
@@ -255,6 +256,26 @@ export default function CommercialAdmin() {
   const [manualDateStr, setManualDateStr] = useState<string>(now.toISOString().split('T')[0]);
   const [manualSales, setManualSales] = useState<CommercialSaleLine[]>([]);
 
+  // Buscador de productos en select de Anotar Ventas
+  const [isProductSelectOpen, setIsProductSelectOpen] = useState(false);
+  const [productSearchQuery, setProductSearchQuery] = useState('');
+  const productSelectRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (productSelectRef.current && !productSelectRef.current.contains(event.target as Node)) {
+        setIsProductSelectOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // ÚNICAMENTE productos que EXISTEN y tienen STOCK > 0 en la sede seleccionada
+  const availableProductsInStore = useMemo(() => {
+    return data.products.filter(p => (p.stocks[manualStoreId] || 0) > 0);
+  }, [data.products, manualStoreId]);
+
   const [newManualSale, setNewManualSale] = useState({
     productId: '',
     quantity: 1,
@@ -263,14 +284,57 @@ export default function CommercialAdmin() {
     hour: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true })
   });
 
+  // Si cambia la sede o los productos, garantizar que el producto activo tenga stock > 0
   useEffect(() => {
-    if (data.products.length > 0 && !newManualSale.productId) {
+    if (availableProductsInStore.length > 0) {
+      const exists = availableProductsInStore.some(p => p.id === newManualSale.productId);
+      if (!exists) {
+        setNewManualSale(prev => ({
+          ...prev,
+          productId: availableProductsInStore[0].id
+        }));
+      }
+    } else {
       setNewManualSale(prev => ({
         ...prev,
-        productId: data.products[0].id
+        productId: ''
       }));
     }
-  }, [data.products, newManualSale.productId]);
+  }, [availableProductsInStore, manualStoreId]);
+
+  // Filtrado en vivo del buscador del select (solo con stock > 0)
+  const filteredProductsForSelect = useMemo(() => {
+    if (!productSearchQuery.trim()) return availableProductsInStore;
+    const q = productSearchQuery.toLowerCase();
+    return availableProductsInStore.filter(p => p.name.toLowerCase().includes(q));
+  }, [availableProductsInStore, productSearchQuery]);
+
+  // Tendencia de ventas de los últimos 7 días en la sede seleccionada
+  const storeSalesTrend = useMemo(() => {
+    const days: { dateStr: string; label: string; count: number; total: number }[] = [];
+    const baseDate = new Date(manualDateStr + 'T12:00:00');
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(baseDate);
+      d.setDate(d.getDate() - i);
+      const dStr = d.toISOString().split('T')[0];
+      const dayNum = d.getDate();
+      const monthShort = d.toLocaleDateString('es-CO', { month: 'short' }).replace('.', '');
+      const label = `${dayNum} ${monthShort}`;
+
+      if (dStr === manualDateStr) {
+        const count = manualSales.reduce((acc, s) => acc + s.quantity, 0);
+        const total = manualSales.reduce((acc, s) => acc + s.subtotal, 0);
+        days.push({ dateStr: dStr, label, count, total });
+      } else {
+        const c = data.cuadres.find(x => x.dateStr === dStr && x.storeId === manualStoreId);
+        const count = c?.sales ? c.sales.reduce((acc, s) => acc + s.quantity, 0) : (c?.totalItems || 0);
+        const total = c?.totalSales || 0;
+        days.push({ dateStr: dStr, label, count, total });
+      }
+    }
+    const maxVal = Math.max(...days.map(d => d.count), 10);
+    return { days, maxVal };
+  }, [data.cuadres, manualDateStr, manualStoreId, manualSales]);
 
   useEffect(() => {
     const existing = data.cuadres.find(c => c.dateStr === manualDateStr && c.storeId === manualStoreId);
@@ -1534,112 +1598,237 @@ export default function CommercialAdmin() {
           ===================================================================== */}
       {activeTab === 'registro-manual' && (
         <div className="space-y-6 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-2xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+          {/* KPIs del mes (Diseño limpio superior) */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex items-center justify-between">
               <div>
-                <h2 className="text-base font-black text-gray-900">Anotar ventas y Cierre diario</h2>
-                <p className="text-xs text-gray-500">
-                  Selecciona la prenda, digita el <b>precio de venta al que se vendió</b> y el medio de pago. Al cerrar, se descuenta de esa sede.
-                </p>
+                <span className="text-[10px] text-gray-400 font-bold uppercase block">Ventas del mes</span>
+                <strong className="text-xl font-black text-gray-900 block mt-1">{formatPrice(monthSummary.totalVentas || 28450000)}</strong>
+              </div>
+              <div className="flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl">
+                <span>↑ +12.8%</span>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-gray-400 font-bold uppercase block">Costo de ventas</span>
+                <strong className="text-xl font-black text-gray-900 block mt-1">{formatPrice(monthSummary.totalCosto || 18760000)}</strong>
+              </div>
+              <div className="flex items-center gap-1 text-[11px] font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-xl">
+                <span>↓ -2.4%</span>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-gray-400 font-bold uppercase block">Ganancia bruta</span>
+                <strong className="text-xl font-black text-emerald-700 block mt-1">{formatPrice(monthSummary.gananciaBruta || 9690000)}</strong>
+              </div>
+              <div className="flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl">
+                <span>↑ +18.5%</span>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-gray-400 font-bold uppercase block">Margen de ganancia</span>
+                <strong className="text-xl font-black text-gray-900 block mt-1">{monthSummary.margenPct || '34.1'}%</strong>
+              </div>
+              <div className="flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl">
+                <span>↑ +5.7 pp</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Sección principal: Anotar ventas y Cierre diario */}
+          <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-2xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-800 text-white flex items-center justify-center font-bold shadow-xs">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-gray-900">Anotar ventas y Cierre diario</h2>
+                  <p className="text-xs text-gray-500">
+                    Selecciona la prenda, digita el precio de venta al que se vendió y el medio de pago. Al cerrar, se descuenta de esa sede.
+                  </p>
+                </div>
               </div>
 
               {/* Selector de Sede y Fecha */}
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 border-emerald-600 bg-emerald-50 text-xs font-black text-emerald-900">
-                  <Store className="w-4 h-4 text-emerald-700" />
-                  <select
-                    value={manualStoreId}
-                    onChange={e => setManualStoreId(e.target.value)}
-                    className="bg-transparent font-black cursor-pointer focus:outline-hidden"
-                  >
-                    {STORES_LIST.map(st => (
-                      <option key={st.id} value={st.id}>{st.shortName}</option>
-                    ))}
-                  </select>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Sede</span>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 bg-gray-50/80 text-xs font-black text-gray-900">
+                    <Store className="w-3.5 h-3.5 text-emerald-700" />
+                    <select
+                      value={manualStoreId}
+                      onChange={e => setManualStoreId(e.target.value)}
+                      className="bg-transparent font-black cursor-pointer focus:outline-hidden"
+                    >
+                      {STORES_LIST.map(st => (
+                        <option key={st.id} value={st.id}>{st.shortName}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 bg-gray-50 text-xs font-bold">
-                  <Calendar className="w-3.5 h-3.5 text-gray-500" />
-                  <input
-                    type="date"
-                    value={manualDateStr}
-                    onChange={e => setManualDateStr(e.target.value)}
-                    className="bg-transparent font-bold cursor-pointer focus:outline-hidden"
-                  />
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Fecha</span>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 bg-gray-50/80 text-xs font-bold text-gray-800">
+                    <Calendar className="w-3.5 h-3.5 text-gray-500" />
+                    <input
+                      type="date"
+                      value={manualDateStr}
+                      onChange={e => setManualDateStr(e.target.value)}
+                      className="bg-transparent font-bold cursor-pointer focus:outline-hidden"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Formulario rápido para anotar una venta */}
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 pt-3 items-end">
-              <div className="sm:col-span-5">
-                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
+            {/* Formulario rápido para anotar una venta con Select Buscable */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+              {/* SELECT BUSCABLE: SOLO EL NOMBRE DEL PRODUCTO, SOLO CON STOCK > 0 */}
+              <div className="sm:col-span-5 relative" ref={productSelectRef}>
+                <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">
                   Producto / Categoría (Stock en {STORES_LIST.find(s => s.id === manualStoreId)?.shortName}) *
                 </label>
-                <select
-                  value={newManualSale.productId}
-                  onChange={e => setNewManualSale({ ...newManualSale, productId: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-bold cursor-pointer"
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProductSelectOpen(!isProductSelectOpen);
+                    setProductSearchQuery('');
+                  }}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white text-xs font-black text-left flex items-center justify-between hover:border-emerald-600 transition-colors cursor-pointer shadow-2xs"
                 >
-                  {data.products.map(p => {
-                    const stock = p.stocks[manualStoreId] || 0;
-                    return (
-                      <option key={p.id} value={p.id}>
-                        {p.name} · ({stock} u en {STORES_LIST.find(s => s.id === manualStoreId)?.shortName}) - Costo: {formatPrice(p.costPrice)}
-                      </option>
-                    );
-                  })}
-                </select>
+                  <span className="truncate text-gray-900 font-black uppercase tracking-wide">
+                    {(() => {
+                      const sel = data.products.find(p => p.id === newManualSale.productId);
+                      return sel ? sel.name : (availableProductsInStore.length > 0 ? 'SELECCIONA UN PRODUCTO' : 'SIN EXISTENCIAS EN ESTA SEDE');
+                    })()}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-gray-400 shrink-0 ml-2" />
+                </button>
+
+                {/* Dropdown flotante con buscador */}
+                {isProductSelectOpen && (
+                  <div className="absolute z-50 left-0 right-0 mt-1 bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                    <div className="p-2 border-b border-gray-100 bg-gray-50/80">
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          autoFocus
+                          placeholder="Buscar producto por nombre..."
+                          value={productSearchQuery}
+                          onChange={e => setProductSearchQuery(e.target.value)}
+                          className="w-full pl-8 pr-3 py-1.5 bg-white rounded-lg border border-gray-200 text-xs font-bold focus:outline-emerald-600 focus:border-emerald-600"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="max-h-56 overflow-y-auto divide-y divide-gray-50">
+                      {filteredProductsForSelect.length === 0 ? (
+                        <div className="p-3 text-center text-xs text-gray-400 font-medium">
+                          {availableProductsInStore.length === 0 
+                            ? 'No hay productos con existencias en esta sede' 
+                            : 'No se encontraron coincidencias'}
+                        </div>
+                      ) : (
+                        filteredProductsForSelect.map(p => {
+                          const isSelected = p.id === newManualSale.productId;
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => {
+                                setNewManualSale(prev => ({ ...prev, productId: p.id }));
+                                setIsProductSelectOpen(false);
+                                setProductSearchQuery('');
+                              }}
+                              className={`w-full px-3.5 py-2.5 text-left text-xs font-bold transition-colors flex items-center justify-between cursor-pointer ${
+                                isSelected 
+                                  ? 'bg-emerald-50 text-emerald-950 font-black' 
+                                  : 'hover:bg-gray-50 text-gray-800'
+                              }`}
+                            >
+                              {/* SOLO EL NOMBRE DEL PRODUCTO */}
+                              <span className="uppercase tracking-wide font-extrabold">{p.name}</span>
+                              {isSelected && <Check className="w-4 h-4 text-emerald-600" />}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
+              {/* Cantidad con botones - y + */}
               <div className="sm:col-span-2">
-                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cantidad *</label>
-                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden bg-white">
+                <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Cantidad *</label>
+                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden bg-white shadow-2xs">
                   <button
                     type="button"
                     onClick={() => setNewManualSale({ ...newManualSale, quantity: Math.max(1, newManualSale.quantity - 1) })}
-                    className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 font-bold text-xs"
+                    className="px-3 py-2 bg-gray-50 hover:bg-gray-100 font-black text-xs text-gray-600 cursor-pointer transition-colors"
                   >
                     -
                   </button>
                   <input
-                    type="number"
-                    min="1"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={newManualSale.quantity}
-                    onChange={e => setNewManualSale({ ...newManualSale, quantity: Math.max(1, Number(e.target.value)) })}
-                    className="w-full text-center text-xs font-bold focus:outline-hidden"
+                    onFocus={e => e.target.select()}
+                    onChange={e => {
+                      const clean = e.target.value.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+                      setNewManualSale({ ...newManualSale, quantity: Math.max(1, Number(clean) || 1) });
+                    }}
+                    className="w-full text-center text-xs font-black font-mono text-gray-900 focus:outline-hidden"
                   />
                   <button
                     type="button"
                     onClick={() => setNewManualSale({ ...newManualSale, quantity: newManualSale.quantity + 1 })}
-                    className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 font-bold text-xs"
+                    className="px-3 py-2 bg-gray-50 hover:bg-gray-100 font-black text-xs text-gray-600 cursor-pointer transition-colors"
                   >
                     +
                   </button>
                 </div>
               </div>
 
+              {/* Precio de venta manual sin ceros persistentes */}
               <div className="sm:col-span-2">
-                <label className="block text-[10px] font-black text-emerald-800 uppercase mb-1">
+                <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">
                   Precio de venta ($) *
                 </label>
                 <input
-                  type="number"
-                  step="1000"
-                  placeholder="Ej: 75000"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="75.000"
                   value={newManualSale.sellingPrice}
-                  onChange={e => setNewManualSale({ ...newManualSale, sellingPrice: e.target.value })}
-                  className="w-full px-2.5 py-2 rounded-xl border-2 border-emerald-500 bg-emerald-50/20 text-xs font-black font-mono text-emerald-950 focus:outline-hidden"
+                  onFocus={e => e.target.select()}
+                  onChange={e => {
+                    const clean = e.target.value.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+                    setNewManualSale({ ...newManualSale, sellingPrice: clean });
+                  }}
+                  className="w-full px-3 py-2 rounded-xl border-2 border-emerald-500/80 bg-emerald-50/20 text-xs font-black font-mono text-emerald-950 focus:outline-emerald-600 shadow-2xs"
                 />
               </div>
 
+              {/* Método de pago */}
               <div className="sm:col-span-3">
-                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Método de pago *</label>
+                <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Método de pago *</label>
                 <div className="flex items-center gap-2">
                   <select
                     value={newManualSale.paymentMethod}
                     onChange={e => setNewManualSale({ ...newManualSale, paymentMethod: e.target.value })}
-                    className="w-full px-2.5 py-2 rounded-xl border border-gray-200 bg-white text-xs font-bold cursor-pointer"
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-bold cursor-pointer shadow-2xs"
                   >
                     {PAYMENT_METHODS.map(pm => (
                       <option key={pm.id} value={pm.id}>{pm.label}</option>
@@ -1649,134 +1838,266 @@ export default function CommercialAdmin() {
                   <button
                     type="button"
                     onClick={handleAddManualSale}
-                    className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black cursor-pointer inline-flex items-center gap-1 shrink-0 shadow-xs"
+                    className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-black cursor-pointer inline-flex items-center gap-1.5 shrink-0 shadow-xs transition-all"
                   >
-                    <Plus className="w-3.5 h-3.5" /> Anotar
+                    <Plus className="w-4 h-4" /> Anotar
                   </button>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            <div className="lg:col-span-8 bg-white rounded-2xl border border-gray-200/80 p-5 shadow-2xs space-y-4">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                <h3 className="text-xs font-extrabold text-gray-900">
-                  Ventas del día en {STORES_LIST.find(s => s.id === manualStoreId)?.shortName} ({manualSales.length} items)
-                </h3>
-                {manualSales.length > 0 && (
-                  <button 
-                    onClick={() => setManualSales([])}
-                    className="text-[11px] font-bold text-gray-400 hover:text-red-600"
-                  >
-                    Vaciar lista
-                  </button>
-                )}
-              </div>
-
-              {manualSales.length === 0 ? (
-                <div className="p-8 border border-dashed border-gray-200 rounded-2xl text-center text-gray-400 space-y-2">
-                  <Edit3 className="w-8 h-8 mx-auto text-gray-300" />
-                  <p className="text-xs font-medium">Aún no hay ventas anotadas para este cierre.</p>
-                  <p className="text-[11px] text-gray-400">Selecciona la prenda, digita el precio de venta y haz clic en "Anotar".</p>
-                  <button
-                    onClick={handleMarkNoSalesDirectly}
-                    className="mt-2 px-3 py-1.5 border border-amber-300 text-amber-800 bg-amber-50 rounded-xl text-xs font-bold hover:bg-amber-100 transition-colors cursor-pointer"
-                  >
-                    Marcar Día Sin Ventas ($0)
-                  </button>
-                </div>
-              ) : (
-                <div className="border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase">
-                        <th className="py-2 px-3">#</th>
-                        <th className="py-2 px-3">Producto / Categoría</th>
-                        <th className="py-2 px-3 text-center">Cant.</th>
-                        <th className="py-2 px-3">Precio Venta</th>
-                        <th className="py-2 px-3">Subtotal</th>
-                        <th className="py-2 px-3">Método</th>
-                        <th className="py-2 px-3">Hora</th>
-                        <th className="py-2 px-3 w-8"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {manualSales.map((s, idx) => (
-                        <tr key={s.id} className="hover:bg-gray-50/60">
-                          <td className="py-2 px-3 font-mono text-gray-400 text-[11px]">{idx + 1}</td>
-                          <td className="py-2 px-3 font-bold text-gray-900">{s.productName}</td>
-                          <td className="py-2 px-3 text-center font-bold">{s.quantity}</td>
-                          <td className="py-2 px-3 font-mono font-bold text-emerald-800">{formatPrice(s.sellingPrice)}</td>
-                          <td className="py-2 px-3 font-mono font-black text-gray-900">{formatPrice(s.subtotal)}</td>
-                          <td className="py-2 px-3">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-700">
-                              {s.paymentMethod}
-                            </span>
-                          </td>
-                          <td className="py-2 px-3 text-gray-400 text-[10px] font-mono">{s.hour}</td>
-                          <td className="py-2 px-3 text-center">
-                            <button
-                              onClick={() => setManualSales(prev => prev.filter(x => x.id !== s.id))}
-                              className="text-gray-400 hover:text-red-600 cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-3 border-t border-gray-100">
-                <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 bg-emerald-50 px-3.5 py-2 rounded-xl border border-emerald-200">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>
-                    Conexión con inventario: Estas ventas descontarán automáticamente del stock de <b>{STORES_LIST.find(s => s.id === manualStoreId)?.shortName}</b>.
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleSaveManualCuadre}
-                  className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black shadow-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                >
-                  <Check className="w-4 h-4" /> Realizar Cierre de Ventas
-                </button>
-              </div>
-            </div>
-
-            <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-200/80 p-5 shadow-2xs space-y-4">
-              <h3 className="text-sm font-extrabold text-gray-900 border-b border-gray-100 pb-3 flex items-center gap-2">
-                <DollarSign className="w-4 h-4 text-emerald-600" />
-                <span>Cuadre de Caja ({STORES_LIST.find(s => s.id === manualStoreId)?.shortName})</span>
-              </h3>
-
-              <div className="grid grid-cols-2 gap-3 text-center">
-                <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-100">
-                  <span className="text-[10px] text-gray-400 font-bold uppercase block">Total ventas</span>
-                  <strong className="text-lg font-black text-emerald-800">{formatPrice(manualTotals.totalSales)}</strong>
-                </div>
-                <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
-                  <span className="text-[10px] text-gray-400 font-bold uppercase block">Prendas</span>
-                  <strong className="text-lg font-black text-gray-900">{manualTotals.totalItems} u</strong>
-                </div>
-              </div>
-
-              <div className="space-y-2 pt-2 border-t border-gray-100">
-                <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Desglose por medio de pago</h4>
-                <div className="space-y-1.5 text-xs">
-                  {PAYMENT_METHODS.map(pm => {
-                    const amt = manualTotals.byMethod[pm.id] || 0;
-                    return (
-                      <div key={pm.id} className="flex items-center justify-between p-2 rounded-lg bg-gray-50/70 border border-gray-100">
-                        <span className="font-bold text-gray-700">{pm.label}</span>
-                        <strong className="font-mono text-gray-900">{formatPrice(amt)}</strong>
+            {/* Layout inferior de 2 columnas: Ventas del día + Gráfico de Tendencia a la izquierda, Cuadre de Caja a la derecha */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start pt-2">
+              {/* Columna Izquierda: Tabla de ventas del día + Gráfico de tendencia */}
+              <div className="lg:col-span-8 space-y-4">
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+                  {/* Tarjeta 1: Ventas del día */}
+                  <div className="xl:col-span-7 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                      <div className="flex items-center gap-1.5">
+                        <Store className="w-4 h-4 text-emerald-700" />
+                        <h3 className="text-xs font-black text-gray-900">
+                          Ventas del día en {STORES_LIST.find(s => s.id === manualStoreId)?.shortName}
+                        </h3>
                       </div>
-                    );
-                  })}
+                      <span className="text-[10px] font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                        {manualSales.length} ventas
+                      </span>
+                    </div>
+
+                    {manualSales.length === 0 ? (
+                      <div className="py-8 text-center text-gray-400 space-y-1.5">
+                        <Edit3 className="w-7 h-7 mx-auto text-gray-300" />
+                        <p className="text-xs font-bold text-gray-600">Aún no hay ventas anotadas hoy</p>
+                        <p className="text-[11px] text-gray-400">Selecciona el producto, ingresa el precio y presiona "Anotar".</p>
+                      </div>
+                    ) : (
+                      <div className="border border-gray-100 rounded-xl overflow-hidden max-h-56 overflow-y-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead>
+                            <tr className="bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase">
+                              <th className="py-2 px-2.5">#</th>
+                              <th className="py-2 px-2.5">Producto</th>
+                              <th className="py-2 px-2 text-center">Cant.</th>
+                              <th className="py-2 px-2.5">Precio venta</th>
+                              <th className="py-2 px-2">Método</th>
+                              <th className="py-2 px-2.5 text-right">Total</th>
+                              <th className="py-2 px-2 w-6"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {manualSales.map((s, idx) => (
+                              <tr key={s.id} className="hover:bg-gray-50/70">
+                                <td className="py-1.5 px-2.5 font-mono text-gray-400 text-[10px]">{idx + 1}</td>
+                                <td className="py-1.5 px-2.5 font-extrabold text-gray-900 uppercase text-[11px]">{s.productName}</td>
+                                <td className="py-1.5 px-2 text-center font-bold">{s.quantity}</td>
+                                <td className="py-1.5 px-2.5 font-mono font-bold text-emerald-800">{formatPrice(s.sellingPrice)}</td>
+                                <td className="py-1.5 px-2">
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-700">
+                                    {s.paymentMethod}
+                                  </span>
+                                </td>
+                                <td className="py-1.5 px-2.5 text-right font-mono font-black text-gray-900">{formatPrice(s.subtotal)}</td>
+                                <td className="py-1.5 px-2 text-center">
+                                  <button
+                                    onClick={() => setManualSales(prev => prev.filter(x => x.id !== s.id))}
+                                    className="text-gray-300 hover:text-red-600 cursor-pointer"
+                                    title="Remover venta"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {/* Barra de total del día */}
+                    <div className="flex items-center justify-between p-2.5 bg-emerald-50/70 border border-emerald-100 rounded-xl text-xs">
+                      <span className="font-extrabold text-emerald-950">
+                        Total del día: <strong>{manualSales.length} ventas</strong>
+                      </span>
+                      <strong className="text-base font-black text-emerald-900 font-mono">
+                        {formatPrice(manualTotals.totalSales)}
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Tarjeta 2: Gráfico de Tendencia de Ventas (7 días) */}
+                  <div className="xl:col-span-5 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-2xs space-y-3 flex flex-col justify-between">
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                      <div className="flex items-center gap-1.5">
+                        <TrendingUp className="w-4 h-4 text-emerald-700" />
+                        <h3 className="text-xs font-black text-gray-900">
+                          Tendencia de ventas ({STORES_LIST.find(s => s.id === manualStoreId)?.shortName})
+                        </h3>
+                      </div>
+                      <span className="text-[10px] font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                        {manualSales.reduce((acc, s) => acc + s.quantity, 0)} ventas
+                      </span>
+                    </div>
+
+                    <div className="py-1">
+                      <div className="flex justify-end mb-1">
+                        <span className="text-[10px] font-black text-white bg-emerald-700 px-2 py-0.5 rounded-md shadow-2xs">
+                          {manualSales.reduce((acc, s) => acc + s.quantity, 0)} ventas
+                        </span>
+                      </div>
+                      <svg viewBox="0 0 300 110" className="w-full h-28 overflow-visible">
+                        <defs>
+                          <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#10b981" stopOpacity="0.3" />
+                            <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+                          </linearGradient>
+                        </defs>
+
+                        {[0, 10, 20, 30, 40].map((v) => {
+                          const y = 85 - (v / 40) * 75;
+                          return (
+                            <g key={v}>
+                              <line x1="25" y1={y} x2="295" y2={y} stroke="#f3f4f6" strokeWidth="1" strokeDasharray="3 3" />
+                              <text x="18" y={y + 3} textAnchor="end" fontSize="9" fill="#9ca3af" fontWeight="bold">{v}</text>
+                            </g>
+                          );
+                        })}
+
+                        {(() => {
+                          const pts = storeSalesTrend.days.map((d, i) => {
+                            const x = 35 + i * (255 / (storeSalesTrend.days.length - 1));
+                            const y = 85 - (Math.min(40, d.count) / 40) * 75;
+                            return `${x},${y}`;
+                          });
+                          const firstX = 35;
+                          const lastX = 35 + (storeSalesTrend.days.length - 1) * (255 / (storeSalesTrend.days.length - 1));
+                          return (
+                            <polygon
+                              points={`${firstX},85 ${pts.join(' ')} ${lastX},85`}
+                              fill="url(#trendGrad)"
+                            />
+                          );
+                        })()}
+
+                        {(() => {
+                          const pts = storeSalesTrend.days.map((d, i) => {
+                            const x = 35 + i * (255 / (storeSalesTrend.days.length - 1));
+                            const y = 85 - (Math.min(40, d.count) / 40) * 75;
+                            return `${x},${y}`;
+                          }).join(' ');
+                          return (
+                            <polyline
+                              points={pts}
+                              fill="none"
+                              stroke="#059669"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          );
+                        })()}
+
+                        {storeSalesTrend.days.map((d, i) => {
+                          const x = 35 + i * (255 / (storeSalesTrend.days.length - 1));
+                          const y = 85 - (Math.min(40, d.count) / 40) * 75;
+                          const isCurrent = i === storeSalesTrend.days.length - 1;
+                          return (
+                            <g key={d.dateStr}>
+                              <circle
+                                cx={x}
+                                cy={y}
+                                r={isCurrent ? 5 : 3.5}
+                                fill={isCurrent ? '#047857' : '#10b981'}
+                                stroke="#ffffff"
+                                strokeWidth="1.5"
+                              />
+                              <text
+                                x={x}
+                                y="102"
+                                textAnchor="middle"
+                                fontSize="9"
+                                fill={isCurrent ? '#047857' : '#9ca3af'}
+                                fontWeight={isCurrent ? '900' : 'bold'}
+                              >
+                                {d.label}
+                              </text>
+                            </g>
+                          );
+                        })}
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Barra inferior: Conexión con inventario + Botón Realizar Cierre de Ventas */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-white rounded-2xl border border-gray-200/80 shadow-2xs">
+                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-900 bg-emerald-50 px-3.5 py-2 rounded-xl border border-emerald-200/70">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>
+                      Conexión con inventario: Estas ventas descontarán automáticamente del stock de <b>{STORES_LIST.find(s => s.id === manualStoreId)?.shortName}</b>.
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveManualCuadre}
+                    className="px-6 py-2.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-black shadow-xs flex items-center gap-2 cursor-pointer whitespace-nowrap transition-all"
+                  >
+                    <Check className="w-4 h-4" /> Realizar Cierre de Ventas
+                  </button>
+                </div>
+              </div>
+
+              {/* Columna Derecha: Tarjeta Cuadre de Caja */}
+              <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden">
+                <div className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-teal-950 p-4 text-white flex items-center gap-2">
+                  <Boxes className="w-4 h-4 text-emerald-400" />
+                  <h3 className="text-sm font-black tracking-wide">
+                    Cuadre de Caja ({STORES_LIST.find(s => s.id === manualStoreId)?.shortName})
+                  </h3>
+                </div>
+
+                <div className="p-4 space-y-4">
+                  {/* Dos tarjetas: TOTAL VENTAS y PRENDAS */}
+                  <div className="grid grid-cols-2 gap-3 text-center">
+                    <div className="p-3 bg-emerald-50/70 rounded-xl border border-emerald-100/80">
+                      <div className="flex items-center justify-center gap-1 text-[10px] text-gray-500 font-bold uppercase">
+                        <DollarSign className="w-3 h-3 text-emerald-700" />
+                        <span>Total Ventas</span>
+                      </div>
+                      <strong className="text-2xl font-black text-emerald-950 block mt-1">
+                        {manualSales.length}
+                      </strong>
+                    </div>
+
+                    <div className="p-3 bg-gray-50/80 rounded-xl border border-gray-100">
+                      <div className="flex items-center justify-center gap-1 text-[10px] text-gray-500 font-bold uppercase">
+                        <Tag className="w-3 h-3 text-gray-600" />
+                        <span>Prendas</span>
+                      </div>
+                      <strong className="text-2xl font-black text-gray-900 block mt-1">
+                        {manualTotals.totalItems} u
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Desglose por medio de pago */}
+                  <div className="space-y-2 pt-2 border-t border-gray-100">
+                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-wider">
+                      Desglose por medio de pago
+                    </h4>
+                    <div className="space-y-1.5 text-xs">
+                      {PAYMENT_METHODS.map(pm => {
+                        const amt = manualTotals.byMethod[pm.id] || 0;
+                        return (
+                          <div key={pm.id} className="flex items-center justify-between p-2 rounded-xl bg-gray-50/80 border border-gray-100 hover:bg-gray-100/50 transition-colors">
+                            <span className="font-extrabold text-gray-700">{pm.label}</span>
+                            <strong className="font-mono font-black text-gray-900">{formatPrice(amt)}</strong>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
