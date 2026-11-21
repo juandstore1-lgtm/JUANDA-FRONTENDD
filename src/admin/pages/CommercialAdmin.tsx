@@ -275,6 +275,7 @@ export default function CommercialAdmin() {
   const [aiInlineImages, setAiInlineImages] = useState<string[]>([]);
   const [aiInlineIsScanning, setAiInlineIsScanning] = useState(false);
   const [aiInlineExtractedSales, setAiInlineExtractedSales] = useState<CommercialSaleLine[]>([]);
+  const [geminiApiKey, setGeminiApiKey] = useState<string>(() => localStorage.getItem('juand_gemini_api_key') || '');
   const aiFileInputRef = useRef<HTMLInputElement>(null);
 
   // Buscador de productos en select de Anotar Ventas
@@ -324,22 +325,30 @@ export default function CommercialAdmin() {
   };
 
   const handleConfigureGeminiKey = () => {
-    const currentKey = localStorage.getItem('juand_gemini_api_key') || '';
+    const currentKey = geminiApiKey || localStorage.getItem('juand_gemini_api_key') || '';
     Swal.fire({
       title: '🔑 Configurar Gemini API Key',
       html: `
-        <div class="text-left text-xs text-gray-600 space-y-2">
-          <p>Para lectura en vivo de libretas físicas con <b>Google Gemini Vision</b>, ingresa tu API Key gratuita de Google AI Studio:</p>
-          <input id="swal-gemini-key" type="password" class="swal2-input text-xs" placeholder="AIzaSy..." value="${currentKey}" style="width: 100%; box-sizing: border-box; font-size: 12px; margin: 8px 0;" />
-          <p class="text-[11px] text-gray-500">
-            ¿No tienes una? Puedes obtenerla gratis en <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: #059669; font-weight: bold; text-decoration: underline;">Google AI Studio</a>.
-          </p>
+        <div class="text-left text-xs text-gray-700 space-y-3">
+          <p>Para examinar y extraer en vivo cualquier foto o libreta manuscrita con <b>Google Gemini Vision</b>, ingresa tu API Key gratuita de Google AI Studio:</p>
+          <div class="p-2.5 bg-purple-50 border border-purple-200 rounded-xl space-y-1.5">
+            <p class="font-bold text-purple-950 text-xs">¿Cómo obtenerla gratis en 10 segundos?</p>
+            <ol class="list-decimal list-inside text-[11px] text-purple-800 space-y-1">
+              <li>Haz clic aquí para abrir <a href="https://aistudio.google.com/app/apikey" target="_blank" class="font-black text-purple-700 underline">Google AI Studio</a>.</li>
+              <li>Inicia sesión con tu cuenta de Google y pulsa <b>"Create API key"</b>.</li>
+              <li>Copia la clave generada y pégala aquí abajo:</li>
+            </ol>
+          </div>
+          <input id="swal-gemini-key" type="password" class="swal2-input text-xs" placeholder="AIzaSy..." value="${currentKey}" style="width: 100%; box-sizing: border-box; font-size: 13px; margin: 8px 0;" />
         </div>
       `,
       showCancelButton: true,
       confirmButtonText: 'Guardar Clave',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#059669',
+      showDenyButton: !!currentKey,
+      denyButtonText: 'Eliminar Clave',
+      denyButtonColor: '#dc2626',
+      confirmButtonColor: '#7c3aed',
       preConfirm: () => {
         const val = (document.getElementById('swal-gemini-key') as HTMLInputElement)?.value?.trim() || '';
         return val;
@@ -348,11 +357,23 @@ export default function CommercialAdmin() {
       if (res.isConfirmed) {
         if (res.value) {
           localStorage.setItem('juand_gemini_api_key', res.value);
-          Swal.fire({ icon: 'success', title: 'API Key Guardada', text: 'Ahora la IA usará Google Gemini Vision en vivo para leer las fotos de libreta.', confirmButtonColor: '#059669' });
-        } else {
-          localStorage.removeItem('juand_gemini_api_key');
-          Swal.fire({ icon: 'info', title: 'Modo Predeterminado Activo', text: 'Se utilizará el extractor de alta precisión de libreta.', confirmButtonColor: '#059669' });
+          setGeminiApiKey(res.value);
+          Swal.fire({
+            icon: 'success',
+            title: 'API Key Guardada',
+            text: '¡Listo! Ahora la IA examinará y extraerá en tiempo real cualquier foto de cuaderno o libreta que subas.',
+            confirmButtonColor: '#059669'
+          });
         }
+      } else if (res.isDenied) {
+        localStorage.removeItem('juand_gemini_api_key');
+        setGeminiApiKey('');
+        Swal.fire({
+          icon: 'info',
+          title: 'API Key Eliminada',
+          text: 'Se eliminó la clave de Gemini de este navegador.',
+          confirmButtonColor: '#059669'
+        });
       }
     });
   };
@@ -368,29 +389,85 @@ export default function CommercialAdmin() {
       return;
     }
 
+    let activeKey = geminiApiKey || localStorage.getItem('juand_gemini_api_key') || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+
+    if (!activeKey) {
+      const result = await Swal.fire({
+        title: '🔑 Activar Inteligencia Artificial en Vivo',
+        html: `
+          <div class="text-left text-xs text-gray-700 space-y-3">
+            <p>Para examinar y extraer <b>cualquier cuaderno o libreta nueva en tiempo real</b>, la IA de visión necesita conectarse con Google Gemini.</p>
+            <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-2">
+              <p class="font-bold text-purple-950 text-xs">¿Cómo activarla gratis en 10 segundos?</p>
+              <ol class="list-decimal list-inside text-[11px] text-purple-800 space-y-1">
+                <li>Abre <a href="https://aistudio.google.com/app/apikey" target="_blank" class="font-bold text-purple-700 underline">Google AI Studio</a> con tu cuenta de Google.</li>
+                <li>Pulsa el botón azul <b>"Create API key"</b> y cópiala.</li>
+                <li>Pégala aquí abajo y pulsa Guardar:</li>
+              </ol>
+            </div>
+            <input id="swal-prompt-inline-key" type="password" class="swal2-input text-xs" placeholder="Pega tu API Key de Gemini aquí (AIzaSy...)" style="width: 100%; box-sizing: border-box; font-size: 13px; margin: 8px 0;" />
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: '⚡ Guardar y Examinar Libreta',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#7c3aed',
+        preConfirm: () => {
+          const val = (document.getElementById('swal-prompt-inline-key') as HTMLInputElement)?.value?.trim();
+          if (!val) {
+            Swal.showValidationMessage('Por favor pega tu API Key para poder examinar la libreta');
+            return false;
+          }
+          return val;
+        }
+      });
+
+      if (!result.isConfirmed || !result.value) {
+        return;
+      }
+
+      activeKey = result.value;
+      localStorage.setItem('juand_gemini_api_key', activeKey);
+      setGeminiApiKey(activeKey);
+    }
+
     setAiInlineIsScanning(true);
 
-    const geminiKey = localStorage.getItem('juand_gemini_api_key') || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+    try {
+      let allExtracted: CommercialSaleLine[] = [];
+      const catalogNames = data.products.map(p => `- ${p.name} (Ref. costo: $${p.costPrice})`).join('\n');
 
-    if (geminiKey) {
-      try {
-        let allExtracted: CommercialSaleLine[] = [];
-        const catalogList = data.products.map(p => p.name).join(', ');
+      const prompt = `Actúa como un contador y auditor de inventario experto en tiendas de ropa de Colombia.
+Analiza con total fidelidad y precisión la fotografía adjunta de la libreta física de ventas manuscritas.
+Examina CADA FILA escrita a mano. NO inventes renglones y NO omitas ninguna fila visible en la imagen.
 
-        for (let i = 0; i < aiInlineImages.length; i++) {
-          const base64Image = aiInlineImages[i];
-          const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, '');
-          const mimeType = base64Image.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
+Catálogo oficial de productos disponible en la tienda:
+${catalogNames}
 
-          const prompt = `Analiza detalladamente la fotografía de la libreta física de ventas de ropa.
-Extrae CADA FILA de venta individualmente, sin omitir ninguna.
-Catálogo disponible en la tienda: ${catalogList}.
-Medios de pago posibles: Efectivo, Bold, Addi, Datáfono, Nequi, Daviplata, Sistecrédito.
-(Si dice Tarjeta, regístralo como Datáfono).
-Devuelve ÚNICAMENTE un array JSON con este formato para cada fila:
+Para cada renglón de venta manuscrito que detectes en la página, extrae:
+1. productName: Empareja la prenda manuscrita con el producto más similar del catálogo oficial anterior.
+   Ejemplos habituales en libretas de ropa:
+   - "Camis 1.1", "Camisa 1.1" -> CAMISAS ALTA GAMA
+   - "Saco 1.1" -> SACOS 1.1
+   - "Camisa FB", "Camisa" -> CAMISAS FB
+   - "Jean", "Jeans" -> JEANS
+   - "Zapatillas", "Tenis" -> ZAPATILLAS
+   - "mocho", "Mochos" -> MOCHOS
+   - "Sudadera" -> SUDADERAS
+   - "media", "Medias" -> MEDIAS
+   - "Esqueleto FB", "Esqueleto" -> ESQUELETO FB
+   - "Chaqueta" -> CHAQUETAS
+   - "Conjunto" -> CONJUNTOS
+   - "Gorra" -> GORRAS
+2. quantity: Cantidad de prendas (número entero, default 1).
+3. sellingPrice: Precio de venta unitario en pesos colombianos como número entero sin puntos ni signos (ej: 75000, 125000, 45000, 5000, 60000, 115000). Si varias prendas suman un total conjunto agrupado con una llave o flecha, calcula o divide el precio unitario correspondiente.
+4. paymentMethod: Uno de los siguientes métodos oficiales: "Efectivo", "Bold", "Addi", "Datáfono", "Nequi", "Daviplata", "Sistecrédito". Si en el renglón dice "Tarjeta", asígnalo como "Datáfono". Si la casilla de método está en blanco, usa "Efectivo".
+5. hour: Hora de la venta si está escrita (ej: "07:45 a. m.", "02:40 p. m.", "11:33 a. m."). Si no aparece, deja "".
+
+Devuelve ÚNICAMENTE un array JSON con esta estructura exacta, sin texto introductorio ni bloques markdown:
 [
   {
-    "productName": "Nombre exacto más cercano del catálogo",
+    "productName": "CAMISAS ALTA GAMA",
     "quantity": 1,
     "sellingPrice": 75000,
     "paymentMethod": "Efectivo",
@@ -398,277 +475,167 @@ Devuelve ÚNICAMENTE un array JSON con este formato para cada fila:
   }
 ]`;
 
-          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: prompt },
-                  { inline_data: { mime_type: mimeType, data: cleanBase64 } }
-                ]
-              }]
-            })
-          });
+      const candidateModels = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-2.5-flash'];
 
-          const resJson = await response.json();
-          const textOutput = resJson?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (textOutput) {
-            const jsonMatch = textOutput.match(/\[[\s\S]*\]/);
-            if (jsonMatch) {
-              const parsed = JSON.parse(jsonMatch[0]);
-              parsed.forEach((l: any, idx: number) => {
-                const matchedProd = data.products.find(p => p.name.toUpperCase() === String(l.productName).toUpperCase()) ||
-                                    data.products.find(p => p.name.toUpperCase().includes(String(l.productName).toUpperCase())) ||
-                                    data.products[0];
-                const q = Math.max(1, Number(l.quantity) || 1);
-                const sp = Number(l.sellingPrice) || 50000;
-                const pm = PAYMENT_METHODS.some(m => m.id.toLowerCase() === String(l.paymentMethod).toLowerCase())
-                  ? PAYMENT_METHODS.find(m => m.id.toLowerCase() === String(l.paymentMethod).toLowerCase())!.id
-                  : (String(l.paymentMethod).toLowerCase().includes('tarjeta') ? 'Datáfono' : 'Efectivo');
+      for (let i = 0; i < aiInlineImages.length; i++) {
+        const base64Image = aiInlineImages[i];
+        const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, '');
+        const mimeType = base64Image.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
 
-                allExtracted.push({
-                  id: `ai-gemini-${Date.now()}-${i}-${idx}`,
-                  productId: matchedProd.id,
-                  productName: matchedProd.name,
-                  quantity: q,
-                  costPrice: matchedProd.costPrice,
-                  sellingPrice: sp,
-                  subtotal: q * sp,
-                  costTotal: q * matchedProd.costPrice,
-                  profit: (q * sp) - (q * matchedProd.costPrice),
-                  paymentMethod: pm,
-                  hour: l.hour || new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true }),
-                  verified: true
-                });
-              });
+        let responseText = '';
+        let lastErrorMsg = '';
+
+        for (const modelName of candidateModels) {
+          try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${activeKey}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{
+                  parts: [
+                    { text: prompt },
+                    { inline_data: { mime_type: mimeType, data: cleanBase64 } }
+                  ]
+                }],
+                generationConfig: {
+                  temperature: 0.1,
+                  responseMimeType: 'application/json'
+                }
+              })
+            });
+
+            if (res.ok) {
+              const resJson = await res.json();
+              responseText = resJson?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+              if (responseText) break;
+            } else {
+              const errObj = await res.json().catch(() => ({}));
+              lastErrorMsg = errObj?.error?.message || `HTTP ${res.status}: ${res.statusText}`;
+              if (res.status === 400 || res.status === 403) {
+                throw new Error(lastErrorMsg);
+              }
+            }
+          } catch (modelErr: any) {
+            lastErrorMsg = modelErr.message;
+            if (lastErrorMsg.toLowerCase().includes('api_key') || lastErrorMsg.toLowerCase().includes('key not valid')) {
+              throw modelErr;
             }
           }
         }
 
-        if (allExtracted.length > 0) {
-          setAiInlineExtractedSales(allExtracted);
-          setAiInlineIsScanning(false);
-          Swal.fire({
-            icon: 'success',
-            title: 'Lectura con Gemini Vision Completada',
-            html: `<p class="text-xs text-gray-700">Se detectaron <b>${allExtracted.length} filas de venta</b> en vivo desde las fotos de libreta.</p>`,
-            confirmButtonColor: '#059669'
-          });
-          return;
+        if (!responseText) {
+          throw new Error(lastErrorMsg || 'No se pudo obtener respuesta del modelo de Gemini Vision.');
         }
-      } catch (err: any) {
-        console.warn('Fallback a extractor de precisión local:', err);
-      }
-    }
 
-    // Extractor de precisión fila por fila de libreta física
-    setTimeout(() => {
+        const cleanJsonStr = responseText.replace(/```(?:json)?\s*/gi, '').replace(/```\s*$/gi, '').trim();
+        const jsonMatch = cleanJsonStr.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) {
+          throw new Error('La IA no devolvió un formato de filas válido para esta imagen.');
+        }
+
+        const parsedRows = JSON.parse(jsonMatch[0]);
+        if (Array.isArray(parsedRows)) {
+          parsedRows.forEach((l: any, idx: number) => {
+            const rawName = String(l.productName || '').trim();
+            const cleanSearch = rawName.toUpperCase();
+
+            let matchedProd = data.products.find(p => p.name.toUpperCase() === cleanSearch) ||
+                              data.products.find(p => p.name.toUpperCase().includes(cleanSearch) || cleanSearch.includes(p.name.toUpperCase()));
+            if (!matchedProd) {
+              const words = cleanSearch.split(/[\s-]+/).filter(w => w.length > 2);
+              matchedProd = data.products.find(p => words.some(w => p.name.toUpperCase().includes(w)));
+            }
+            if (!matchedProd) {
+              matchedProd = data.products[0];
+            }
+
+            const q = Math.max(1, Number(l.quantity) || 1);
+            let sp = Number(String(l.sellingPrice || '').replace(/[^\d]/g, '')) || matchedProd.costPrice || 50000;
+            if (sp < 1000) sp = sp * 1000;
+
+            let pm = 'Efectivo';
+            const pmLower = String(l.paymentMethod || '').toLowerCase();
+            if (pmLower.includes('bold')) pm = 'Bold';
+            else if (pmLower.includes('addi')) pm = 'Addi';
+            else if (pmLower.includes('tarjeta') || pmLower.includes('datafono') || pmLower.includes('datáfono')) pm = 'Datáfono';
+            else if (pmLower.includes('nequi')) pm = 'Nequi';
+            else if (pmLower.includes('daviplata')) pm = 'Daviplata';
+            else if (pmLower.includes('siste')) pm = 'Sistecrédito';
+            else pm = 'Efectivo';
+
+            allExtracted.push({
+              id: `ai-live-${Date.now()}-${i}-${idx}-${Math.random().toString(36).substr(2, 4)}`,
+              productId: matchedProd.id,
+              productName: matchedProd.name,
+              quantity: q,
+              costPrice: matchedProd.costPrice,
+              sellingPrice: sp,
+              subtotal: q * sp,
+              costTotal: q * matchedProd.costPrice,
+              profit: (q * sp) - (q * matchedProd.costPrice),
+              paymentMethod: pm,
+              hour: l.hour || new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true }),
+              verified: true
+            });
+          });
+        }
+      }
+
       setAiInlineIsScanning(false);
 
-      if (manualDateStr.endsWith('-19')) {
-        const prodZap = data.products.find(p => p.id === 'p-13') || data.products[0];
-        const detected19: CommercialSaleLine[] = [
-          {
-            id: `ai-nb-${Date.now()}-19-1`,
-            productId: prodZap.id,
-            productName: prodZap.name,
-            quantity: 1,
-            costPrice: prodZap.costPrice,
-            sellingPrice: 45000,
-            subtotal: 45000,
-            costTotal: prodZap.costPrice,
-            profit: 45000 - prodZap.costPrice,
-            paymentMethod: 'Efectivo',
-            hour: '05:33 p. m.',
-            verified: true
-          }
-        ];
-        setAiInlineExtractedSales(detected19);
+      if (allExtracted.length > 0) {
+        setAiInlineExtractedSales(allExtracted);
+        const totalPesos = allExtracted.reduce((acc, s) => acc + s.subtotal, 0);
         Swal.fire({
           icon: 'success',
-          title: 'Lectura de libreta completada (19 Nov)',
-          html: `<p class="text-xs text-gray-600">Se extrajo 1 venta de Zapatillas Restante por $45.000.</p>`,
+          title: '¡Lectura de Libreta Exitosa!',
+          html: `
+            <div class="text-left text-xs text-gray-700 space-y-2">
+              <p class="font-bold text-gray-900">La IA examinó tu libreta en vivo:</p>
+              <div class="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1 text-[11px]">
+                <p>• Ventas extraídas: <b>${allExtracted.length} filas</b></p>
+                <p>• Total del cuaderno: <b>${formatPrice(totalPesos)}</b></p>
+              </div>
+              <p class="text-gray-500 text-[11px]">Revisa y edita cualquier renglón en la tabla de la derecha antes de confirmar.</p>
+            </div>
+          `,
+          confirmButtonColor: '#059669',
+          confirmButtonText: 'Verificar Partidas'
+        });
+      } else {
+        Swal.fire({
+          icon: 'info',
+          title: 'No se detectaron ventas',
+          text: 'La IA no pudo identificar filas legibles de venta en la foto subida. Verifica la iluminación y el enfoque.',
           confirmButtonColor: '#059669'
         });
-        return;
       }
-
-      // Extracción exacta fila por fila del cuaderno real de ventas
-      const pCamisa11 = data.products.find(p => p.id === 'p-1') || data.products[0]; // CAMISAS ALTA GAMA (Camisa 1.1)
-      const pSaco11 = data.products.find(p => p.id === 'p-17') || data.products[0]; // SACOS 1.1
-      const pCamisaFB = data.products.find(p => p.id === 'p-2') || data.products[0]; // CAMISAS FB
-      const pJean = data.products.find(p => p.id === 'p-5') || data.products[0]; // JEANS
-      const pZapatillas = data.products.find(p => p.id === 'p-13') || data.products[0]; // ZAPATILLAS
-      const pMocho = data.products.find(p => p.id === 'p-6') || data.products[0]; // MOCHOS
-      const pSudadera = data.products.find(p => p.id === 'p-11') || data.products[0]; // SUDADERAS
-      const pMedias = data.products.find(p => p.id === 'p-10') || data.products[0]; // MEDIAS
-
-      const notebookSales: CommercialSaleLine[] = [
-        {
-          id: `ai-nb-${Date.now()}-1`,
-          productId: pCamisa11.id,
-          productName: pCamisa11.name,
-          quantity: 1,
-          costPrice: pCamisa11.costPrice,
-          sellingPrice: 75000,
-          subtotal: 75000,
-          costTotal: pCamisa11.costPrice,
-          profit: 75000 - pCamisa11.costPrice,
-          paymentMethod: 'Efectivo',
-          hour: '07:45 a. m.',
-          verified: true
-        },
-        {
-          id: `ai-nb-${Date.now()}-2`,
-          productId: pSaco11.id,
-          productName: pSaco11.name,
-          quantity: 1,
-          costPrice: pSaco11.costPrice,
-          sellingPrice: 125000,
-          subtotal: 125000,
-          costTotal: pSaco11.costPrice,
-          profit: 125000 - pSaco11.costPrice,
-          paymentMethod: 'Efectivo',
-          hour: '02:40 p. m.',
-          verified: true
-        },
-        {
-          id: `ai-nb-${Date.now()}-3`,
-          productId: pCamisaFB.id,
-          productName: pCamisaFB.name,
-          quantity: 1,
-          costPrice: pCamisaFB.costPrice,
-          sellingPrice: 60000,
-          subtotal: 60000,
-          costTotal: pCamisaFB.costPrice,
-          profit: 60000 - pCamisaFB.costPrice,
-          paymentMethod: 'Efectivo',
-          hour: '02:43 p. m.',
-          verified: true
-        },
-        {
-          id: `ai-nb-${Date.now()}-4`,
-          productId: pJean.id,
-          productName: pJean.name,
-          quantity: 1,
-          costPrice: pJean.costPrice,
-          sellingPrice: 150000,
-          subtotal: 150000,
-          costTotal: pJean.costPrice,
-          profit: 150000 - pJean.costPrice,
-          paymentMethod: 'Efectivo',
-          hour: '05:06 p. m.',
-          verified: true
-        },
-        {
-          id: `ai-nb-${Date.now()}-5`,
-          productId: pZapatillas.id,
-          productName: pZapatillas.name,
-          quantity: 1,
-          costPrice: pZapatillas.costPrice,
-          sellingPrice: 105000,
-          subtotal: 105000,
-          costTotal: pZapatillas.costPrice,
-          profit: 105000 - pZapatillas.costPrice,
-          paymentMethod: 'Bold',
-          hour: '07:34 p. m.',
-          verified: true
-        },
-        {
-          id: `ai-nb-${Date.now()}-6`,
-          productId: pCamisa11.id,
-          productName: pCamisa11.name,
-          quantity: 1,
-          costPrice: pCamisa11.costPrice,
-          sellingPrice: 75000,
-          subtotal: 75000,
-          costTotal: pCamisa11.costPrice,
-          profit: 75000 - pCamisa11.costPrice,
-          paymentMethod: 'Addi',
-          hour: '07:47 p. m.',
-          verified: true
-        },
-        {
-          id: `ai-nb-${Date.now()}-7`,
-          productId: pMocho.id,
-          productName: pMocho.name,
-          quantity: 1,
-          costPrice: pMocho.costPrice,
-          sellingPrice: 115000,
-          subtotal: 115000,
-          costTotal: pMocho.costPrice,
-          profit: 115000 - pMocho.costPrice,
-          paymentMethod: 'Datáfono',
-          hour: '08:05 p. m.',
-          verified: true
-        },
-        {
-          id: `ai-nb-${Date.now()}-8`,
-          productId: pJean.id,
-          productName: pJean.name,
-          quantity: 1,
-          costPrice: pJean.costPrice,
-          sellingPrice: 125000,
-          subtotal: 125000,
-          costTotal: pJean.costPrice,
-          profit: 125000 - pJean.costPrice,
-          paymentMethod: 'Datáfono',
-          hour: '08:05 p. m.',
-          verified: true
-        },
-        {
-          id: `ai-nb-${Date.now()}-9`,
-          productId: pSudadera.id,
-          productName: pSudadera.name,
-          quantity: 1,
-          costPrice: pSudadera.costPrice,
-          sellingPrice: 115000,
-          subtotal: 115000,
-          costTotal: pSudadera.costPrice,
-          profit: 115000 - pSudadera.costPrice,
-          paymentMethod: 'Datáfono',
-          hour: '08:05 p. m.',
-          verified: true
-        },
-        {
-          id: `ai-nb-${Date.now()}-10`,
-          productId: pMedias.id,
-          productName: pMedias.name,
-          quantity: 1,
-          costPrice: pMedias.costPrice,
-          sellingPrice: 5000,
-          subtotal: 5000,
-          costTotal: pMedias.costPrice,
-          profit: 5000 - pMedias.costPrice,
-          paymentMethod: 'Datáfono',
-          hour: '08:05 p. m.',
-          verified: true
-        }
-      ];
-
-      setAiInlineExtractedSales(notebookSales);
-
+    } catch (err: any) {
+      setAiInlineIsScanning(false);
       Swal.fire({
-        icon: 'success',
-        title: 'Lectura con IA completada',
+        icon: 'error',
+        title: 'Error de análisis con Gemini Vision',
         html: `
           <div class="text-left text-xs text-gray-700 space-y-2">
-            <p>Se extrajeron <b>10 partidas de venta fila por fila</b> exactamente como en la libreta:</p>
-            <div class="p-2.5 bg-gray-50 border border-gray-200 rounded-xl space-y-1 text-[11px] font-mono">
-              <p>• Efectivo: $410.000 (4 ventas)</p>
-              <p>• Bold: $105.000 (1 venta)</p>
-              <p>• Addi: $75.000 (1 venta)</p>
-              <p>• Datáfono / Tarjeta: $360.000 (4 ventas)</p>
-              <p class="font-bold text-emerald-800 text-xs mt-1 pt-1 border-t border-gray-200">TOTAL CUADERNO: $950.000 (10 prendas)</p>
+            <p>No se pudo procesar la fotografía con Google Gemini:</p>
+            <div class="p-2.5 bg-red-50 border border-red-200 text-red-800 rounded font-mono text-[11px] break-words">
+              ${err?.message || 'Error desconocido'}
             </div>
-            <p class="text-xs text-gray-500">Puedes verificar cada fila abajo y confirmar para agregarlas al día.</p>
+            <p class="text-[11px] text-gray-500 mt-2">
+              Verifica tu API Key de Gemini o genérala gratis en Google AI Studio.
+            </p>
           </div>
         `,
-        confirmButtonColor: '#059669',
-        confirmButtonText: 'Verificar y Confirmar'
+        showCancelButton: true,
+        confirmButtonText: '🔑 Configurar API Key',
+        cancelButtonText: 'Cerrar',
+        confirmButtonColor: '#7c3aed'
+      }).then(res => {
+        if (res.isConfirmed) {
+          handleConfigureGeminiKey();
+        }
       });
-    }, 1200);
+    }
   };
 
   const handleUpdateInlineExtractedSale = (
@@ -2651,10 +2618,19 @@ Devuelve ÚNICAMENTE un array JSON con este formato para cada fila:
                         <button
                           type="button"
                           onClick={handleConfigureGeminiKey}
-                          className="w-full py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                          className={`w-full py-1.5 px-3 rounded-xl text-[11px] font-bold flex items-center justify-between border transition-all cursor-pointer ${
+                            geminiApiKey
+                              ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+                              : 'bg-purple-50 hover:bg-purple-100 text-purple-900 border-purple-200'
+                          }`}
                         >
-                          <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-                          <span>{localStorage.getItem('juand_gemini_api_key') ? '🔑 Gemini API Key configurada' : '🔑 Configurar Gemini API Key (Google AI)'}</span>
+                          <span className="flex items-center gap-1.5">
+                            <Sparkles className={`w-3.5 h-3.5 ${geminiApiKey ? 'text-emerald-600' : 'text-purple-600'}`} />
+                            <span>{geminiApiKey ? '🟢 Gemini Vision Activo en vivo' : '⚡ Activar Gemini API Key (Gratis)'}</span>
+                          </span>
+                          <span className="text-[10px] underline font-medium">
+                            {geminiApiKey ? 'Cambiar' : 'Activar (10s)'}
+                          </span>
                         </button>
                       </div>
                     )}
@@ -2663,10 +2639,19 @@ Devuelve ÚNICAMENTE un array JSON con este formato para cada fila:
                       <button
                         type="button"
                         onClick={handleConfigureGeminiKey}
-                        className="w-full py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                        className={`w-full py-1.5 px-3 rounded-xl text-[11px] font-bold flex items-center justify-between border transition-all cursor-pointer ${
+                          geminiApiKey
+                            ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+                            : 'bg-purple-50 hover:bg-purple-100 text-purple-900 border-purple-200'
+                        }`}
                       >
-                        <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-                        <span>{localStorage.getItem('juand_gemini_api_key') ? '🔑 Gemini API Key configurada' : '🔑 Configurar Gemini API Key (Google AI)'}</span>
+                        <span className="flex items-center gap-1.5">
+                          <Sparkles className={`w-3.5 h-3.5 ${geminiApiKey ? 'text-emerald-600' : 'text-purple-600'}`} />
+                          <span>{geminiApiKey ? '🟢 Gemini Vision Activo en vivo' : '⚡ Activar Gemini API Key (Gratis)'}</span>
+                        </span>
+                        <span className="text-[10px] underline font-medium">
+                          {geminiApiKey ? 'Cambiar' : 'Activar (10s)'}
+                        </span>
                       </button>
                     )}
                   </div>
