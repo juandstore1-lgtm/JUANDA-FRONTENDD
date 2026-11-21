@@ -467,7 +467,7 @@ export default function TrabajaConNosotros() {
                       <span className="px-2 py-0.5 bg-yellow-400 text-black text-[10px] font-black rounded-md uppercase tracking-wider">
                         Temporada Navideña
                       </span>
-                      <span className="text-xs text-emerald-200 font-semibold">Contratación Rápida Cali</span>
+                      <span className="text-xs text-emerald-200 font-semibold">Cali · Fechas clave de Diciembre</span>
                     </div>
                     <h3 className="text-base sm:text-lg font-black mt-0.5 text-white">
                       Convocatoria Especial: Temporada Decembrina 2026
@@ -486,17 +486,14 @@ export default function TrabajaConNosotros() {
                     <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">{selectedVacancy.position}</h2>
                     {/* Brand Badges */}
                     <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                      {selectedVacancy.company && selectedVacancy.company.includes('Quality') && selectedVacancy.company.includes('Juan') ? (
+                      {selectedVacancy.company && selectedVacancy.company.toUpperCase().includes('QUALITY') && selectedVacancy.company.toUpperCase().includes('JUAN') ? (
                         <>
                           <span className="px-2.5 py-0.5 bg-black text-amber-300 text-[11px] font-black rounded border border-amber-500/30">
-                            Juan'D Store
+                            JUAND STORE
                           </span>
                           <span className="text-xs text-gray-400 font-bold">&</span>
                           <span className="px-2.5 py-0.5 bg-zinc-900 text-yellow-400 text-[11px] font-black rounded border border-yellow-500/30">
-                            Quality Store
-                          </span>
-                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded">
-                            Convocatoria unificada
+                            QUALITY STORE
                           </span>
                         </>
                       ) : (
@@ -1018,7 +1015,7 @@ export default function TrabajaConNosotros() {
                           <span>Sede de preferencia (Convocatoria multisede para todas las tiendas) *</span>
                         </label>
                         <p className="text-[11px] text-amber-800 leading-tight">
-                          Esta oferta aplica simultáneamente para <b>Juan'D Store</b> y <b>Quality Store</b>. Puedes elegir tu tienda de preferencia o indicar disponibilidad para cualquier sede.
+                          Esta oferta aplica simultáneamente para <b>JUAND STORE</b> y <b>QUALITY STORE</b>. Puedes elegir tu tienda de preferencia o indicar disponibilidad para cualquier sede.
                         </p>
                         <select
                           value={preferredSede}
@@ -1026,10 +1023,10 @@ export default function TrabajaConNosotros() {
                           className="w-full px-3 py-2 text-xs border border-amber-300 rounded-lg bg-white font-medium text-gray-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                         >
                           <option value="Disponible para cualquier sede (Recomendado)">⭐ Disponible para cualquier sede (Recomendado - Mayor oportunidad)</option>
-                          <option value="Sede Villacolombia (Juan'D Store)">Sede Villacolombia (Juan'D Store)</option>
-                          <option value="Sede República de Israel (Juan'D Store)">Sede República de Israel (Juan'D Store)</option>
-                          <option value="Sede Ciudad Modelo (Juan'D Store)">Sede Ciudad Modelo (Juan'D Store)</option>
-                          <option value="Sede Mariano Ramos (Quality Store)">Sede Mariano Ramos (Quality Store)</option>
+                          <option value="Sede Villacolombia (JUAND STORE)">Sede Villacolombia (JUAND STORE)</option>
+                          <option value="Sede República de Israel (JUAND STORE)">Sede República de Israel (JUAND STORE)</option>
+                          <option value="Sede Ciudad Modelo (JUAND STORE)">Sede Ciudad Modelo (JUAND STORE)</option>
+                          <option value="Sede Mariano Ramos (QUALITY STORE)">Sede Mariano Ramos (QUALITY STORE)</option>
                         </select>
                       </div>
                     )}

@@ -146,7 +146,7 @@ export default function RecruitmentAdmin() {
 
   // Empty Vacancy Form (starts 100% clean)
   const createEmptyVacancy = (): JobVacancy => ({
-    company: "Juan'D Store",
+    company: "JUAND STORE",
     sede: stores.length > 0 ? (stores[0].barrio || stores[0].name) : "República de Israel",
     position: "",
     employmentType: "Vinculación laboral directa",
@@ -345,14 +345,14 @@ export default function RecruitmentAdmin() {
 
   // --- Helper: Copy TikTok / Social Media Ready Recruitment Ad ---
   const copyTikTokAd = (v?: JobVacancy | null) => {
-    const isBothCompanies = v?.company ? (v.company.includes('Quality') && v.company.includes('Juan')) : true;
+    const isBothCompanies = v?.company ? (v.company.toUpperCase().includes('QUALITY') && v.company.toUpperCase().includes('JUAN')) : true;
     const isAllSedes = v?.sede ? v.sede.toLowerCase().includes('todas') : true;
-    const brandName = isBothCompanies ? "JUANDSTORE & QUALITY STORE" : (v?.company?.toUpperCase() || "JUANDSTORE");
+    const brandName = isBothCompanies ? "JUAND STORE y QUALITY STORE" : (v?.company?.toUpperCase() || "JUAND STORE");
     const position = v?.position || "Personal de apoyo - Temporada Decembrina";
     const sede = isAllSedes
       ? "Todas las sedes en Cali (Villacolombia, República de Israel, Ciudad Modelo y Mariano Ramos)"
       : (v?.sede ? `Sede ${v.sede}` : "Sedes en Cali");
-    const text = `🎄 ¡TRABAJO DE TEMPORADA EN CALI PARA DICIEMBRE! 🎄✨\n\nEn ${brandName} estamos buscando personal de apoyo para las fechas claves de Diciembre (días como 6, 7, 20, 21, 22, 23, 24 y fin de año) 👕👟🔥\n\n💼 Cargo: ${position}\n📍 Ubicación: ${sede}\n🏢 Convocatoria: ${isBothCompanies ? "Aplica para Juan'D Store y Quality Store (1 sola vacante)" : brandName}\n💰 Pago: PAGO POR DÍA TRABAJADO (se cancela directamente el día laborado)\n⏰ Horarios y días: Varían según las fechas de temporada asignadas por la administración\n❌ Sin contratos fijos ni ataduras: Trabajas los días acordados y recibes el pago de tu día\n\n👉 REQUISITOS:\n✅ Mayor de 18 años\n✅ Excelente actitud de servicio y proactividad comercial\n✅ Disponibilidad para trabajar en las fechas decembrinas que te programen\n\n📲 ¿CÓMO POSTULARTE?\nEntra al enlace oficial en nuestro perfil:\n🌐 https://www.juandstore.com/trabaja-con-nosotros\nLlena tus datos y selecciona tus fechas disponibles. ¡Te esperamos!\n\n#trabajosihaycali #empleoscali #temporadadiciembre #juandstore #qualitystore #vacantescali #cali #navidadcali #trabajopordia #empleocali`;
+    const text = `🎄 ¡TRABAJO DE TEMPORADA EN CALI PARA DICIEMBRE! 🎄✨\n\nEn ${brandName} estamos buscando personal de apoyo para las fechas claves de Diciembre (días como 6, 7, 20, 21, 22, 23, 24 y fin de año) 👕👟🔥\n\n💼 Cargo: ${position}\n📍 Ubicación: ${sede}\n🏢 Convocatoria: ${isBothCompanies ? "Aplica para JUAND STORE y QUALITY STORE (1 sola vacante)" : brandName}\n💰 Pago: PAGO POR DÍA TRABAJADO (se cancela directamente el día laborado)\n⏰ Horarios y días: Varían según las fechas de temporada asignadas por la administración\n❌ Sin contratos fijos ni ataduras: Trabajas los días acordados y recibes el pago de tu día\n\n👉 REQUISITOS:\n✅ Mayor de 18 años\n✅ Excelente actitud de servicio y proactividad comercial\n✅ Disponibilidad para trabajar en las fechas decembrinas que te programen\n\n📲 ¿CÓMO POSTULARTE?\nEntra al enlace oficial en nuestro perfil:\n🌐 https://www.juandstore.com/trabaja-con-nosotros\nLlena tus datos y selecciona tus fechas disponibles. ¡Te esperamos!\n\n#trabajosihaycali #empleoscali #temporadadiciembre #juandstore #qualitystore #vacantescali #cali #navidadcali #trabajopordia #empleocali`;
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text);
@@ -368,7 +368,7 @@ export default function RecruitmentAdmin() {
     Swal.fire({
       icon: 'success',
       title: '¡Anuncio para TikTok / Redes Copiado!',
-      html: '<p class="text-xs text-gray-600">Texto optimizado con la modalidad de <b>pago por día trabajado</b>, multisede y multimarca listo para pegar en TikTok o redes sociales.</p>',
+      html: '<p class="text-xs text-gray-600">Texto optimizado con la modalidad de <b>pago por día trabajado</b> para JUAND STORE y QUALITY STORE listo para pegar en TikTok o redes sociales.</p>',
       confirmButtonColor: '#10b981'
     });
   };
@@ -376,13 +376,13 @@ export default function RecruitmentAdmin() {
   // --- Helper: Load Recommended December Seasonal Vacancy Template ---
   const loadDecemberTemplate = () => {
     setVacancyForm({
-      company: "Juan'D Store & Quality Store",
+      company: "JUAND STORE y QUALITY STORE",
       sede: "Todas las sedes (Cali)",
       position: "Personal de apoyo - Temporada Decembrina",
       employmentType: "Temporada Decembrina",
       contractType: "Pago por día trabajado",
-      title: "Personal de apoyo - Temporada Decembrina Cali (Todas las sedes y marcas)",
-      description: "Buscamos personal con excelente energía y actitud comercial para trabajar como apoyo en fechas clave de diciembre en las sedes de Juan'D Store y Quality Store en Cali. Se paga directamente el día trabajado según los turnos asignados por la administración de la tienda.",
+      title: "Personal de apoyo - Temporada Decembrina Cali",
+      description: "Buscamos personal con excelente energía y actitud comercial para trabajar como apoyo en fechas clave de diciembre en las sedes de JUAND STORE y QUALITY STORE en Cali. Se paga directamente el día trabajado según los turnos asignados por la administración de la tienda.",
       workScheduleType: "Por turnos / Fechas asignadas",
       workScheduleHours: "Horario asignado según fecha comercial de la tienda",
       saturdayHours: "Según fecha programada",
@@ -402,7 +402,7 @@ export default function RecruitmentAdmin() {
       paymentFrequency: "Diario / Por día trabajado",
       paymentDates: "Al terminar el día laborado",
       probationPeriod: "No aplica",
-      workPlace: "Todas las sedes de Juan'D Store y Quality Store en Cali",
+      workPlace: "Todas las sedes de JUAND STORE y QUALITY STORE en Cali",
       status: "ACTIVA",
       vacanciesCount: 20
     });
@@ -410,7 +410,7 @@ export default function RecruitmentAdmin() {
       'Mayor de 18 años.',
       'Excelente actitud de servicio y atención al cliente.',
       'Disponibilidad para trabajar en las fechas de diciembre asignadas por la tienda (ej. 6, 7, 20, 21, 22, 23, 24 dic).',
-      'Disponibilidad para presentarse en cualquiera de las sedes de Cali (Juan\'D Store / Quality Store).',
+      'Disponibilidad para presentarse en cualquiera de las sedes de Cali (JUAND STORE / QUALITY STORE).',
       'Puntualidad, buena presentación y compromiso.',
       'Aceptación de modalidad de pago por día trabajado.'
     ];
@@ -418,8 +418,8 @@ export default function RecruitmentAdmin() {
     setSelectedReqs(decReqs);
     Swal.fire({
       icon: 'success',
-      title: '¡Plantilla Decembrina Unificada Cargada!',
-      text: 'Configurada para TODAS LAS SEDES (Villacolombia, República, Ciudad Modelo, Mariano Ramos) y AMBAS MARCAS (Juan\'D Store & Quality Store) en 1 sola vacante.',
+      title: '¡Plantilla Decembrina Cargada!',
+      text: 'Configurada para TODAS LAS SEDES (Villacolombia, República, Ciudad Modelo, Mariano Ramos) para JUAND STORE y QUALITY STORE en 1 sola vacante.',
       timer: 2600,
       showConfirmButton: false
     });
@@ -1453,9 +1453,9 @@ export default function RecruitmentAdmin() {
                                     🎄 Decembrina
                                   </span>
                                 )}
-                                {v.company && v.company.includes('Quality') && v.company.includes('Juan') && (
+                                {v.company && v.company.toUpperCase().includes('QUALITY') && v.company.toUpperCase().includes('JUAN') && (
                                   <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                                    ⚡ Ambas marcas
+                                    ⚡ JUAND STORE y QUALITY STORE
                                   </span>
                                 )}
                               </div>
@@ -1528,9 +1528,9 @@ export default function RecruitmentAdmin() {
                               🎄 Temporada Decembrina
                             </span>
                           )}
-                          {selectedVacancy.company && selectedVacancy.company.includes('Quality') && selectedVacancy.company.includes('Juan') && (
+                          {selectedVacancy.company && selectedVacancy.company.toUpperCase().includes('QUALITY') && selectedVacancy.company.toUpperCase().includes('JUAN') && (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                              ⚡ Juan'D Store & Quality Store
+                              ⚡ JUAND STORE y QUALITY STORE
                             </span>
                           )}
                         </div>
@@ -3628,7 +3628,7 @@ export default function RecruitmentAdmin() {
                       </div>
                     )}
 
-                    {/* Quick switch to make 1 unified vacancy for both brands & all stores */}
+                    {/* Quick switch to make 1 unified vacancy for JUAND STORE & QUALITY STORE */}
                     <div className="p-3.5 bg-gradient-to-r from-amber-50 via-yellow-50 to-orange-50 border border-amber-300 rounded-xl flex items-center justify-between gap-3 shadow-2xs">
                       <div className="flex items-start gap-2.5">
                         <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-300 text-amber-700 flex items-center justify-center font-black text-sm shrink-0">
@@ -3636,46 +3636,46 @@ export default function RecruitmentAdmin() {
                         </div>
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-black text-amber-950">1 Sola Vacante Multisede y Multimarca</span>
+                            <span className="text-xs font-black text-amber-950">1 Sola Vacante para JUAND STORE y QUALITY STORE</span>
                             <span className="px-2 py-0.5 bg-amber-200 text-amber-900 text-[10px] font-black rounded-full">
-                              Juan'D Store + Quality Store
+                              JUAND STORE + QUALITY STORE
                             </span>
                           </div>
                           <p className="text-[11px] text-amber-900/90 leading-tight mt-0.5">
-                            Publica <b>1 única oferta</b> válida para todas las sedes (Villacolombia, República, Ciudad Modelo, Mariano Ramos) y ambas marcas al mismo tiempo.
+                            Publica <b>1 única oferta</b> válida para todas las sedes de Cali (Villacolombia, República de Israel, Ciudad Modelo, Mariano Ramos) para <b>JUAND STORE</b> y <b>QUALITY STORE</b> al mismo tiempo.
                           </p>
                         </div>
                       </div>
                       <button
                         type="button"
                         onClick={() => {
-                          const isCurrentlyUnified = vacancyForm.company.includes('Quality') && vacancyForm.sede.includes('Todas');
+                          const isCurrentlyUnified = vacancyForm.company.toUpperCase().includes('QUALITY') && vacancyForm.sede.includes('Todas');
                           if (isCurrentlyUnified) {
                             setVacancyForm(prev => ({
                               ...prev,
-                              company: "Juan'D Store",
+                              company: "JUAND STORE",
                               sede: stores[0]?.barrio || stores[0]?.name || "Villacolombia",
                               workPlace: `Sede ${stores[0]?.barrio || stores[0]?.name || "Villacolombia"}`
                             }));
                           } else {
                             setVacancyForm(prev => ({
                               ...prev,
-                              company: "Juan'D Store & Quality Store",
+                              company: "JUAND STORE y QUALITY STORE",
                               sede: "Todas las sedes (Cali)",
-                              workPlace: "Todas las sedes de Juan'D Store y Quality Store en Cali"
+                              workPlace: "Todas las sedes de JUAND STORE y QUALITY STORE en Cali"
                             }));
                           }
                         }}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
-                          vacancyForm.company.includes('Quality') && vacancyForm.sede.includes('Todas')
+                          vacancyForm.company.toUpperCase().includes('QUALITY') && vacancyForm.sede.includes('Todas')
                             ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm'
                             : 'bg-white hover:bg-amber-100 text-amber-900 border border-amber-300'
                         }`}
                       >
-                        {vacancyForm.company.includes('Quality') && vacancyForm.sede.includes('Todas') ? (
+                        {vacancyForm.company.toUpperCase().includes('QUALITY') && vacancyForm.sede.includes('Todas') ? (
                           <>
                             <Check className="w-3.5 h-3.5" />
-                            Activada (Ambas marcas y sedes)
+                            Activada (JUAND STORE y QUALITY STORE - Todas las sedes)
                           </>
                         ) : (
                           'Activar para todas'
@@ -3698,14 +3698,14 @@ export default function RecruitmentAdmin() {
                             setVacancyForm(prev => ({
                               ...prev,
                               company: newCompany,
-                              workPlace: prev.sede.includes('Todas') ? 'Todas las sedes de Juan\'D Store y Quality Store en Cali' : prev.workPlace
+                              workPlace: prev.sede.includes('Todas') ? 'Todas las sedes de JUAND STORE y QUALITY STORE en Cali' : prev.workPlace
                             }));
                           }}
                           className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg bg-white"
                         >
-                          <option value="Juan'D Store & Quality Store">Ambas marcas (Juan'D Store & Quality Store)</option>
-                          <option value="Juan'D Store">Juan'D Store</option>
-                          <option value="Quality Store">Quality Store</option>
+                          <option value="JUAND STORE y QUALITY STORE">JUAND STORE y QUALITY STORE</option>
+                          <option value="JUAND STORE">JUAND STORE</option>
+                          <option value="QUALITY STORE">QUALITY STORE</option>
                         </select>
                       </div>
 
@@ -3719,12 +3719,12 @@ export default function RecruitmentAdmin() {
                             setVacancyForm(prev => ({
                               ...prev,
                               sede: val,
-                              workPlace: isAll ? 'Todas las sedes de Juan\'D Store y Quality Store en Cali' : `Sede ${val}`
+                              workPlace: isAll ? 'Todas las sedes de JUAND STORE y QUALITY STORE en Cali' : `Sede ${val}`
                             }));
                           }}
                           className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg bg-white"
                         >
-                          <option value="Todas las sedes (Cali)">⭐ Todas las sedes (Cali y alrededores)</option>
+                          <option value="Todas las sedes (Cali)">⭐ Todas las sedes (Cali)</option>
                           {stores.length > 0 ? (
                             stores.map(s => (
                               <option key={s.id} value={s.barrio || s.name}>{s.barrio || s.name}</option>
@@ -3776,7 +3776,7 @@ export default function RecruitmentAdmin() {
                           className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg bg-white"
                         >
                           <option value="Vinculación laboral directa">Vinculación laboral directa</option>
-                          <option value="Temporada Decembrina">🎄 Temporada Decembrina (Contratación Inmediata)</option>
+                          <option value="Temporada Decembrina">🎄 Temporada Decembrina (Fechas clave de Diciembre)</option>
                           <option value="Obra o Labor (Temporada)">Obra o Labor (Temporada)</option>
                           <option value="Término fijo">Término fijo</option>
                           <option value="Prestación de servicios">Prestación de servicios</option>
@@ -4193,17 +4193,14 @@ export default function RecruitmentAdmin() {
 
                 <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-3">
                   <div className="flex items-center justify-between gap-1 flex-wrap">
-                    {vacancyForm.company.includes('Quality') && vacancyForm.company.includes('Juan') ? (
+                    {vacancyForm.company.toUpperCase().includes('QUALITY') && vacancyForm.company.toUpperCase().includes('JUAN') ? (
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="px-2 py-0.5 bg-black text-amber-300 text-[10px] font-black rounded border border-amber-500/30">
-                          Juan'D Store
+                          JUAND STORE
                         </span>
                         <span className="text-[10px] text-gray-400 font-bold">&</span>
                         <span className="px-2 py-0.5 bg-zinc-900 text-yellow-400 text-[10px] font-black rounded border border-yellow-500/30">
-                          Quality Store
-                        </span>
-                        <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 text-[9px] font-bold rounded">
-                          Ambas marcas
+                          QUALITY STORE
                         </span>
                       </div>
                     ) : (
@@ -4862,7 +4859,7 @@ export default function RecruitmentAdmin() {
                       <span className="px-2.5 py-0.5 bg-gradient-to-r from-red-600 to-emerald-600 text-white text-[10px] font-black rounded-full uppercase tracking-wider shadow-2xs">
                         Aspirante Temporada Decembrina
                       </span>
-                      <span className="text-[11px] font-bold text-emerald-800">Cali · Contratación Inmediata</span>
+                      <span className="text-[11px] font-bold text-emerald-800">Cali · Fechas clave de Diciembre</span>
                     </div>
                     <h4 className="text-xs font-black text-emerald-950 mt-1.5">Disponibilidad en Diciembre y Fechas seleccionadas:</h4>
                     <div className="text-xs text-emerald-900 font-semibold mt-1 bg-white/80 p-2.5 rounded-lg border border-emerald-200 leading-relaxed">
