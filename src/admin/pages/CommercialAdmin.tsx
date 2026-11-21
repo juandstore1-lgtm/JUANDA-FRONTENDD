@@ -338,16 +338,126 @@ export default function CommercialAdmin() {
     return { days, maxVal };
   }, [data.cuadres, manualDateStr, manualStoreId, manualSales]);
 
+  const existingCuadre = useMemo(() => {
+    return data.cuadres.find(c => c.dateStr === manualDateStr && c.storeId === manualStoreId && (c.status === 'REGISTERED' || c.status === 'NO_SALES'));
+  }, [data.cuadres, manualDateStr, manualStoreId]);
+
+  const isAlreadyClosed = !!existingCuadre;
+  const [isClosureSecurityLocked, setIsClosureSecurityLocked] = useState<boolean>(true);
+
   useEffect(() => {
-    const existing = data.cuadres.find(c => c.dateStr === manualDateStr && c.storeId === manualStoreId);
-    if (existing && existing.sales && existing.sales.length > 0) {
-      setManualSales(existing.sales);
+    const existing = data.cuadres.find(c => c.dateStr === manualDateStr && c.storeId === manualStoreId && (c.status === 'REGISTERED' || c.status === 'NO_SALES'));
+    if (existing) {
+      setIsClosureSecurityLocked(true);
+      if (existing.sales && existing.sales.length > 0) {
+        setManualSales(existing.sales);
+      } else {
+        setManualSales([]);
+      }
     } else {
+      setIsClosureSecurityLocked(false);
       setManualSales([]);
     }
   }, [manualDateStr, manualStoreId, data.cuadres]);
 
+  const handleToggleClosureLock = () => {
+    if (!isAlreadyClosed) return;
+
+    if (isClosureSecurityLocked) {
+      const storeObj = STORES_LIST.find(s => s.id === manualStoreId)!;
+      Swal.fire({
+        icon: 'warning',
+        title: '🔒 ¿Desbloquear Cierre de Caja?',
+        html: `
+          <div class="text-left text-xs text-gray-700 space-y-2">
+            <p>El cierre de ventas de <b>${storeObj.shortName}</b> para el <b>${manualDateStr}</b> ya fue registrado oficialmente:</p>
+            <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1">
+              <p><b>Total registrado:</b> ${existingCuadre ? formatPrice(existingCuadre.totalSales) : '$0'} (${existingCuadre?.totalItems || 0} prendas)</p>
+              ${existingCuadre?.updatedAt ? `<p class="text-[10px] text-gray-500 font-mono">Última actualización: ${new Date(existingCuadre.updatedAt).toLocaleString('es-CO')}</p>` : ''}
+            </div>
+            <p class="text-amber-900 font-bold">
+              Al desbloquear, podrás agregar o eliminar ventas y actualizar el cierre. Al guardar nuevamente, el inventario se ajustará automáticamente.
+            </p>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Sí, Desbloquear Cierre',
+        cancelButtonText: 'Mantener Bloqueado',
+        confirmButtonColor: '#d97706',
+        cancelButtonColor: '#6b7280'
+      }).then(res => {
+        if (res.isConfirmed) {
+          setIsClosureSecurityLocked(false);
+        }
+      });
+    } else {
+      setIsClosureSecurityLocked(true);
+    }
+  };
+
+  const handleReopenClosure = () => {
+    if (!existingCuadre) return;
+    const storeObj = STORES_LIST.find(s => s.id === manualStoreId)!;
+
+    Swal.fire({
+      icon: 'warning',
+      title: '¿Reabrir este Cierre de Caja?',
+      html: `
+        <div class="text-left text-xs text-gray-700 space-y-2">
+          <p>Vas a revertir el cierre de <b>${storeObj.shortName}</b> del <b>${manualDateStr}</b>.</p>
+          <div class="p-3 bg-red-50 border border-red-200 rounded-xl space-y-1 text-red-900">
+            <p>• Se devolverán las <b>${existingCuadre.totalItems} prendas</b> vendidas al stock de ${storeObj.shortName}.</p>
+            <p>• El día volverá al estado <b>"Pendiente de Cierre"</b>.</p>
+            <p>• Las ventas anotadas se mantendrán en pantalla para que puedas corregirlas o iniciar de nuevo.</p>
+          </div>
+          <p class="font-bold text-gray-900">¿Estás seguro de que deseas reabrir el cuadre?</p>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'Sí, Reabrir y Restaurar Stock',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6b7280'
+    }).then(res => {
+      if (res.isConfirmed) {
+        CommercialService.deleteCuadre(existingCuadre.id, true);
+        refreshData();
+        setIsClosureSecurityLocked(false);
+        Swal.fire({
+          icon: 'success',
+          title: 'Cierre Reabierto',
+          text: `El día ${manualDateStr} en ${storeObj.shortName} volvió a estado pendiente y el inventario fue restaurado con éxito.`,
+          confirmButtonColor: '#059669'
+        });
+      }
+    });
+  };
+
+  const handleRemoveManualSale = (saleId: string) => {
+    if (isAlreadyClosed && isClosureSecurityLocked) {
+      Swal.fire({
+        icon: 'info',
+        title: '🔒 Cierre de Caja Protegido',
+        text: 'Este cierre ya fue registrado y está protegido. Desbloquea el cierre en el banner superior si necesitas eliminar o modificar ventas.',
+        confirmButtonColor: '#059669',
+        confirmButtonText: 'Entendido'
+      });
+      return;
+    }
+    setManualSales(prev => prev.filter(x => x.id !== saleId));
+  };
+
   const handleAddManualSale = () => {
+    if (isAlreadyClosed && isClosureSecurityLocked) {
+      Swal.fire({
+        icon: 'info',
+        title: '🔒 Cierre de Caja Protegido',
+        text: 'Este cierre de caja ya fue registrado y está protegido. Si necesitas agregar más ventas a este día, desbloquea el cierre en la parte superior.',
+        confirmButtonColor: '#059669',
+        confirmButtonText: 'Entendido'
+      });
+      return;
+    }
     const prod = data.products.find(p => p.id === newManualSale.productId);
     if (!prod) return;
 
@@ -425,6 +535,28 @@ export default function CommercialAdmin() {
   const handleSaveManualCuadre = () => {
     const storeObj = STORES_LIST.find(s => s.id === manualStoreId)!;
 
+    // Si ya está cerrado pero el modo seguro sigue bloqueado
+    if (isAlreadyClosed && isClosureSecurityLocked) {
+      Swal.fire({
+        icon: 'info',
+        title: '🔒 Cierre Bloqueado por Seguridad',
+        html: `
+          <div class="text-left text-xs text-gray-700 space-y-2">
+            <p>Esta sede (<b>${storeObj.shortName}</b>) ya tiene un cierre oficial guardado para el <b>${manualDateStr}</b> por valor de <b>${existingCuadre ? formatPrice(existingCuadre.totalSales) : '$0'}</b>.</p>
+            <p class="text-amber-800 font-bold">
+              Para evitar modificaciones involuntarias y descuadres en el inventario, el botón está protegido.
+            </p>
+            <p class="text-gray-500">
+              Para actualizar este cierre, haz clic en el botón <b>"Desbloquear para Modificar"</b> en el banner superior.
+            </p>
+          </div>
+        `,
+        confirmButtonColor: '#059669',
+        confirmButtonText: 'Entendido'
+      });
+      return;
+    }
+
     if (manualSales.length === 0) {
       Swal.fire({
         icon: 'question',
@@ -438,57 +570,142 @@ export default function CommercialAdmin() {
         if (res.isConfirmed) {
           CommercialService.markNoSalesDay(manualDateStr, manualStoreId);
           refreshData();
+          setIsClosureSecurityLocked(true);
           Swal.fire({
             icon: 'info',
             title: 'Día registrado sin ventas',
             text: `Se marcó el día ${manualDateStr} para ${storeObj.shortName} con $0 de venta.`,
-            confirmButtonColor: '#007A33'
+            confirmButtonColor: '#059669'
           });
         }
       });
       return;
     }
 
-    const cuadre: CommercialDailyCuadre = {
-      id: `cuadre-${manualDateStr}-${manualStoreId}`,
-      dateStr: manualDateStr,
-      storeId: manualStoreId,
-      storeName: storeObj.shortName,
-      status: 'REGISTERED',
-      sales: manualSales,
-      totalSales: manualTotals.totalSales,
-      totalCost: manualTotals.totalCost,
-      totalProfit: manualTotals.totalProfit,
-      totalItems: manualTotals.totalItems,
-      totalsByMethod: manualTotals.byMethod,
-      updatedAt: new Date().toISOString()
+    const executeSave = () => {
+      const cuadre: CommercialDailyCuadre = {
+        id: `cuadre-${manualDateStr}-${manualStoreId}`,
+        dateStr: manualDateStr,
+        storeId: manualStoreId,
+        storeName: storeObj.shortName,
+        status: 'REGISTERED',
+        sales: manualSales,
+        totalSales: manualTotals.totalSales,
+        totalCost: manualTotals.totalCost,
+        totalProfit: manualTotals.totalProfit,
+        totalItems: manualTotals.totalItems,
+        totalsByMethod: manualTotals.byMethod,
+        updatedAt: new Date().toISOString()
+      };
+
+      CommercialService.saveCuadre(cuadre);
+      refreshData();
+      setIsClosureSecurityLocked(true);
+
+      Swal.fire({
+        icon: 'success',
+        title: isAlreadyClosed ? '¡Cierre de Ventas Actualizado!' : '¡Cierre de Ventas Guardado!',
+        html: `
+          <p class="text-sm">El cierre de ventas de <b>${storeObj.shortName}</b> para el <b>${manualDateStr}</b> quedó registrado correctamente.</p>
+          <p class="text-xs text-emerald-700 font-bold mt-2">Total vendido: ${formatPrice(manualTotals.totalSales)} (${manualTotals.totalItems} prendas)</p>
+          <p class="text-[11px] text-gray-500 mt-1">El stock de ${storeObj.shortName} se actualizó automáticamente.</p>
+        `,
+        confirmButtonColor: '#059669'
+      });
     };
 
-    CommercialService.saveCuadre(cuadre);
-    refreshData();
+    // Si ya existía un cierre y fue desbloqueado para editar, pedir confirmación con comparativa
+    if (isAlreadyClosed) {
+      Swal.fire({
+        icon: 'warning',
+        title: '⚠️ ¿Confirmar actualización de cierre?',
+        html: `
+          <div class="text-left text-xs text-gray-700 space-y-2">
+            <p>Vas a sobreescribir el cierre oficial de <b>${storeObj.shortName}</b> del <b>${manualDateStr}</b>.</p>
+            <div class="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-1">
+              <p><b>Cierre anterior:</b> ${existingCuadre ? formatPrice(existingCuadre.totalSales) : '$0'} (${existingCuadre?.totalItems || 0} prendas)</p>
+              <p class="text-emerald-700 font-black"><b>Nuevo cierre a guardar:</b> ${formatPrice(manualTotals.totalSales)} (${manualTotals.totalItems} prendas)</p>
+            </div>
+            <p class="text-amber-800 font-medium">
+              Al confirmar, el descuento de inventario anterior se revertirá y se aplicará el descuento de las nuevas ventas automáticamente.
+            </p>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Sí, Sobrescribir y Actualizar Cierre',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#d97706',
+        cancelButtonColor: '#6b7280'
+      }).then(res => {
+        if (res.isConfirmed) {
+          executeSave();
+        }
+      });
+      return;
+    }
 
+    // Si es un cierre nuevo, pedir confirmación antes de descontar stock
     Swal.fire({
-      icon: 'success',
-      title: '¡Cierre de Ventas Guardado!',
+      icon: 'question',
+      title: '¿Realizar Cierre de Ventas Oficial?',
       html: `
-        <p class="text-sm">El cierre de ventas de <b>${storeObj.shortName}</b> para el <b>${manualDateStr}</b> quedó registrado correctamente.</p>
-        <p class="text-xs text-emerald-700 font-bold mt-2">Total vendido: ${formatPrice(manualTotals.totalSales)} (${manualTotals.totalItems} prendas)</p>
-        <p class="text-[11px] text-gray-500 mt-1">El stock de ${storeObj.shortName} se actualizó automáticamente.</p>
+        <div class="text-left text-xs text-gray-700 space-y-2">
+          <p>¿Confirmas el cierre para <b>${storeObj.shortName}</b> el <b>${manualDateStr}</b>?</p>
+          <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 space-y-1">
+            <p><b>Total ventas:</b> ${manualSales.length} ventas (${manualTotals.totalItems} prendas)</p>
+            <p class="text-emerald-900 font-black text-sm"><b>Monto total:</b> ${formatPrice(manualTotals.totalSales)}</p>
+          </div>
+          <p class="text-gray-500 text-[11px]">
+            Estas prendas se descontarán automáticamente del stock de <b>${storeObj.shortName}</b>.
+          </p>
+        </div>
       `,
-      confirmButtonColor: '#007A33'
+      showCancelButton: true,
+      confirmButtonText: 'Sí, Realizar Cierre de Ventas',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#059669',
+      cancelButtonColor: '#6b7280'
+    }).then(res => {
+      if (res.isConfirmed) {
+        executeSave();
+      }
     });
   };
 
   const handleMarkNoSalesDirectly = () => {
     const storeObj = STORES_LIST.find(s => s.id === manualStoreId)!;
-    CommercialService.markNoSalesDay(manualDateStr, manualStoreId);
-    refreshData();
-    setManualSales([]);
+
+    if (isAlreadyClosed && isClosureSecurityLocked) {
+      Swal.fire({
+        icon: 'info',
+        title: '🔒 Cierre Bloqueado por Seguridad',
+        text: 'Este día ya tiene un cierre oficial. Desbloquea el cierre en la parte superior si deseas marcarlo como día sin ventas.',
+        confirmButtonColor: '#059669'
+      });
+      return;
+    }
+
     Swal.fire({
-      icon: 'info',
-      title: 'Día registrado sin ventas',
-      text: `Se marcó el día ${manualDateStr} para ${storeObj.shortName} como cerrado / sin ventas ($0).`,
-      confirmButtonColor: '#007A33'
+      icon: 'warning',
+      title: '¿Marcar día sin ventas ($0)?',
+      text: `Se marcará el día ${manualDateStr} para ${storeObj.shortName} como cerrado sin ventas.`,
+      showCancelButton: true,
+      confirmButtonText: 'Sí, marcar sin ventas',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#eab308'
+    }).then(res => {
+      if (res.isConfirmed) {
+        CommercialService.markNoSalesDay(manualDateStr, manualStoreId);
+        refreshData();
+        setManualSales([]);
+        setIsClosureSecurityLocked(true);
+        Swal.fire({
+          icon: 'info',
+          title: 'Día registrado sin ventas',
+          text: `Se marcó el día ${manualDateStr} para ${storeObj.shortName} como cerrado / sin ventas ($0).`,
+          confirmButtonColor: '#059669'
+        });
+      }
     });
   };
 
@@ -1651,7 +1868,18 @@ export default function CommercialAdmin() {
                   <Edit3 className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-base font-black text-gray-900">Anotar ventas y Cierre diario</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-black text-gray-900">Anotar ventas y Cierre diario</h2>
+                    {isAlreadyClosed ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
+                        <ShieldCheck className="w-3 h-3 text-emerald-700" /> Cierre Realizado
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
+                        <Clock className="w-3 h-3 text-blue-600" /> Pendiente de Cierre
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-500">
                     Selecciona la prenda, digita el precio de venta al que se vendió y el medio de pago. Al cerrar, se descuenta de esa sede.
                   </p>
@@ -1690,6 +1918,77 @@ export default function CommercialAdmin() {
                 </div>
               </div>
             </div>
+
+            {/* Banner de Estado de Cierre y Seguridad */}
+            {isAlreadyClosed && existingCuadre && (
+              <div className={`p-4 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs ${
+                isClosureSecurityLocked
+                  ? 'bg-amber-50/80 border-amber-200/90 text-amber-950'
+                  : 'bg-emerald-50/80 border-emerald-200/90 text-emerald-950'
+              }`}>
+                <div className="flex items-start sm:items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-2xs ${
+                    isClosureSecurityLocked ? 'bg-amber-600 text-white' : 'bg-emerald-700 text-white'
+                  }`}>
+                    {isClosureSecurityLocked ? <Lock className="w-5 h-5" /> : <Unlock className="w-5 h-5" />}
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white border border-amber-300 text-amber-900 shadow-2xs">
+                        {existingCuadre.status === 'NO_SALES' ? 'Día Marcado Sin Ventas ($0)' : 'Cierre Oficial Registrado'}
+                      </span>
+                      <span className="text-xs font-bold text-gray-800">
+                        {existingCuadre.status === 'NO_SALES' 
+                          ? 'Esta sede no tuvo ventas registradas' 
+                          : `${formatPrice(existingCuadre.totalSales)} · ${existingCuadre.totalItems} prendas vendidas`}
+                      </span>
+                      {existingCuadre.updatedAt && (
+                        <span className="text-[10px] text-gray-500 font-mono">
+                          (Guardado: {new Date(existingCuadre.updatedAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })})
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1 font-medium">
+                      {isClosureSecurityLocked
+                        ? '🔒 Este día ya cuenta con cierre de caja. El botón y las modificaciones están protegidos con candado para evitar sobreescrituras accidentales.'
+                        : '🔓 Modo Edición Activo: Puedes realizar ajustes o registrar ventas adicionales. Recuerda presionar "Sobrescribir y Actualizar Cierre" al finalizar.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Acciones de seguridad: Desbloquear / Rebloquear / Reabrir */}
+                <div className="flex items-center gap-2 self-start md:self-center shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleToggleClosureLock}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black cursor-pointer flex items-center gap-1.5 transition-all shadow-2xs ${
+                      isClosureSecurityLocked
+                        ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                        : 'bg-white hover:bg-gray-100 text-gray-800 border border-gray-200'
+                    }`}
+                  >
+                    {isClosureSecurityLocked ? (
+                      <>
+                        <Unlock className="w-3.5 h-3.5" /> Desbloquear para Modificar
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-3.5 h-3.5 text-gray-600" /> Volver a Bloquear
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleReopenClosure}
+                    title="Anular el cierre de este día y devolver las prendas al inventario"
+                    className="px-3 py-2 bg-white hover:bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1 transition-colors"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-red-600" /> Reabrir Cuadre
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Formulario rápido para anotar una venta con Select Buscable */}
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
@@ -1902,7 +2201,7 @@ export default function CommercialAdmin() {
                                 <td className="py-1.5 px-2.5 text-right font-mono font-black text-gray-900">{formatPrice(s.subtotal)}</td>
                                 <td className="py-1.5 px-2 text-center">
                                   <button
-                                    onClick={() => setManualSales(prev => prev.filter(x => x.id !== s.id))}
+                                    onClick={() => handleRemoveManualSale(s.id)}
                                     className="text-gray-300 hover:text-red-600 cursor-pointer"
                                     title="Remover venta"
                                   >
@@ -2040,13 +2339,35 @@ export default function CommercialAdmin() {
                     </span>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={handleSaveManualCuadre}
-                    className="px-6 py-2.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-black shadow-xs flex items-center gap-2 cursor-pointer whitespace-nowrap transition-all"
-                  >
-                    <Check className="w-4 h-4" /> Realizar Cierre de Ventas
-                  </button>
+                  <div className="flex items-center gap-2.5">
+                    {isAlreadyClosed ? (
+                      isClosureSecurityLocked ? (
+                        <button
+                          type="button"
+                          onClick={handleSaveManualCuadre}
+                          className="px-5 py-2.5 bg-amber-50/90 hover:bg-amber-100 text-amber-900 border-2 border-amber-300 rounded-xl text-xs font-black shadow-xs flex items-center gap-2 cursor-pointer whitespace-nowrap transition-all"
+                        >
+                          <Lock className="w-4 h-4 text-amber-600" /> Cierre Realizado (Protegido con Candado)
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleSaveManualCuadre}
+                          className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black shadow-xs flex items-center gap-2 cursor-pointer whitespace-nowrap transition-all animate-pulse"
+                        >
+                          <RefreshCw className="w-4 h-4" /> Sobrescribir y Actualizar Cierre
+                        </button>
+                      )
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleSaveManualCuadre}
+                        className="px-6 py-2.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-black shadow-xs flex items-center gap-2 cursor-pointer whitespace-nowrap transition-all"
+                      >
+                        <Check className="w-4 h-4" /> Realizar Cierre de Ventas
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -3119,23 +3440,27 @@ export default function CommercialAdmin() {
                           if (found && found.status === 'REGISTERED') {
                             return (
                               <td key={day} className="py-2 px-1">
-                                <span 
-                                  title={`${st.shortName} · ${dateStr}: ${formatPrice(found.totalSales)}`}
-                                  className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold inline-flex items-center justify-center text-[10px]"
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenPendingCuadre(st.id, dateStr)}
+                                  title={`${st.shortName} · ${dateStr}: ${formatPrice(found.totalSales)} (Clic para inspeccionar cierre)`}
+                                  className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold inline-flex items-center justify-center text-[10px] hover:bg-emerald-200 cursor-pointer shadow-2xs transition-colors"
                                 >
                                   ✓
-                                </span>
+                                </button>
                               </td>
                             );
                           } else if (found && found.status === 'NO_SALES') {
                             return (
                               <td key={day} className="py-2 px-1">
-                                <span 
-                                  title={`${st.shortName} · ${dateStr}: Sin ventas ($0)`}
-                                  className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 font-bold inline-flex items-center justify-center text-[10px]"
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenPendingCuadre(st.id, dateStr)}
+                                  title={`${st.shortName} · ${dateStr}: Sin ventas ($0) (Clic para inspeccionar cierre)`}
+                                  className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 font-bold inline-flex items-center justify-center text-[10px] hover:bg-amber-200 cursor-pointer shadow-2xs transition-colors"
                                 >
                                   –
-                                </span>
+                                </button>
                               </td>
                             );
                           } else if (isPastOrToday) {
