@@ -115,6 +115,7 @@ export default function TrabajaConNosotros() {
     'Trabajo en equipo'
   ]);
   const [otherSkill, setOtherSkill] = useState('');
+  const [preferredSede, setPreferredSede] = useState('Disponible para cualquier sede (Recomendado)');
 
   useEffect(() => {
     loadVacancies();
@@ -331,7 +332,8 @@ export default function TrabajaConNosotros() {
 
       let finalObs = formData.additionalObservations || '';
       if (isTemporada(selectedVacancy)) {
-        const seasonalNote = `[🎄 TEMPORADA DECEMBRINA - PAGO POR DÍA] Disponibilidad: ${decemberDatesChoice}${decemberSpecificNotes ? ` | Días específicos: ${decemberSpecificNotes}` : ''}. Confirma acuerdo: pago por día laborado sin salario mensual ni auxilio.`;
+        const sedeNote = (selectedVacancy?.sede && selectedVacancy.sede.toLowerCase().includes('todas')) ? ` | Sede preferencia: ${preferredSede}` : '';
+        const seasonalNote = `[🎄 TEMPORADA DECEMBRINA - PAGO POR DÍA]${sedeNote} | Disponibilidad: ${decemberDatesChoice}${decemberSpecificNotes ? ` | Días específicos: ${decemberSpecificNotes}` : ''}. Confirma acuerdo: pago por día laborado sin salario mensual ni auxilio.`;
         finalObs = finalObs ? `${seasonalNote}\n${finalObs}` : seasonalNote;
       }
 
@@ -401,19 +403,23 @@ export default function TrabajaConNosotros() {
           </div>
           {vacancies.length > 1 && (
             <div className="flex flex-wrap gap-2">
-              {vacancies.map(v => (
-                <button
-                  key={v.id}
-                  onClick={() => setSelectedVacancy(v)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    selectedVacancy?.id === v.id
-                      ? (isTemporada(v) ? 'bg-gradient-to-r from-red-600 to-emerald-600 text-white shadow-md font-bold' : 'bg-emerald-600 text-white shadow-md')
-                      : (isTemporada(v) ? 'bg-red-900/40 text-red-200 border border-red-500/40 hover:bg-red-900/60' : 'bg-white/10 text-gray-300 hover:bg-white/20')
-                  }`}
-                >
-                  {isTemporada(v) ? `🎄 ${v.position} (${v.sede})` : `${v.position} (${v.sede})`}
-                </button>
-              ))}
+              {vacancies.map(v => {
+                const isUnified = (v.company && v.company.includes('Quality') && v.company.includes('Juan')) || (v.sede && v.sede.toLowerCase().includes('todas'));
+                const sedeLabel = isUnified ? 'Todas las sedes' : v.sede;
+                return (
+                  <button
+                    key={v.id}
+                    onClick={() => setSelectedVacancy(v)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      selectedVacancy?.id === v.id
+                        ? (isTemporada(v) ? 'bg-gradient-to-r from-red-600 to-emerald-600 text-white shadow-md font-bold' : 'bg-emerald-600 text-white shadow-md')
+                        : (isTemporada(v) ? 'bg-red-900/40 text-red-200 border border-red-500/40 hover:bg-red-900/60' : 'bg-white/10 text-gray-300 hover:bg-white/20')
+                    }`}
+                  >
+                    {isTemporada(v) ? `🎄 ${v.position} (${sedeLabel})` : `${v.position} (${sedeLabel})`}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -476,7 +482,30 @@ export default function TrabajaConNosotros() {
               {/* Header */}
               <div className="border-l-4 border-yellow-400 pl-4 mb-6">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">{selectedVacancy.position}</h2>
+                  <div>
+                    <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">{selectedVacancy.position}</h2>
+                    {/* Brand Badges */}
+                    <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                      {selectedVacancy.company && selectedVacancy.company.includes('Quality') && selectedVacancy.company.includes('Juan') ? (
+                        <>
+                          <span className="px-2.5 py-0.5 bg-black text-amber-300 text-[11px] font-black rounded border border-amber-500/30">
+                            Juan'D Store
+                          </span>
+                          <span className="text-xs text-gray-400 font-bold">&</span>
+                          <span className="px-2.5 py-0.5 bg-zinc-900 text-yellow-400 text-[11px] font-black rounded border border-yellow-500/30">
+                            Quality Store
+                          </span>
+                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded">
+                            Convocatoria unificada
+                          </span>
+                        </>
+                      ) : (
+                        <span className="px-2.5 py-0.5 bg-black text-white text-[11px] font-bold rounded">
+                          {selectedVacancy.company}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     {isTemporada(selectedVacancy) && (
                       <span className="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-red-600 to-emerald-600 text-white text-xs font-black rounded-full shadow-2xs">
@@ -489,13 +518,13 @@ export default function TrabajaConNosotros() {
                     </span>
                   </div>
                 </div>
-                <p className="text-sm text-gray-500 mt-1">{selectedVacancy.title}</p>
+                <p className="text-sm text-gray-500 mt-2">{selectedVacancy.title}</p>
                 
                 {/* Meta pills */}
-                <div className="flex flex-wrap gap-4 mt-4 text-xs font-medium text-gray-600">
-                  <span className="flex items-center gap-1.5 bg-gray-100 px-3 py-1 rounded-full">
-                    <MapPin className="w-3.5 h-3.5 text-gray-500" />
-                    {selectedVacancy.sede}, Cali
+                <div className="flex flex-wrap gap-3 mt-4 text-xs font-medium text-gray-600">
+                  <span className="flex items-center gap-1.5 bg-emerald-50 text-emerald-900 border border-emerald-200 px-3 py-1 rounded-full font-semibold">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                    {selectedVacancy.sede && selectedVacancy.sede.toLowerCase().includes('todas') ? 'Todas las sedes en Cali (Villacolombia, República, Ciudad Modelo, Mariano Ramos)' : `${selectedVacancy.sede}, Cali`}
                   </span>
                   <span className="flex items-center gap-1.5 bg-gray-100 px-3 py-1 rounded-full">
                     <Briefcase className="w-3.5 h-3.5 text-gray-500" />
@@ -981,6 +1010,29 @@ export default function TrabajaConNosotros() {
                         ))}
                       </select>
                     </div>
+
+                    {selectedVacancy?.sede && selectedVacancy.sede.toLowerCase().includes('todas') && (
+                      <div className="sm:col-span-2 p-3 bg-amber-50/80 border border-amber-200 rounded-xl space-y-1.5">
+                        <label className="block text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                          <span>🏢</span>
+                          <span>Sede de preferencia (Convocatoria multisede para todas las tiendas) *</span>
+                        </label>
+                        <p className="text-[11px] text-amber-800 leading-tight">
+                          Esta oferta aplica simultáneamente para <b>Juan'D Store</b> y <b>Quality Store</b>. Puedes elegir tu tienda de preferencia o indicar disponibilidad para cualquier sede.
+                        </p>
+                        <select
+                          value={preferredSede}
+                          onChange={e => setPreferredSede(e.target.value)}
+                          className="w-full px-3 py-2 text-xs border border-amber-300 rounded-lg bg-white font-medium text-gray-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                        >
+                          <option value="Disponible para cualquier sede (Recomendado)">⭐ Disponible para cualquier sede (Recomendado - Mayor oportunidad)</option>
+                          <option value="Sede Villacolombia (Juan'D Store)">Sede Villacolombia (Juan'D Store)</option>
+                          <option value="Sede República de Israel (Juan'D Store)">Sede República de Israel (Juan'D Store)</option>
+                          <option value="Sede Ciudad Modelo (Juan'D Store)">Sede Ciudad Modelo (Juan'D Store)</option>
+                          <option value="Sede Mariano Ramos (Quality Store)">Sede Mariano Ramos (Quality Store)</option>
+                        </select>
+                      </div>
+                    )}
 
                     <div>
                       <label className="block text-xs font-semibold text-gray-700 mb-1">¿Cuánto tiempo de experiencia tienes en ventas? *</label>
