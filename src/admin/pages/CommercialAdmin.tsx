@@ -59,6 +59,8 @@ import {
 } from '../../services/commercialService';
 import { formatPrice } from '../../utils/format';
 
+type StoreId = 'republica' | 'modelo' | 'quality' | 'mariano';
+
 export default function CommercialAdmin() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'resumen';
@@ -1603,7 +1605,7 @@ export default function CommercialAdmin() {
             <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex items-center justify-between">
               <div>
                 <span className="text-[10px] text-gray-400 font-bold uppercase block">Ventas del mes</span>
-                <strong className="text-xl font-black text-gray-900 block mt-1">{formatPrice(monthSummary.totalVentas || 28450000)}</strong>
+                <strong className="text-xl font-black text-gray-900 block mt-1">{formatPrice(monthlyMetrics.totalVentas || 28450000)}</strong>
               </div>
               <div className="flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl">
                 <span>↑ +12.8%</span>
@@ -1613,7 +1615,7 @@ export default function CommercialAdmin() {
             <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex items-center justify-between">
               <div>
                 <span className="text-[10px] text-gray-400 font-bold uppercase block">Costo de ventas</span>
-                <strong className="text-xl font-black text-gray-900 block mt-1">{formatPrice(monthSummary.totalCosto || 18760000)}</strong>
+                <strong className="text-xl font-black text-gray-900 block mt-1">{formatPrice(monthlyMetrics.totalCosto || 18760000)}</strong>
               </div>
               <div className="flex items-center gap-1 text-[11px] font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-xl">
                 <span>↓ -2.4%</span>
@@ -1623,7 +1625,7 @@ export default function CommercialAdmin() {
             <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex items-center justify-between">
               <div>
                 <span className="text-[10px] text-gray-400 font-bold uppercase block">Ganancia bruta</span>
-                <strong className="text-xl font-black text-emerald-700 block mt-1">{formatPrice(monthSummary.gananciaBruta || 9690000)}</strong>
+                <strong className="text-xl font-black text-emerald-700 block mt-1">{formatPrice(monthlyMetrics.gananciaBruta || 9690000)}</strong>
               </div>
               <div className="flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl">
                 <span>↑ +18.5%</span>
@@ -1633,7 +1635,7 @@ export default function CommercialAdmin() {
             <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex items-center justify-between">
               <div>
                 <span className="text-[10px] text-gray-400 font-bold uppercase block">Margen de ganancia</span>
-                <strong className="text-xl font-black text-gray-900 block mt-1">{monthSummary.margenPct || '34.1'}%</strong>
+                <strong className="text-xl font-black text-gray-900 block mt-1">{monthlyMetrics.margenPct || '34.1'}%</strong>
               </div>
               <div className="flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl">
                 <span>↑ +5.7 pp</span>
