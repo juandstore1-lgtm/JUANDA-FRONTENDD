@@ -52,8 +52,17 @@ export default function TrabajaConNosotros() {
 
   const isTemporada = (v?: JobVacancy | null) => {
     if (!v) return false;
-    const text = `${v.employmentType || ''} ${v.contractType || ''} ${v.title || ''} ${v.position || ''} ${v.description || ''}`.toLowerCase();
-    return text.includes('decembr') || text.includes('diciembre') || text.includes('temporada');
+    const emp = (v.employmentType || '').toLowerCase().trim();
+    const contract = (v.contractType || '').toLowerCase().trim();
+    const pos = (v.position || '').toLowerCase().trim();
+    const title = (v.title || '').toLowerCase().trim();
+
+    // Only true if explicitly configured as Temporada Decembrina or Pago por día trabajado
+    if (emp.includes('temporada decembrina') || contract.includes('pago por día')) return true;
+    if (pos.includes('temporada decembrina') || pos.includes('apoyo decembrin')) return true;
+    if (title.includes('temporada decembrina') || title.includes('apoyo decembrin')) return true;
+
+    return false;
   };
 
   // Form state
@@ -731,9 +740,19 @@ export default function TrabajaConNosotros() {
                           {selectedVacancy.sundayHours && (
                             <p><strong className="text-gray-900">Domingo y lunes trabajado:</strong> {selectedVacancy.sundayHours}</p>
                           )}
-                          {(selectedVacancy.scheduleObservations || selectedVacancy.sundayPolicy) && (
-                            <p><strong className="text-gray-900">Observaciones domingos/festivos:</strong> {selectedVacancy.scheduleObservations || selectedVacancy.sundayPolicy}</p>
-                          )}
+                          {(() => {
+                            const cleanObs = selectedVacancy.scheduleObservations
+                              ? selectedVacancy.scheduleObservations
+                                  .replace(/\[DATOS_TURNOS_JSON:.*?\]/s, '')
+                                  .replace(/📅 FECHAS Y HORARIOS ASIGNADOS:[\s\S]*/s, '')
+                                  .trim()
+                              : '';
+                            const displayPolicy = cleanObs || selectedVacancy.sundayPolicy;
+                            if (!displayPolicy) return null;
+                            return (
+                              <p><strong className="text-gray-900">Observaciones domingos/festivos:</strong> {displayPolicy}</p>
+                            );
+                          })()}
                         </div>
                       </div>
                     )}

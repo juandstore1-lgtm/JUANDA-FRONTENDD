@@ -145,7 +145,7 @@ export default function RecruitmentAdmin() {
     notes: ''
   });
 
-  // Empty Vacancy Form (starts 100% clean)
+  // Empty Vacancy Form (starts 100% clean for regular / fixed roles)
   const createEmptyVacancy = (): JobVacancy => ({
     company: "JUAND STORE",
     sede: stores.length > 0 ? (stores[0].barrio || stores[0].name) : "República de Israel",
@@ -154,25 +154,25 @@ export default function RecruitmentAdmin() {
     title: "",
     description: "",
     workScheduleType: "Tiempo completo",
-    workScheduleHours: "",
-    saturdayHours: "",
+    workScheduleHours: "8:00 a. m. – 6:00 p. m.",
+    saturdayHours: "9:00 a. m. – 5:00 p. m.",
     workDays: "Lunes a sábado",
     sundayPolicy: "Domingos intercalados",
-    sundayHours: "",
-    holidayPolicy: "Sí, se trabajan",
+    sundayHours: "10:00 a. m. – 4:00 p. m.",
+    holidayPolicy: "No se trabajan",
     holidayHours: "",
     scheduleObservations: "",
     remunerationType: "Salario fijo",
-    baseSalary: "",
-    transportAid: "",
-    sundayHolidaySurcharge: "",
-    benefits: "",
+    baseSalary: "$ 1.750.000",
+    transportAid: "$ 162.000 (Auxilio legal de transporte)",
+    sundayHolidaySurcharge: "Aplica recargo legal",
+    benefits: "Todas las prestaciones de ley (Salud, Pensión, Cesantías, Prima)",
     salaryObservations: "",
-    requirements: "",
-    contractType: "Vinculación laboral directa",
+    requirements: "Bachiller académico, Experiencia en el cargo, Excelente actitud de servicio y puntualidad.",
+    contractType: "Contrato a término fijo",
     paymentFrequency: "Quincenal",
-    paymentDates: "",
-    probationPeriod: "Según normatividad vigente",
+    paymentDates: "Días 15 y 30 de cada mes",
+    probationPeriod: "2 meses (según normatividad vigente)",
     workPlace: stores.length > 0 ? `Sede ${stores[0].barrio || stores[0].name}` : "Sede asignada",
     status: "ACTIVA",
     vacanciesCount: 1
@@ -180,7 +180,7 @@ export default function RecruitmentAdmin() {
 
   const [vacancyForm, setVacancyForm] = useState<JobVacancy>(createEmptyVacancy());
   const [shiftDates, setShiftDates] = useState<ShiftDateItem[]>([]);
-  const [scheduleMode, setScheduleMode] = useState<'FIJO' | 'ESPECIFICO'>('ESPECIFICO');
+  const [scheduleMode, setScheduleMode] = useState<'FIJO' | 'ESPECIFICO'>('FIJO');
   const [newShiftRawDate, setNewShiftRawDate] = useState('');
   const [newShiftDayName, setNewShiftDayName] = useState('—');
   const [newShiftHours, setNewShiftHours] = useState('10:00 a. m. – 8:00 p. m.');
@@ -555,23 +555,14 @@ export default function RecruitmentAdmin() {
 
   // --- Vacancy Operations ---
   const openNewVacancyModal = () => {
-    setShiftDates(defaultDecemberShifts);
-    setScheduleMode('ESPECIFICO');
+    setShiftDates([]);
+    setScheduleMode('FIJO');
     setNewShiftRawDate('');
     setNewShiftDayName('—');
-    setNewShiftHours('10:00 a. m. – 8:00 p. m.');
+    setNewShiftHours('8:00 a. m. – 6:00 p. m.');
     setNewShiftDailyPay('40.000');
     setEditingShiftId(null);
     const empty = createEmptyVacancy();
-    empty.company = "JUAND STORE y QUALITY STORE";
-    empty.sede = "Todas las sedes (Cali)";
-    empty.position = "Asesor Comercial y Vendedor";
-    empty.title = "Asesor Comercial y Vendedor - Personal de Apoyo";
-    empty.employmentType = "Temporada decembrina";
-    empty.contractType = "Pago por día trabajado";
-    empty.baseSalary = "$ 40.000 / día trabajado";
-    empty.workScheduleType = "Por turnos";
-    empty.scheduleObservations = serializeShiftDates(defaultDecemberShifts);
     setVacancyForm(empty);
     setAvailableReqs(defaultRequirements);
     setSelectedReqs([]);
@@ -581,12 +572,14 @@ export default function RecruitmentAdmin() {
 
   const openEditVacancyModal = (v: JobVacancy) => {
     setVacancyForm(v);
+    const isSeason = (v.employmentType || '').toLowerCase().includes('temporada') ||
+                     (v.contractType || '').toLowerCase().includes('pago por día');
     const parsedShifts = parseShiftDates(v.scheduleObservations);
     setShiftDates(parsedShifts);
-    setScheduleMode(parsedShifts.length > 0 ? 'ESPECIFICO' : 'FIJO');
+    setScheduleMode(parsedShifts.length > 0 && isSeason ? 'ESPECIFICO' : 'FIJO');
     setNewShiftRawDate('');
     setNewShiftDayName('—');
-    setNewShiftHours('10:00 a. m. – 8:00 p. m.');
+    setNewShiftHours(isSeason ? '10:00 a. m. – 8:00 p. m.' : '8:00 a. m. – 6:00 p. m.');
     setNewShiftDailyPay('40.000');
     setEditingShiftId(null);
     const parsed = v.requirements ? v.requirements.split(',').map(r => r.trim()).filter(Boolean) : [];
@@ -616,8 +609,24 @@ export default function RecruitmentAdmin() {
 
     try {
       setSavingVacancy(true);
+      let scheduleObs = vacancyForm.scheduleObservations || '';
+      let workSchedHours = vacancyForm.workScheduleHours;
+      let workDaysVal = vacancyForm.workDays;
+
+      if (scheduleMode === 'ESPECIFICO' && shiftDates.length > 0) {
+        scheduleObs = serializeShiftDates(shiftDates);
+        workSchedHours = `Horario variable según fecha (${shiftDates.length} fechas programadas)`;
+        workDaysVal = shiftDates.map(d => d.date).join(', ');
+      } else if (scheduleMode === 'FIJO') {
+        // Clean out any seasonal shift data for a fixed job (like Administrador)
+        scheduleObs = vacancyForm.scheduleObservations ? vacancyForm.scheduleObservations.replace(/\[DATOS_TURNOS_JSON:.*?\]/s, '').replace(/📅 FECHAS Y HORARIOS ASIGNADOS:[\s\S]*/s, '').trim() : '';
+      }
+
       const toSave = {
         ...vacancyForm,
+        scheduleObservations: scheduleObs,
+        workScheduleHours: workSchedHours,
+        workDays: workDaysVal,
         title: vacancyForm.title.trim() || `${vacancyForm.position} - ${vacancyForm.company}`,
         requirements: selectedReqs.join(', '),
         status: status
@@ -3917,21 +3926,46 @@ export default function RecruitmentAdmin() {
                           value={vacancyForm.employmentType}
                           onChange={e => {
                             const val = e.target.value;
-                            setVacancyForm(prev => ({
-                              ...prev,
-                              employmentType: val,
-                              contractType: val === 'Temporada Decembrina' ? 'Temporada Decembrina (Obra o labor)' : val,
-                              title: val === 'Temporada Decembrina' && !prev.title.includes('Decembrina')
-                                ? (prev.position ? `${prev.position} - Temporada Decembrina Cali` : 'Asesor(a) de ventas - Temporada Decembrina Cali')
-                                : prev.title
-                            }));
+                            if (val === 'Temporada Decembrina') {
+                              setScheduleMode('ESPECIFICO');
+                              if (shiftDates.length === 0) {
+                                updateShiftDatesAndForm(defaultDecemberShifts);
+                              }
+                              setVacancyForm(prev => ({
+                                ...prev,
+                                employmentType: val,
+                                contractType: 'Pago por día trabajado',
+                                remunerationType: 'Pago por día trabajado',
+                                baseSalary: '$ 40.000 / día trabajado',
+                                transportAid: 'No aplica (tarifa diaria)',
+                                sundayHolidaySurcharge: 'No aplica (tarifa integral)',
+                                workScheduleType: 'Por turnos',
+                                title: prev.title && !prev.title.includes('Decembrina')
+                                  ? `${prev.position || 'Personal de apoyo'} - Temporada Decembrina Cali`
+                                  : prev.title
+                              }));
+                            } else {
+                              // Switch to regular fixed role (Administrador, etc.)
+                              setScheduleMode('FIJO');
+                              updateShiftDatesAndForm([]);
+                              setVacancyForm(prev => ({
+                                ...prev,
+                                employmentType: val,
+                                contractType: val,
+                                remunerationType: 'Salario fijo',
+                                baseSalary: prev.baseSalary.includes('/ día') || !prev.baseSalary ? '$ 1.750.000' : prev.baseSalary,
+                                transportAid: prev.transportAid.includes('No aplica') || !prev.transportAid ? '$ 162.000 (Auxilio de transporte legal)' : prev.transportAid,
+                                sundayHolidaySurcharge: prev.sundayHolidaySurcharge.includes('No aplica') || !prev.sundayHolidaySurcharge ? 'Aplica recargo legal' : prev.sundayHolidaySurcharge,
+                                workScheduleType: 'Tiempo completo',
+                                scheduleObservations: ''
+                              }));
+                            }
                           }}
                           className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg bg-white"
                         >
-                          <option value="Vinculación laboral directa">Vinculación laboral directa</option>
+                          <option value="Vinculación laboral directa">Vinculación laboral directa (Fijo / Indefinido)</option>
+                          <option value="Término fijo">Contrato a término fijo</option>
                           <option value="Temporada Decembrina">🎄 Temporada Decembrina (Fechas clave de Diciembre)</option>
-                          <option value="Obra o Labor (Temporada)">Obra o Labor (Temporada)</option>
-                          <option value="Término fijo">Término fijo</option>
                           <option value="Prestación de servicios">Prestación de servicios</option>
                         </select>
                       </div>
@@ -4658,56 +4692,61 @@ export default function RecruitmentAdmin() {
                     </span>
                   </div>
 
-                  {/* Section: Fechas y horarios de trabajo matching mockup */}
+                  {/* Section: Horarios / Fechas en vista previa */}
                   <div className="pt-2 border-t border-gray-100 space-y-2">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900">
-                      <span>📅</span>
-                      <span>Fechas y horarios de trabajo</span>
-                    </div>
-
-                    {shiftDates.length > 0 ? (
-                      <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-                        {shiftDates.map((s, idx) => {
-                          const shortDate = formatShortShiftDate(s.date, s.rawDate);
-                          return (
-                            <div key={s.id || idx} className="flex items-center justify-between text-xs py-1 border-b border-gray-50 last:border-b-0">
-                              <span className="font-semibold text-gray-800 text-[11px] truncate max-w-[130px]">
-                                {shortDate}
-                              </span>
-                              <span className="text-[11px] text-gray-600 font-medium">
-                                {s.hours}
-                              </span>
-                              <span className="text-[11px] font-bold text-gray-900 shrink-0">
-                                {s.dailyPay || '$40.000'}
-                              </span>
+                    {scheduleMode === 'ESPECIFICO' && shiftDates.length > 0 ? (
+                      <>
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900">
+                          <span>📅</span>
+                          <span>Fechas y horarios de trabajo</span>
+                        </div>
+                        <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                          {shiftDates.map((s, idx) => {
+                            const shortDate = formatShortShiftDate(s.date, s.rawDate);
+                            return (
+                              <div key={s.id || idx} className="flex items-center justify-between text-xs py-1 border-b border-gray-50 last:border-b-0">
+                                <span className="font-semibold text-gray-800 text-[11px] truncate max-w-[130px]">
+                                  {shortDate}
+                                </span>
+                                <span className="text-[11px] text-gray-600 font-medium">
+                                  {s.hours}
+                                </span>
+                                <span className="text-[11px] font-bold text-gray-900 shrink-0">
+                                  {s.dailyPay || '$40.000'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl flex items-center justify-between mt-2">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                              💰
                             </div>
-                          );
-                        })}
-                      </div>
+                            <div>
+                              <p className="text-xs font-black text-emerald-950">
+                                Pago total estimado: ${estimatedTotalPay.toLocaleString('es-CO')}
+                              </p>
+                              <p className="text-[10px] text-emerald-700 font-medium">
+                                ({shiftDates.length} {shiftDates.length === 1 ? 'jornada' : 'jornadas'} × {sampleDailyPay})
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </>
                     ) : (
-                      <div className="text-[11px] text-gray-500 space-y-1">
-                        <p><strong className="text-gray-900">Horario L-V:</strong> {vacancyForm.workScheduleHours || 'Por definir'}</p>
+                      <div className="text-[11px] text-gray-700 space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900 mb-1">
+                          <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Condiciones laborales y horario</span>
+                        </div>
+                        <p><strong className="text-gray-900">Salario base:</strong> {vacancyForm.baseSalary || '$ 1.750.000'} (mensual)</p>
+                        {vacancyForm.transportAid && <p><strong className="text-gray-900">Auxilio transporte:</strong> {vacancyForm.transportAid}</p>}
+                        <p><strong className="text-gray-900">Horario L-V:</strong> {vacancyForm.workScheduleHours || '8:00 a. m. – 6:00 p. m.'}</p>
                         {vacancyForm.saturdayHours && <p><strong className="text-gray-900">Horario Sábado:</strong> {vacancyForm.saturdayHours}</p>}
                         {vacancyForm.sundayHours && <p><strong className="text-gray-900">Dom/Lun trabajado:</strong> {vacancyForm.sundayHours}</p>}
                       </div>
                     )}
-
-                    {/* Pago total estimado card */}
-                    <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl flex items-center justify-between mt-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
-                          💰
-                        </div>
-                        <div>
-                          <p className="text-xs font-black text-emerald-950">
-                            Pago total estimado: ${estimatedTotalPay.toLocaleString('es-CO')}
-                          </p>
-                          <p className="text-[10px] text-emerald-700 font-medium">
-                            ({shiftDates.length} {shiftDates.length === 1 ? 'jornada' : 'jornadas'} × {sampleDailyPay})
-                          </p>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
