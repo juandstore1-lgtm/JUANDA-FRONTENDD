@@ -160,7 +160,13 @@ export default function FinancialAdmin() {
   // Filtered Expenses by Store & Month
   const filteredExpenses = useMemo(() => {
     return data.expenses.filter(exp => {
-      const matchMonth = !exp.date || getMonthYearKey(exp.date) === selectedMonth;
+      let matchMonth = true;
+      if (selectedMonth.includes('Año Completo')) {
+        matchMonth = exp.date ? exp.date.startsWith('2026') : true;
+      } else {
+        matchMonth = !exp.date || getMonthYearKey(exp.date) === selectedMonth;
+      }
+
       const matchStore = selectedStore === 'Todas las sedes' || exp.store === selectedStore || exp.store === 'Todas las sedes';
       const matchSearch = exp.concept.toLowerCase().includes(expenseSearch.toLowerCase()) ||
                           exp.category.toLowerCase().includes(expenseSearch.toLowerCase());
@@ -185,6 +191,77 @@ export default function FinancialAdmin() {
   const recurringTotal = useMemo(() => {
     return data.recurringExpenses.filter(r => r.isActive).reduce((acc, curr) => acc + curr.amount, 0);
   }, [data.recurringExpenses]);
+
+  // Totales dinámicos por categoría
+  const categoryTotals = useMemo(() => {
+    const cats: Record<string, number> = {
+      'Arriendo': 0,
+      'Servicios públicos': 0,
+      'Nómina': 0,
+      'Logística': 0,
+      'Otros': 0
+    };
+    filteredExpenses.forEach(e => {
+      if (cats[e.category] !== undefined) {
+        cats[e.category] += e.amount;
+      } else {
+        cats['Otros'] += e.amount;
+      }
+    });
+    return cats;
+  }, [filteredExpenses]);
+
+  // Totales dinámicos por sede
+  const storeTotals = useMemo(() => {
+    const stores: Record<string, number> = {
+      'República': 0,
+      'Ciudad Modelo': 0,
+      'Quality': 0,
+      'Sede Mariano': 0
+    };
+    filteredExpenses.forEach(e => {
+      if (stores[e.store] !== undefined) {
+        stores[e.store] += e.amount;
+      } else if (e.store === 'Todas las sedes' || e.store === 'Todas') {
+        const quarter = e.amount / 4;
+        stores['República'] += quarter;
+        stores['Ciudad Modelo'] += quarter;
+        stores['Quality'] += quarter;
+        stores['Sede Mariano'] += quarter;
+      }
+    });
+    const total = Object.values(stores).reduce((a, b) => a + b, 0) || 1;
+    return [
+      { name: 'República', amount: stores['República'], pct: Math.round((stores['República'] / total) * 100) },
+      { name: 'Ciudad Modelo', amount: stores['Ciudad Modelo'], pct: Math.round((stores['Ciudad Modelo'] / total) * 100) },
+      { name: 'Quality', amount: stores['Quality'], pct: Math.round((stores['Quality'] / total) * 100) },
+      { name: 'Sede Mariano', amount: stores['Sede Mariano'], pct: Math.round((stores['Sede Mariano'] / total) * 100) },
+    ];
+  }, [filteredExpenses]);
+
+  // Historial dinámico de meses para la gráfica de 6 meses
+  const monthlyHistory = useMemo(() => {
+    const months = ['Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov'];
+    const codes = ['06', '07', '08', '09', '10', '11'];
+    const monthNames: Record<string, string> = {
+      '06': 'Junio', '07': 'Julio', '08': 'Agosto', '09': 'Septiembre', '10': 'Octubre', '11': 'Noviembre'
+    };
+    return months.map((m, idx) => {
+      const c = codes[idx];
+      const sum = data.expenses
+        .filter(e => e.date && e.date.startsWith(`2026-${c}`))
+        .reduce((acc, curr) => acc + curr.amount, 0);
+      const isSelected = selectedMonth.includes(monthNames[c]);
+      return {
+        m,
+        code: c,
+        fullName: `${monthNames[c]} 2026`,
+        amount: sum,
+        val: sum > 0 ? sum / 1000000 : 15,
+        highlight: isSelected
+      };
+    });
+  }, [data.expenses, selectedMonth]);
 
   // Supplier Debts KPIs
   const filteredSupplierDebts = useMemo(() => {
@@ -475,9 +552,19 @@ export default function FinancialAdmin() {
               onChange={e => setSelectedMonth(e.target.value)}
               className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none cursor-pointer hover:bg-gray-100"
             >
-              <option value="Noviembre 2026">Noviembre 2026</option>
+              <option value="Noviembre 2026">Noviembre 2026 (Mes Actual)</option>
+              <option value="Octubre 2026">Octubre 2026</option>
+              <option value="Septiembre 2026">Septiembre 2026</option>
+              <option value="Agosto 2026">Agosto 2026</option>
+              <option value="Julio 2026">Julio 2026</option>
+              <option value="Junio 2026">Junio 2026</option>
+              <option value="Mayo 2026">Mayo 2026</option>
+              <option value="Abril 2026">Abril 2026</option>
+              <option value="Marzo 2026">Marzo 2026</option>
+              <option value="Febrero 2026">Febrero 2026</option>
+              <option value="Enero 2026">Enero 2026</option>
               <option value="Diciembre 2026">Diciembre 2026</option>
-              <option value="Enero 2027">Enero 2027</option>
+              <option value="Año Completo 2026 (Consolidado)">Año Completo 2026 (Consolidado)</option>
             </select>
 
             <select
@@ -757,8 +844,8 @@ export default function FinancialAdmin() {
                       strokeDasharray="238.76" strokeDashoffset="54.9" />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                    <span className="text-[11px] font-black text-gray-900 leading-tight">$17.589.000</span>
-                    <span className="text-[8px] font-bold text-gray-400">Total mes</span>
+                    <span className="text-[11px] font-black text-gray-900 leading-tight">{formatCOP(totalExpenses)}</span>
+                    <span className="text-[8px] font-bold text-gray-400">Total {selectedMonth.includes('Año') ? 'del año' : 'del mes'}</span>
                   </div>
                 </div>
 
@@ -768,31 +855,41 @@ export default function FinancialAdmin() {
                     <span className="flex items-center gap-1.5 text-gray-700 font-medium">
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-700"></span> Arriendo
                     </span>
-                    <span className="font-bold text-gray-900">34% <span className="text-gray-400 font-normal">· $5.95M</span></span>
+                    <span className="font-bold text-gray-900">
+                      {totalExpenses > 0 ? Math.round((categoryTotals['Arriendo'] / totalExpenses) * 100) : 0}% <span className="text-gray-400 font-normal">· {formatCOP(categoryTotals['Arriendo'])}</span>
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-1.5 text-gray-700 font-medium">
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Servicios públicos
                     </span>
-                    <span className="font-bold text-gray-900">14% <span className="text-gray-400 font-normal">· $2.52M</span></span>
+                    <span className="font-bold text-gray-900">
+                      {totalExpenses > 0 ? Math.round((categoryTotals['Servicios públicos'] / totalExpenses) * 100) : 0}% <span className="text-gray-400 font-normal">· {formatCOP(categoryTotals['Servicios públicos'])}</span>
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-1.5 text-gray-700 font-medium">
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> Nómina
                     </span>
-                    <span className="font-bold text-gray-900">18% <span className="text-gray-400 font-normal">· $3.20M</span></span>
+                    <span className="font-bold text-gray-900">
+                      {totalExpenses > 0 ? Math.round((categoryTotals['Nómina'] / totalExpenses) * 100) : 0}% <span className="text-gray-400 font-normal">· {formatCOP(categoryTotals['Nómina'])}</span>
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-1.5 text-gray-700 font-medium">
                       <span className="w-2.5 h-2.5 rounded-full bg-cyan-500"></span> Logística
                     </span>
-                    <span className="font-bold text-gray-900">7% <span className="text-gray-400 font-normal">· $1.25M</span></span>
+                    <span className="font-bold text-gray-900">
+                      {totalExpenses > 0 ? Math.round((categoryTotals['Logística'] / totalExpenses) * 100) : 0}% <span className="text-gray-400 font-normal">· {formatCOP(categoryTotals['Logística'])}</span>
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-1.5 text-gray-700 font-medium">
                       <span className="w-2.5 h-2.5 rounded-full bg-slate-400"></span> Otros
                     </span>
-                    <span className="font-bold text-gray-900">27% <span className="text-gray-400 font-normal">· $4.66M</span></span>
+                    <span className="font-bold text-gray-900">
+                      {totalExpenses > 0 ? Math.round((categoryTotals['Otros'] / totalExpenses) * 100) : 0}% <span className="text-gray-400 font-normal">· {formatCOP(categoryTotals['Otros'])}</span>
+                    </span>
                   </div>
                 </div>
               </div>
@@ -891,12 +988,14 @@ export default function FinancialAdmin() {
                       <td className="py-2.5 flex items-center gap-2 font-bold text-gray-900">
                         <DollarSign className="w-3.5 h-3.5 text-emerald-700" /> Gastos mensuales
                       </td>
-                      <td className="py-2.5 text-right font-mono font-bold">$17.589.000</td>
-                      <td className="py-2.5 text-right font-mono text-emerald-700">$5.389.000</td>
-                      <td className="py-2.5 text-right font-mono text-red-600 font-bold">$12.200.000</td>
+                      <td className="py-2.5 text-right font-mono font-bold">{formatCOP(totalExpenses)}</td>
+                      <td className="py-2.5 text-right font-mono text-emerald-700">{formatCOP(paidExpenses)}</td>
+                      <td className="py-2.5 text-right font-mono text-red-600 font-bold">{formatCOP(pendingExpenses)}</td>
                       <td className="py-2.5 text-center">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                          Pendiente
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          pendingExpenses === 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {pendingExpenses === 0 ? 'Al día' : 'Pendiente'}
                         </span>
                       </td>
                     </tr>
@@ -950,19 +1049,14 @@ export default function FinancialAdmin() {
             {/* Sedes - Gastos del mes */}
             <div className="lg:col-span-5 bg-white rounded-2xl border border-gray-200/80 p-5 shadow-2xs space-y-3">
               <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                <h3 className="text-sm font-extrabold text-gray-900">Sedes - Gastos del mes</h3>
+                <h3 className="text-sm font-extrabold text-gray-900">Sedes – Gastos {selectedMonth.includes('Año') ? 'del año' : 'del mes'}</h3>
                 <button onClick={() => setActiveTab('gastos')} className="text-[10px] font-bold text-emerald-700 hover:underline">
                   Ver detalle &gt;
                 </button>
               </div>
 
               <div className="space-y-3 pt-1">
-                {[
-                  { name: 'República', amount: 4850000, pct: 27 },
-                  { name: 'Ciudad Modelo', amount: 4320000, pct: 25 },
-                  { name: 'Quality', amount: 4620000, pct: 26 },
-                  { name: 'Sede Mariano', amount: 3799000, pct: 22 }
-                ].map(store => (
+                {storeTotals.map(store => (
                   <div key={store.name} className="space-y-1">
                     <div className="flex items-center justify-between text-xs font-bold">
                       <span className="text-gray-800">{store.name}</span>
@@ -1111,8 +1205,8 @@ export default function FinancialAdmin() {
                       strokeDasharray="238.76" strokeDashoffset="54.9" />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                    <span className="text-[11px] font-black text-gray-900 leading-tight">$17.589.000</span>
-                    <span className="text-[8px] font-bold text-gray-400">Total del mes</span>
+                    <span className="text-[11px] font-black text-gray-900 leading-tight">{formatCOP(totalExpenses)}</span>
+                    <span className="text-[8px] font-bold text-gray-400">Total {selectedMonth.includes('Año') ? 'del año' : 'del mes'}</span>
                   </div>
                 </div>
               </div>
@@ -1121,31 +1215,41 @@ export default function FinancialAdmin() {
                   <span className="flex items-center gap-1.5 text-gray-700 font-medium">
                     <span className="w-2 h-2 rounded-full bg-emerald-700"></span> Arriendo
                   </span>
-                  <span className="font-bold text-gray-900">34% <span className="text-gray-400 font-normal">· $5.95M</span></span>
+                  <span className="font-bold text-gray-900">
+                    {totalExpenses > 0 ? Math.round((categoryTotals['Arriendo'] / totalExpenses) * 100) : 0}% <span className="text-gray-400 font-normal">· {formatCOP(categoryTotals['Arriendo'])}</span>
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-1.5 text-gray-700 font-medium">
                     <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Servicios públicos
                   </span>
-                  <span className="font-bold text-gray-900">14% <span className="text-gray-400 font-normal">· $2.52M</span></span>
+                  <span className="font-bold text-gray-900">
+                    {totalExpenses > 0 ? Math.round((categoryTotals['Servicios públicos'] / totalExpenses) * 100) : 0}% <span className="text-gray-400 font-normal">· {formatCOP(categoryTotals['Servicios públicos'])}</span>
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-1.5 text-gray-700 font-medium">
                     <span className="w-2 h-2 rounded-full bg-emerald-400"></span> Nómina
                   </span>
-                  <span className="font-bold text-gray-900">18% <span className="text-gray-400 font-normal">· $3.20M</span></span>
+                  <span className="font-bold text-gray-900">
+                    {totalExpenses > 0 ? Math.round((categoryTotals['Nómina'] / totalExpenses) * 100) : 0}% <span className="text-gray-400 font-normal">· {formatCOP(categoryTotals['Nómina'])}</span>
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-1.5 text-gray-700 font-medium">
                     <span className="w-2 h-2 rounded-full bg-cyan-500"></span> Logística
                   </span>
-                  <span className="font-bold text-gray-900">7% <span className="text-gray-400 font-normal">· $1.25M</span></span>
+                  <span className="font-bold text-gray-900">
+                    {totalExpenses > 0 ? Math.round((categoryTotals['Logística'] / totalExpenses) * 100) : 0}% <span className="text-gray-400 font-normal">· {formatCOP(categoryTotals['Logística'])}</span>
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-1.5 text-gray-700 font-medium">
                     <span className="w-2 h-2 rounded-full bg-slate-400"></span> Otros
                   </span>
-                  <span className="font-bold text-gray-900">27% <span className="text-gray-400 font-normal">· $4.66M</span></span>
+                  <span className="font-bold text-gray-900">
+                    {totalExpenses > 0 ? Math.round((categoryTotals['Otros'] / totalExpenses) * 100) : 0}% <span className="text-gray-400 font-normal">· {formatCOP(categoryTotals['Otros'])}</span>
+                  </span>
                 </div>
               </div>
             </div>
@@ -1155,7 +1259,7 @@ export default function FinancialAdmin() {
               <h3 className="text-sm font-extrabold text-gray-900">Gastos mensuales (Últimos 6 meses)</h3>
               <div className="relative pt-2">
                 <div className="absolute top-1 right-4 bg-emerald-900 text-white font-mono font-bold text-[9px] px-2 py-0.5 rounded shadow">
-                  $17.589.000
+                  {formatCOP(totalExpenses)}
                 </div>
                 <svg viewBox="0 0 320 140" className="w-full h-44 overflow-visible">
                   {[0, 5, 10, 15, 20, 25].map(v => {
@@ -1168,26 +1272,26 @@ export default function FinancialAdmin() {
                     );
                   })}
 
-                  {[
-                    { m: 'Jun', val: 14.5, x: 45 },
-                    { m: 'Jul', val: 15.2, x: 92 },
-                    { m: 'Ago', val: 16.0, x: 139 },
-                    { m: 'Sep', val: 15.8, x: 186 },
-                    { m: 'Oct', val: 16.3, x: 233 },
-                    { m: 'Nov', val: 17.589, x: 280, highlight: true }
-                  ].map(item => {
-                    const h = (item.val / 25) * 95;
+                  {monthlyHistory.map((item, idx) => {
+                    const xs = [45, 92, 139, 186, 233, 280];
+                    const x = xs[idx];
+                    const h = Math.min(95, Math.max(10, (item.val / 25) * 95));
                     return (
-                      <g key={item.m}>
+                      <g
+                        key={item.m}
+                        className="cursor-pointer group"
+                        onClick={() => setSelectedMonth(item.fullName)}
+                      >
                         <rect
-                          x={item.x - 10}
+                          x={x - 10}
                           y={115 - h}
                           width="20"
                           height={h}
                           rx="4"
                           fill={item.highlight ? '#064e3b' : '#a7f3d0'}
+                          className="transition-all hover:opacity-80"
                         />
-                        <text x={item.x} y="130" textAnchor="middle" fontSize="9" fill={item.highlight ? '#064e3b' : '#64748b'} fontWeight="bold">
+                        <text x={x} y="130" textAnchor="middle" fontSize="9" fill={item.highlight ? '#064e3b' : '#64748b'} fontWeight="bold">
                           {item.m}
                         </text>
                       </g>
@@ -1209,14 +1313,9 @@ export default function FinancialAdmin() {
 
             {/* Gastos por Sede */}
             <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-200/80 p-5 shadow-2xs space-y-3">
-              <h3 className="text-sm font-extrabold text-gray-900">Gastos por sede (Noviembre)</h3>
+              <h3 className="text-sm font-extrabold text-gray-900">Gastos por sede ({selectedMonth})</h3>
               <div className="space-y-3 pt-2">
-                {[
-                  { name: 'República', amount: 4850000, pct: 27 },
-                  { name: 'Ciudad Modelo', amount: 4320000, pct: 25 },
-                  { name: 'Quality', amount: 4620000, pct: 26 },
-                  { name: 'Sede Mariano', amount: 3799000, pct: 22 }
-                ].map(store => (
+                {storeTotals.map(store => (
                   <div key={store.name} className="space-y-1">
                     <div className="flex items-center justify-between text-xs font-bold">
                       <span className="text-gray-800 flex items-center gap-1.5">

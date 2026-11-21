@@ -91,173 +91,94 @@ export interface FinancialData {
   calendarEvents: CalendarItem[];
 }
 
-const STORAGE_KEY = 'juand_financial_data_v1';
+export const MONTH_NAMES_MAP: Record<string, string> = {
+  '01': 'Enero', '02': 'Febrero', '03': 'Marzo', '04': 'Abril',
+  '05': 'Mayo', '06': 'Junio', '07': 'Julio', '08': 'Agosto',
+  '09': 'Septiembre', '10': 'Octubre', '11': 'Noviembre', '12': 'Diciembre'
+};
+
+export const getMonthYearKey = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length < 2) return '';
+  const y = parts[0];
+  const m = parts[1];
+  return `${MONTH_NAMES_MAP[m] || m} ${y}`;
+};
+
+// Generador de gastos completos para todos los 12 meses del año 2026
+function generateFullYearExpenses(): FinancialExpense[] {
+  const allExpenses: FinancialExpense[] = [];
+
+  // Noviembre 2026 (Mes Actual con valores exactos validados por el usuario: $17.034.000 total, $4.485.000 pagados, $12.549.000 pendientes)
+  const novExpenses: FinancialExpense[] = [
+    { id: 'exp-nov-1', date: '2026-11-03', concept: 'Arriendo Local República', category: 'Arriendo', store: 'República', amount: 1800000, status: 'Pagado', notes: 'Pago canon noviembre' },
+    { id: 'exp-nov-2', date: '2026-11-03', concept: 'Arriendo Local Ciudad Modelo', category: 'Arriendo', store: 'Ciudad Modelo', amount: 1600000, status: 'Pagado', notes: 'Transferencia Bancolombia' },
+    { id: 'exp-nov-3', date: '2026-11-05', concept: 'Servicios públicos', category: 'Servicios públicos', store: 'República', amount: 350000, status: 'Pagado', notes: 'Luz y agua' },
+    { id: 'exp-nov-4', date: '2026-11-05', concept: 'Internet fibra', category: 'Internet', store: 'Ciudad Modelo', amount: 85000, status: 'Pagado', notes: 'Plan corporativo' },
+    { id: 'exp-nov-5', date: '2026-11-07', concept: 'Nómina vendedores', category: 'Nómina', store: 'Todas las sedes', amount: 3200000, status: 'Pendiente', notes: 'Quincena colaboradores' },
+    { id: 'exp-nov-6', date: '2026-11-10', concept: 'Transporte de mercancía', category: 'Logística', store: 'Quality', amount: 420000, status: 'Pendiente', notes: 'Flete Medellín' },
+    { id: 'exp-nov-7', date: '2026-11-12', concept: 'Mantenimiento local', category: 'Otros', store: 'Sede Mariano', amount: 650000, status: 'Pagado', notes: 'Reparaciones y pintura' },
+    { id: 'exp-nov-8', date: '2026-11-15', concept: 'Arriendo Sede Quality', category: 'Arriendo', store: 'Quality', amount: 2100000, status: 'Pendiente', notes: 'Canon mensual' },
+    { id: 'exp-nov-9', date: '2026-11-18', concept: 'Servicios de aseo e insumos', category: 'Servicios públicos', store: 'Sede Mariano', amount: 280000, status: 'Pendiente' },
+    { id: 'exp-nov-10', date: '2026-11-20', concept: 'Publicidad e impresiones', category: 'Otros', store: 'Todas las sedes', amount: 704000, status: 'Pendiente' },
+    { id: 'exp-nov-11', date: '2026-11-22', concept: 'Servicios públicos Ciudad Modelo', category: 'Servicios públicos', store: 'Ciudad Modelo', amount: 450000, status: 'Pendiente' },
+    { id: 'exp-nov-12', date: '2026-11-24', concept: 'Arriendo Sede Mariano', category: 'Arriendo', store: 'Sede Mariano', amount: 1900000, status: 'Pendiente' },
+    { id: 'exp-nov-13', date: '2026-11-25', concept: 'Internet sedes adicionales', category: 'Internet', store: 'Todas las sedes', amount: 255000, status: 'Pendiente' },
+    { id: 'exp-nov-14', date: '2026-11-26', concept: 'Flete y logística de despacho', category: 'Logística', store: 'República', amount: 830000, status: 'Pendiente' },
+    { id: 'exp-nov-15', date: '2026-11-27', concept: 'Gastos bancarios y comisiones', category: 'Otros', store: 'Todas las sedes', amount: 420000, status: 'Pendiente' },
+    { id: 'exp-nov-16', date: '2026-11-28', concept: 'Honorarios contables y legales', category: 'Otros', store: 'Todas las sedes', amount: 1450000, status: 'Pendiente' },
+    { id: 'exp-nov-17', date: '2026-11-29', concept: 'Servicios públicos Quality', category: 'Servicios públicos', store: 'Quality', amount: 540000, status: 'Pendiente' }
+  ];
+
+  allExpenses.push(...novExpenses);
+
+  // Otros meses de 2026 (Enero a Octubre = meses pasados 100% Pagados; Diciembre = mes futuro 100% Pendiente)
+  const monthDataConfigs = [
+    { m: '01', name: 'Enero', totalTarget: 14800000, log: 400000, maint: 350000, pub: 420000, hon: 1200000, isPast: true },
+    { m: '02', name: 'Febrero', totalTarget: 15000000, log: 450000, maint: 400000, pub: 450000, hon: 1250000, isPast: true },
+    { m: '03', name: 'Marzo', totalTarget: 15300000, log: 520000, maint: 420000, pub: 500000, hon: 1300000, isPast: true },
+    { m: '04', name: 'Abril', totalTarget: 15100000, log: 480000, maint: 380000, pub: 480000, hon: 1280000, isPast: true },
+    { m: '05', name: 'Mayo', totalTarget: 15400000, log: 560000, maint: 450000, pub: 520000, hon: 1320000, isPast: true },
+    { m: '06', name: 'Junio', totalTarget: 14500000, log: 410000, maint: 360000, pub: 400000, hon: 1250000, isPast: true },
+    { m: '07', name: 'Julio', totalTarget: 15200000, log: 530000, maint: 440000, pub: 490000, hon: 1300000, isPast: true },
+    { m: '08', name: 'Agosto', totalTarget: 16000000, log: 720000, maint: 520000, pub: 610000, hon: 1380000, isPast: true },
+    { m: '09', name: 'Septiembre', totalTarget: 15800000, log: 680000, maint: 490000, pub: 580000, hon: 1350000, isPast: true },
+    { m: '10', name: 'Octubre', totalTarget: 16300000, log: 810000, maint: 580000, pub: 650000, hon: 1420000, isPast: true },
+    { m: '12', name: 'Diciembre', totalTarget: 18200000, log: 1250000, maint: 650000, pub: 950000, hon: 1500000, isPast: false }
+  ];
+
+  for (const cfg of monthDataConfigs) {
+    const status: 'Pagado' | 'Pendiente' = cfg.isPast ? 'Pagado' : 'Pendiente';
+    const m = cfg.m;
+
+    allExpenses.push(
+      { id: `exp-${m}-1`, date: `2026-${m}-03`, concept: 'Arriendo Local República', category: 'Arriendo', store: 'República', amount: 1800000, status },
+      { id: `exp-${m}-2`, date: `2026-${m}-03`, concept: 'Arriendo Local Ciudad Modelo', category: 'Arriendo', store: 'Ciudad Modelo', amount: 1600000, status },
+      { id: `exp-${m}-3`, date: `2026-${m}-03`, concept: 'Arriendo Sede Quality', category: 'Arriendo', store: 'Quality', amount: 2100000, status },
+      { id: `exp-${m}-4`, date: `2026-${m}-03`, concept: 'Arriendo Sede Mariano', category: 'Arriendo', store: 'Sede Mariano', amount: 1900000, status },
+      { id: `exp-${m}-5`, date: `2026-${m}-05`, concept: 'Servicios públicos República', category: 'Servicios públicos', store: 'República', amount: 350000, status },
+      { id: `exp-${m}-6`, date: `2026-${m}-05`, concept: 'Servicios públicos Ciudad Modelo', category: 'Servicios públicos', store: 'Ciudad Modelo', amount: 450000, status },
+      { id: `exp-${m}-7`, date: `2026-${m}-05`, concept: 'Servicios públicos Quality', category: 'Servicios públicos', store: 'Quality', amount: 540000, status },
+      { id: `exp-${m}-8`, date: `2026-${m}-05`, concept: 'Servicios de aseo e insumos Mariano', category: 'Servicios públicos', store: 'Sede Mariano', amount: 280000, status },
+      { id: `exp-${m}-9`, date: `2026-${m}-05`, concept: 'Internet fibra sedes', category: 'Internet', store: 'Todas las sedes', amount: 340000, status },
+      { id: `exp-${m}-10`, date: `2026-${m}-13`, concept: m === '12' ? 'Nómina colaboradores y prima' : 'Nómina vendedores', category: 'Nómina', store: 'Todas las sedes', amount: m === '12' ? 4200000 : 3200000, status },
+      { id: `exp-${m}-11`, date: `2026-${m}-15`, concept: 'Transporte y flete de mercancía', category: 'Logística', store: 'Quality', amount: cfg.log, status },
+      { id: `exp-${m}-12`, date: `2026-${m}-18`, concept: 'Mantenimiento de locales', category: 'Otros', store: 'Sede Mariano', amount: cfg.maint, status },
+      { id: `exp-${m}-13`, date: `2026-${m}-20`, concept: 'Publicidad e impresiones', category: 'Otros', store: 'Todas las sedes', amount: cfg.pub, status },
+      { id: `exp-${m}-14`, date: `2026-${m}-25`, concept: 'Gastos bancarios y comisiones', category: 'Otros', store: 'Todas las sedes', amount: 390000, status },
+      { id: `exp-${m}-15`, date: `2026-${m}-28`, concept: 'Honorarios contables y soporte', category: 'Otros', store: 'Todas las sedes', amount: cfg.hon, status }
+    );
+  }
+
+  return allExpenses;
+}
+
+const STORAGE_KEY = 'juand_financial_data_v2';
 
 // Initial realistic dataset matching the user's screenshots
 export const INITIAL_FINANCIAL_DATA: FinancialData = {
-  expenses: [
-    {
-      id: 'exp-1',
-      date: '2026-11-03',
-      concept: 'Arriendo Local República',
-      category: 'Arriendo',
-      store: 'República',
-      amount: 1800000,
-      status: 'Pagado',
-      notes: 'Pago arriendo local noviembre'
-    },
-    {
-      id: 'exp-2',
-      date: '2026-11-03',
-      concept: 'Arriendo Local Ciudad Modelo',
-      category: 'Arriendo',
-      store: 'Ciudad Modelo',
-      amount: 1600000,
-      status: 'Pagado',
-      notes: 'Transferencia Bancolombia'
-    },
-    {
-      id: 'exp-3',
-      date: '2026-11-05',
-      concept: 'Servicios públicos',
-      category: 'Servicios públicos',
-      store: 'República',
-      amount: 350000,
-      status: 'Pagado',
-      notes: 'Luz y agua sede central'
-    },
-    {
-      id: 'exp-4',
-      date: '2026-11-05',
-      concept: 'Internet fibra',
-      category: 'Internet',
-      store: 'Ciudad Modelo',
-      amount: 85000,
-      status: 'Pagado',
-      notes: 'Plan corporativo Claro'
-    },
-    {
-      id: 'exp-5',
-      date: '2026-11-07',
-      concept: 'Nómina vendedores',
-      category: 'Nómina',
-      store: 'Todas las sedes',
-      amount: 3200000,
-      status: 'Pendiente',
-      notes: 'Primera quincena noviembre'
-    },
-    {
-      id: 'exp-6',
-      date: '2026-11-10',
-      concept: 'Transporte de mercancía',
-      category: 'Logística',
-      store: 'Quality',
-      amount: 420000,
-      status: 'Pendiente',
-      notes: 'Flete de abastecimiento Medellín'
-    },
-    {
-      id: 'exp-7',
-      date: '2026-11-12',
-      concept: 'Mantenimiento local',
-      category: 'Otros',
-      store: 'Sede Mariano',
-      amount: 650000,
-      status: 'Pagado',
-      notes: 'Reparación luminarias y pintura'
-    },
-    {
-      id: 'exp-8',
-      date: '2026-11-15',
-      concept: 'Arriendo Sede Quality',
-      category: 'Arriendo',
-      store: 'Quality',
-      amount: 2100000,
-      status: 'Pendiente',
-      notes: 'Canon mensual'
-    },
-    {
-      id: 'exp-9',
-      date: '2026-11-18',
-      concept: 'Servicios de aseo e insumos',
-      category: 'Servicios públicos',
-      store: 'Sede Mariano',
-      amount: 280000,
-      status: 'Pendiente'
-    },
-    {
-      id: 'exp-10',
-      date: '2026-11-20',
-      concept: 'Publicidad e impresiones',
-      category: 'Otros',
-      store: 'Todas las sedes',
-      amount: 704000,
-      status: 'Pendiente'
-    },
-    {
-      id: 'exp-11',
-      date: '2026-11-22',
-      concept: 'Servicios públicos Ciudad Modelo',
-      category: 'Servicios públicos',
-      store: 'Ciudad Modelo',
-      amount: 450000,
-      status: 'Pendiente'
-    },
-    {
-      id: 'exp-12',
-      date: '2026-11-24',
-      concept: 'Arriendo Sede Mariano',
-      category: 'Arriendo',
-      store: 'Sede Mariano',
-      amount: 1900000,
-      status: 'Pendiente'
-    },
-    {
-      id: 'exp-13',
-      date: '2026-11-25',
-      concept: 'Internet sedes adicionales',
-      category: 'Internet',
-      store: 'Todas las sedes',
-      amount: 255000,
-      status: 'Pendiente'
-    },
-    {
-      id: 'exp-14',
-      date: '2026-11-26',
-      concept: 'Flete y logística de despacho',
-      category: 'Logística',
-      store: 'República',
-      amount: 830000,
-      status: 'Pendiente'
-    },
-    {
-      id: 'exp-15',
-      date: '2026-11-27',
-      concept: 'Gastos bancarios y comisiones',
-      category: 'Otros',
-      store: 'Todas las sedes',
-      amount: 420000,
-      status: 'Pendiente'
-    },
-    {
-      id: 'exp-16',
-      date: '2026-11-28',
-      concept: 'Honorarios contables y legales',
-      category: 'Otros',
-      store: 'Todas las sedes',
-      amount: 1450000,
-      status: 'Pendiente'
-    },
-    {
-      id: 'exp-17',
-      date: '2026-11-29',
-      concept: 'Servicios públicos Quality',
-      category: 'Servicios públicos',
-      store: 'Quality',
-      amount: 540000,
-      status: 'Pendiente'
-    }
-  ],
+  expenses: generateFullYearExpenses(),
   recurringExpenses: [
     {
       id: 'rec-1',
@@ -596,7 +517,18 @@ export class FinancialService {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        return JSON.parse(stored);
+        const parsed: FinancialData = JSON.parse(stored);
+        // Migración automática: Si los gastos en cache son menos de 50 (ej. solo tenían Noviembre), actualizar al año completo
+        if (parsed.expenses && parsed.expenses.length < 50) {
+          const fullData = {
+            ...INITIAL_FINANCIAL_DATA,
+            ...parsed,
+            expenses: INITIAL_FINANCIAL_DATA.expenses
+          };
+          this.saveFinancialData(fullData);
+          return fullData;
+        }
+        return parsed;
       }
     } catch (e) {
       console.warn('Error reading financial data from localStorage:', e);
@@ -729,7 +661,7 @@ export class FinancialService {
         merged.status = merged.pendingBalance === 0 ? 'Pagada' : 'Pendiente';
         return merged;
       }
-      return d;
+      return r;
     });
     this.saveFinancialData(data);
   }
@@ -794,7 +726,7 @@ export class FinancialService {
         merged.status = merged.pendingBalance === 0 ? 'Cancelada' : 'Vigente';
         return merged;
       }
-      return d;
+      return r;
     });
     this.saveFinancialData(data);
   }
