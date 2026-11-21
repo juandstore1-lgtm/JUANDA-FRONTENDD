@@ -1876,7 +1876,6 @@ Devuelve ÚNICAMENTE un array JSON con esta estructura exacta, sin texto introdu
         <div className="flex items-center gap-1.5 mt-5 pt-3 border-t border-gray-100 overflow-x-auto custom-scrollbar text-xs">
           {[
             { id: 'resumen', label: 'Resumen general', icon: TrendingUp },
-            { id: 'cargar-ia', label: 'Cargar ventas (IA)', icon: Sparkles },
             { id: 'registro-manual', label: 'Anotar ventas / Cierre', icon: Edit3 },
             { id: 'historial', label: 'Historial de ventas', icon: History },
             { id: 'ventas-mensuales', label: 'Ventas mensuales', icon: BarChart3 },
@@ -2034,7 +2033,7 @@ Devuelve ÚNICAMENTE un array JSON con esta estructura exacta, sin texto introdu
       {/* =====================================================================
           VISTA 2: CARGAR VENTAS CON IA
           ===================================================================== */}
-      {activeTab === 'cargar-ia' && (
+      {false && activeTab === 'cargar-ia' && (
         <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-2xs space-y-6 animate-in fade-in duration-200">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
             <div>
@@ -2396,26 +2395,6 @@ Devuelve ÚNICAMENTE un array JSON con esta estructura exacta, sin texto introdu
                     />
                   </div>
                 </div>
-
-                {/* Botón integrado Cargar ventas (IA) */}
-                <button
-                  type="button"
-                  onClick={() => setIsAiInlineOpen(!isAiInlineOpen)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black shadow-xs flex items-center gap-1.5 cursor-pointer transition-all ${
-                    isAiInlineOpen
-                      ? 'bg-purple-900 text-white shadow-inner ring-2 ring-purple-400'
-                      : 'bg-gradient-to-r from-purple-700 via-indigo-700 to-emerald-700 hover:from-purple-800 hover:to-emerald-800 text-white'
-                  }`}
-                  title="Subir fotos de libreta y extraer ventas simultáneamente con IA"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Cargar ventas (IA)</span>
-                  {aiInlineImages.length > 0 && (
-                    <span className="ml-1 px-1.5 py-0.2 rounded-full text-[9px] bg-white text-purple-900 font-black">
-                      {aiInlineImages.length}
-                    </span>
-                  )}
-                </button>
               </div>
             </div>
 
@@ -2490,8 +2469,8 @@ Devuelve ÚNICAMENTE un array JSON con esta estructura exacta, sin texto introdu
               </div>
             )}
 
-            {/* PANEL INTEGRADO: CARGAR VENTAS (IA) CON SUBIDA SIMULTÁNEA DE IMÁGENES */}
-            {isAiInlineOpen && (
+            {/* PANEL INTEGRADO: CARGAR VENTAS (IA) (DESACTIVADO TEMPORALMENTE) */}
+            {false && isAiInlineOpen && (
               <div className="p-5 rounded-2xl border-2 border-purple-200 bg-gradient-to-br from-purple-50/50 via-white to-emerald-50/30 shadow-md space-y-4 animate-in fade-in zoom-in-95 duration-200">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-100 pb-3">
                   <div className="flex items-center gap-2.5">
@@ -3280,7 +3259,7 @@ Devuelve ÚNICAMENTE un array JSON con esta estructura exacta, sin texto introdu
               <div className="p-10 text-center text-gray-400 space-y-2">
                 <History className="w-8 h-8 mx-auto text-gray-300" />
                 <p className="text-xs font-medium">Aún no hay cuadres registrados en el sistema.</p>
-                <p className="text-[11px] text-gray-400">Ve a "Anotar ventas / Cierre" o "Cargar ventas (IA)" para hacer el primer cierre de ventas.</p>
+                <p className="text-[11px] text-gray-400">Ve a "Anotar ventas / Cierre" para hacer el primer cierre de ventas.</p>
               </div>
             ) : (
               data.cuadres.filter(c => selectedStoreId === 'all' || c.storeId === selectedStoreId).map(cuadre => (
