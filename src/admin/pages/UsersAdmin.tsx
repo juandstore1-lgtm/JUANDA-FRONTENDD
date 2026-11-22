@@ -5,9 +5,7 @@ import {
   Plus, Edit2, Trash2, X, Search, Shield, 
   Mail, Phone, Calendar, Clock, CheckCircle2, 
   XCircle, AlertTriangle, Eye, EyeOff, RefreshCw, 
-  FileText, Check, Lock, Building2, Sparkles, 
-  Copy, UserCheck, UserX, User as UserIcon, ShieldAlert,
-  MapPin, Hash, IdCard
+  Lock, Copy, UserX, MapPin, Hash, Sparkles
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { formatStoreName } from '../../utils/format';
@@ -53,6 +51,33 @@ const STATUS_CONFIG: Record<UserStatus, { label: string; bg: string; text: strin
   }
 };
 
+const USER_META_STORAGE_KEY = 'juand_user_profiles_meta_v1';
+
+const getStoredMeta = (): Record<string, any> => {
+  try {
+    const raw = localStorage.getItem(USER_META_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+const saveStoredMeta = (key: string, data: any) => {
+  try {
+    const curr = getStoredMeta();
+    curr[key] = { ...(curr[key] || {}), ...data };
+    localStorage.setItem(USER_META_STORAGE_KEY, JSON.stringify(curr));
+  } catch {}
+};
+
+const removeStoredMeta = (key: string) => {
+  try {
+    const curr = getStoredMeta();
+    delete curr[key];
+    localStorage.setItem(USER_META_STORAGE_KEY, JSON.stringify(curr));
+  } catch {}
+};
+
 export default function UsersAdmin() {
   const [users, setUsers] = useState<User[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
@@ -92,11 +117,36 @@ export default function UsersAdmin() {
   const loadData = async () => {
     setRefreshing(true);
     try {
-      const [u, s] = await Promise.all([UserService.getUsers(), StoreService.getStores()]);
-      setUsers(u);
-      setStores(s);
+      // Limpiar cualquier residuo de mocks previos
+      try {
+        localStorage.removeItem('juand_system_users_catalog_v1');
+        localStorage.removeItem('juand_system_users_catalog_v2');
+      } catch {}
+
+      const [realUsers, realStores] = await Promise.all([
+        UserService.getUsers(), 
+        StoreService.getStores().catch(() => [])
+      ]);
+
+      const meta = getStoredMeta();
+      const enriched: User[] = (realUsers || []).map((user: User) => {
+        const userMeta = meta[user.id] || (user.email ? meta[user.email] : {}) || {};
+        return {
+          ...user,
+          documentType: user.documentType || userMeta.documentType || 'CC',
+          documentNumber: user.documentNumber || userMeta.documentNumber || '',
+          phone: user.phone || userMeta.phone || '',
+          username: user.username || userMeta.username || (user.email ? user.email.split('@')[0] : ''),
+          status: user.status || userMeta.status || (user.isActive ? 'ACTIVO' : 'INACTIVO'),
+          createdAt: user.createdAt || userMeta.createdAt || '',
+          lastLogin: user.lastLogin || userMeta.lastLogin || 'Sin accesos registrados'
+        };
+      });
+
+      setUsers(enriched);
+      setStores(realStores || []);
     } catch (err) {
-      console.error('Error cargando usuarios y sedes:', err);
+      console.error('Error cargando usuarios y sedes de la base de datos:', err);
     } finally {
       setRefreshing(false);
     }
@@ -106,13 +156,7 @@ export default function UsersAdmin() {
     loadData();
   }, []);
 
-  // Generar ID único automático
-  const generateNewUserId = () => {
-    const nextNum = users.length + 1001;
-    return `ADM-${nextNum}`;
-  };
-
-  // Generar contraseña aleatoria segura
+  // Generar contraseña aleatoria segura si el usuario lo desea
   const generateSecurePassword = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%&*';
     let result = 'Jd#';
@@ -123,7 +167,7 @@ export default function UsersAdmin() {
     setShowPassword(true);
   };
 
-  // Sugerir usuario a partir del nombre o sede
+  // Sugerir nombre de usuario a partir del correo o nombre
   const suggestUsername = () => {
     if (formData.name.trim()) {
       const clean = formData.name.toLowerCase()
@@ -132,16 +176,8 @@ export default function UsersAdmin() {
       const parts = clean.split('.').filter(Boolean);
       const suggested = parts.length > 1 ? `${parts[0]}.${parts[1]}` : parts[0];
       setFormData(prev => ({ ...prev, username: suggested }));
-    } else if (formData.storeIds.length > 0) {
-      const store = stores.find(s => s.id === formData.storeIds[0]);
-      if (store) {
-        const cleanStore = store.name.toLowerCase().includes('republica') ? 'republica'
-          : store.name.toLowerCase().includes('modelo') ? 'ciudadmodelo'
-          : store.name.toLowerCase().includes('colombia') ? 'villacolombia'
-          : store.name.toLowerCase().includes('mariano') ? 'marianoramos'
-          : 'sede';
-        setFormData(prev => ({ ...prev, username: `admin.${cleanStore}` }));
-      }
+    } else if (formData.email.trim()) {
+      setFormData(prev => ({ ...prev, username: formData.email.split('@')[0] }));
     }
   };
 
@@ -156,7 +192,7 @@ export default function UsersAdmin() {
         documentNumber: user.documentNumber || '',
         phone: user.phone || '',
         email: user.email || '',
-        username: user.username || user.email?.split('@')[0] || '',
+        username: user.username || (user.email ? user.email.split('@')[0] : ''),
         password: '',
         roleName: (user.role?.name || 'STORE_ADMIN') as UserRoleName,
         storeIds: user.storeIds || [],
@@ -167,7 +203,7 @@ export default function UsersAdmin() {
     } else {
       setEditingId(null);
       setFormData({
-        id: generateNewUserId(),
+        id: '',
         name: '',
         documentType: 'CC',
         documentNumber: '',
@@ -176,10 +212,10 @@ export default function UsersAdmin() {
         username: '',
         password: '',
         roleName: 'STORE_ADMIN',
-        storeIds: stores.length > 0 ? [stores[0].id] : ['1'],
+        storeIds: stores.length > 0 ? [stores[0].id] : [],
         status: 'ACTIVO',
-        createdAt: new Date().toISOString(),
-        lastLogin: 'Sin accesos registrados'
+        createdAt: '',
+        lastLogin: ''
       });
     }
     setIsModalOpen(true);
@@ -199,13 +235,6 @@ export default function UsersAdmin() {
     }));
   };
 
-  const handleSelectSingleStore = (storeId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      storeIds: [storeId]
-    }));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) {
@@ -217,7 +246,7 @@ export default function UsersAdmin() {
       return;
     }
     if (!editingId && !formData.password.trim()) {
-      Swal.fire({ icon: 'warning', title: 'Contraseña requerida', text: 'Debes asignar una contraseña al nuevo usuario.' });
+      Swal.fire({ icon: 'warning', title: 'Contraseña requerida', text: 'Debes asignar una contraseña para el nuevo usuario.' });
       return;
     }
     if (formData.roleName === 'STORE_ADMIN' && formData.storeIds.length === 0) {
@@ -227,60 +256,57 @@ export default function UsersAdmin() {
 
     setLoading(true);
 
-    const storeNames = formData.roleName === 'GLOBAL_ADMIN'
-      ? ['Todas las sedes (Global)']
-      : formData.storeIds.map(id => {
-          const s = stores.find(st => String(st.id) === String(id));
-          return s ? formatStoreName(s) : `Sede ${id}`;
-        });
-
-    const userData: User = {
-      id: editingId || formData.id || generateNewUserId(),
+    const payload = {
       name: formData.name.trim(),
-      documentType: formData.documentType,
-      documentNumber: formData.documentNumber.trim(),
-      phone: formData.phone.trim(),
       email: formData.email.trim().toLowerCase(),
-      username: formData.username.trim() || formData.email.split('@')[0],
-      password: formData.password || undefined,
-      role: {
-        id: formData.roleName === 'GLOBAL_ADMIN' ? 'r1' : 'r2',
-        name: formData.roleName
-      },
-      storeIds: formData.roleName === 'GLOBAL_ADMIN' ? [] : formData.storeIds,
-      assignedStoreNames: storeNames,
-      status: formData.status,
-      isActive: formData.status === 'ACTIVO',
-      createdAt: editingId ? (formData.createdAt || new Date().toISOString()) : new Date().toISOString(),
-      lastLogin: formData.lastLogin || 'Sin accesos registrados'
+      password: formData.password ? formData.password : undefined,
+      roleName: formData.roleName,
+      storeIds: formData.roleName === 'GLOBAL_ADMIN' ? [] : formData.storeIds.map(Number),
+      isActive: formData.status === 'ACTIVO'
     };
 
     try {
       if (editingId) {
-        await UserService.updateUser(editingId, userData);
+        await UserService.updateUser(editingId, payload);
+        saveStoredMeta(editingId, {
+          documentType: formData.documentType,
+          documentNumber: formData.documentNumber.trim(),
+          phone: formData.phone.trim(),
+          username: formData.username.trim(),
+          status: formData.status
+        });
         Swal.fire({
           icon: 'success',
           title: 'Usuario Actualizado',
-          text: `Los datos del administrador ${userData.name} han sido actualizados exitosamente.`,
+          text: `Los cambios para ${formData.name} fueron guardados exitosamente en la base de datos.`,
           confirmButtonColor: '#000000'
         });
       } else {
-        await UserService.createUser(userData);
+        const created = await UserService.createUser(payload);
+        const newKey = created?.id ? String(created.id) : payload.email;
+        saveStoredMeta(newKey, {
+          documentType: formData.documentType,
+          documentNumber: formData.documentNumber.trim(),
+          phone: formData.phone.trim(),
+          username: formData.username.trim(),
+          status: formData.status,
+          createdAt: new Date().toISOString()
+        });
         Swal.fire({
           icon: 'success',
           title: 'Usuario Registrado',
-          text: `El administrador ${userData.name} ha sido registrado correctamente con ID ${userData.id}.`,
+          text: `El usuario ${formData.name} fue creado exitosamente en la base de datos.`,
           confirmButtonColor: '#000000'
         });
       }
       setIsModalOpen(false);
       loadData();
     } catch (error: any) {
-      console.error(error);
+      console.error('Error al guardar usuario en base de datos:', error);
       Swal.fire({
         icon: 'error',
         title: 'Error al Guardar',
-        text: error.message || 'Ocurrió un error inesperado al guardar el usuario.',
+        text: error.message || 'No se pudo guardar el usuario en la base de datos.',
         confirmButtonColor: '#000000'
       });
     } finally {
@@ -291,9 +317,13 @@ export default function UsersAdmin() {
   const handleQuickStatusChange = async (user: User, newStatus: UserStatus) => {
     try {
       await UserService.updateUser(user.id, {
-        status: newStatus,
+        name: user.name,
+        email: user.email,
+        roleName: user.role?.name,
+        storeIds: user.storeIds?.map(Number),
         isActive: newStatus === 'ACTIVO'
       });
+      saveStoredMeta(user.id, { status: newStatus });
       Swal.fire({
         toast: true,
         position: 'top-end',
@@ -307,7 +337,7 @@ export default function UsersAdmin() {
       Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: 'No se pudo actualizar el estado del usuario.'
+        text: 'No se pudo actualizar el estado en la base de datos.'
       });
     }
   };
@@ -315,30 +345,32 @@ export default function UsersAdmin() {
   const handleDelete = async (user: User) => {
     const result = await Swal.fire({
       title: `¿Eliminar a ${user.name}?`,
-      text: `Se revocará el acceso de usuario "${user.username || user.email}" y se borrará su registro del sistema.`,
+      text: `Esta acción eliminará al usuario (${user.email}) de la base de datos.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#000000',
       cancelButtonColor: '#d33',
-      confirmButtonText: 'Sí, eliminar usuario',
+      confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar'
     });
 
     if (result.isConfirmed) {
       try {
         await UserService.deleteUser(user.id);
+        removeStoredMeta(user.id);
+        if (user.email) removeStoredMeta(user.email);
         loadData();
         Swal.fire({
           icon: 'success',
           title: 'Usuario Eliminado',
-          text: 'El registro ha sido removido del sistema.',
+          text: 'El usuario ha sido eliminado de la base de datos.',
           confirmButtonColor: '#000000'
         });
       } catch (err: any) {
         Swal.fire({
           icon: 'error',
           title: 'Error',
-          text: err.message || 'No se pudo eliminar el usuario.',
+          text: err.message || 'No se pudo eliminar el usuario de la base de datos.',
           confirmButtonColor: '#000000'
         });
       }
@@ -394,7 +426,7 @@ export default function UsersAdmin() {
         user.email?.toLowerCase().includes(q) ||
         user.username?.toLowerCase().includes(q) ||
         user.documentNumber?.toLowerCase().includes(q) ||
-        user.id?.toLowerCase().includes(q) ||
+        String(user.id).toLowerCase().includes(q) ||
         user.phone?.includes(q) ||
         getStoreNames(user.storeIds).toLowerCase().includes(q)
       );
@@ -436,7 +468,7 @@ export default function UsersAdmin() {
                 Usuarios & Administradores
               </h1>
               <p className="text-xs sm:text-sm text-gray-500 font-medium">
-                Gestión de credenciales, roles, sedes y datos de identificación para Juan'D Store & Quality Store.
+                Gestión de credenciales, roles, sedes y datos de identificación desde la base de datos oficial.
               </p>
             </div>
           </div>
@@ -447,7 +479,7 @@ export default function UsersAdmin() {
             onClick={loadData}
             disabled={refreshing}
             className="p-2.5 border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors rounded-lg flex items-center justify-center"
-            title="Refrescar usuarios"
+            title="Refrescar usuarios de la base de datos"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-black' : ''}`} />
           </button>
@@ -468,7 +500,7 @@ export default function UsersAdmin() {
           <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Total Usuarios</p>
           <div className="flex items-baseline justify-between mt-1">
             <span className="text-2xl font-black text-gray-900">{stats.total}</span>
-            <span className="text-xs font-bold text-gray-500">Registrados</span>
+            <span className="text-xs font-bold text-gray-500">En Base de Datos</span>
           </div>
         </div>
 
@@ -568,45 +600,47 @@ export default function UsersAdmin() {
           </div>
         </div>
 
-        {/* Filtro por Sede específico */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-50 text-xs">
-          <span className="text-gray-500 font-bold uppercase tracking-wider text-[11px] mr-1">Filtrar Sede:</span>
-          <button
-            onClick={() => setStoreFilter('ALL')}
-            className={`px-3 py-1 rounded-full font-bold transition-all ${
-              storeFilter === 'ALL' ? 'bg-black text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Todas
-          </button>
-          {stores.map(store => (
+        {/* Filtro por Sede dinámico */}
+        {stores.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-50 text-xs">
+            <span className="text-gray-500 font-bold uppercase tracking-wider text-[11px] mr-1">Filtrar Sede:</span>
             <button
-              key={store.id}
-              onClick={() => setStoreFilter(store.id)}
+              onClick={() => setStoreFilter('ALL')}
               className={`px-3 py-1 rounded-full font-bold transition-all ${
-                storeFilter === store.id ? 'bg-black text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                storeFilter === 'ALL' ? 'bg-black text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              {store.name.replace("JUAN'D STORE - ", "").replace("QUALITY STORE - ", "")}
+              Todas
             </button>
-          ))}
-          {(searchTerm || roleFilter !== 'ALL' || statusFilter !== 'ALL' || storeFilter !== 'ALL') && (
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setRoleFilter('ALL');
-                setStatusFilter('ALL');
-                setStoreFilter('ALL');
-              }}
-              className="ml-auto text-xs font-bold text-red-600 hover:underline"
-            >
-              Limpiar filtros
-            </button>
-          )}
-        </div>
+            {stores.map(store => (
+              <button
+                key={store.id}
+                onClick={() => setStoreFilter(store.id)}
+                className={`px-3 py-1 rounded-full font-bold transition-all ${
+                  storeFilter === store.id ? 'bg-black text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {store.name.replace("JUAN'D STORE - ", "").replace("QUALITY STORE - ", "")}
+              </button>
+            ))}
+            {(searchTerm || roleFilter !== 'ALL' || statusFilter !== 'ALL' || storeFilter !== 'ALL') && (
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setRoleFilter('ALL');
+                  setStatusFilter('ALL');
+                  setStoreFilter('ALL');
+                }}
+                className="ml-auto text-xs font-bold text-red-600 hover:underline"
+              >
+                Limpiar filtros
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Tabla de Usuarios */}
+      {/* Tabla de Usuarios Reales */}
       <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px] text-left border-collapse">
@@ -626,16 +660,18 @@ export default function UsersAdmin() {
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-gray-400">
                     <UserX className="w-10 h-10 mx-auto text-gray-300 mb-2" />
-                    <p className="font-bold text-gray-700">No se encontraron usuarios</p>
-                    <p className="text-xs text-gray-400 mt-1">Prueba cambiando los filtros de búsqueda o agrega un nuevo usuario.</p>
+                    <p className="font-bold text-gray-700">No se encontraron usuarios en la base de datos</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {searchTerm || roleFilter !== 'ALL' || statusFilter !== 'ALL' || storeFilter !== 'ALL'
+                        ? 'Prueba cambiando los filtros seleccionados.'
+                        : 'Puedes registrar un nuevo usuario con el botón "Nuevo Administrador".'}
+                    </p>
                   </td>
                 </tr>
               ) : (
                 filteredUsers.map((user) => {
                   const currentStatus = (user.status || (user.isActive ? 'ACTIVO' : 'INACTIVO')) as UserStatus;
                   const statusInfo = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.ACTIVO;
-                  const StatusIcon = statusInfo.icon;
-                  const isStoreAdmin = user.role?.name === 'STORE_ADMIN';
                   const isGlobalAdmin = user.role?.name === 'GLOBAL_ADMIN';
 
                   return (
@@ -650,10 +686,10 @@ export default function UsersAdmin() {
                           </div>
                           <div>
                             <div className="font-mono text-xs font-bold text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded inline-block">
-                              {user.id}
+                              #{user.id}
                             </div>
                             <div className="text-xs text-gray-500 font-medium mt-0.5">
-                              @{user.username || user.email?.split('@')[0]}
+                              @{user.username || (user.email ? user.email.split('@')[0] : '')}
                             </div>
                           </div>
                         </div>
@@ -675,7 +711,7 @@ export default function UsersAdmin() {
                         <div className="space-y-1">
                           <div className="flex items-center space-x-1.5 text-xs text-gray-700 font-medium">
                             <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                            <span className="truncate max-w-[180px]">{user.email}</span>
+                            <span className="truncate max-w-[180px]">{user.email || 'Sin correo'}</span>
                           </div>
                           {user.phone ? (
                             <a
@@ -819,8 +855,8 @@ export default function UsersAdmin() {
                 </h2>
                 <p className="text-xs text-gray-400">
                   {editingId 
-                    ? `Modificando credenciales y sede asignada de ${formData.name}`
-                    : 'Ingresa los 13 datos requeridos para la ficha del administrador de sede.'}
+                    ? `Modificando datos y sede asignada de ${formData.name}`
+                    : 'Ingresa los 13 datos del formulario para registrar en la base de datos.'}
                 </p>
               </div>
               <button 
@@ -833,19 +869,21 @@ export default function UsersAdmin() {
             
             <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
               
-              {/* ID de Usuario (automático) */}
+              {/* ID de Usuario */}
               <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <Hash className="w-4 h-4 text-gray-500" />
                   <div>
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-600">
-                      1. ID de Usuario (Generado automáticamente)
+                      1. ID de Usuario
                     </label>
-                    <span className="font-mono font-bold text-sm text-gray-900">{formData.id}</span>
+                    <span className="font-mono font-bold text-sm text-gray-900">
+                      {editingId ? `#${formData.id}` : '(Generado automáticamente por la base de datos)'}
+                    </span>
                   </div>
                 </div>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
-                  Sistema Auto-ID
+                <span className="text-[10px] uppercase font-bold tracking-wider text-gray-600 bg-gray-200 px-2 py-0.5 rounded">
+                  {editingId ? 'Base de datos' : 'Auto Incremental'}
                 </span>
               </div>
 
@@ -864,7 +902,7 @@ export default function UsersAdmin() {
                     <input 
                       type="text" 
                       required 
-                      placeholder="Ej. Yeferson Alexis Muñoz"
+                      placeholder="Nombres y apellidos del administrador"
                       value={formData.name} 
                       onChange={e => setFormData({ ...formData, name: e.target.value })} 
                       className="w-full px-3.5 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-black" 
@@ -895,7 +933,7 @@ export default function UsersAdmin() {
                     <input 
                       type="text" 
                       required 
-                      placeholder="Ej. 1144098234"
+                      placeholder="Número de cédula o documento"
                       value={formData.documentNumber} 
                       onChange={e => setFormData({ ...formData, documentNumber: e.target.value })} 
                       className="w-full px-3.5 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-black" 
@@ -914,14 +952,13 @@ export default function UsersAdmin() {
                   {/* Celular */}
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                      5. Celular / Teléfono de contacto *
+                      5. Celular / Teléfono de contacto
                     </label>
                     <div className="relative">
                       <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                       <input 
                         type="tel" 
-                        required 
-                        placeholder="Ej. 3157891234"
+                        placeholder="Ej. 315 123 4567"
                         value={formData.phone} 
                         onChange={e => setFormData({ ...formData, phone: e.target.value })} 
                         className="w-full pl-9 pr-3.5 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-black" 
@@ -939,7 +976,7 @@ export default function UsersAdmin() {
                       <input 
                         type="email" 
                         required 
-                        placeholder="ejemplo@juandstore.com"
+                        placeholder="correo@ejemplo.com"
                         value={formData.email} 
                         onChange={e => setFormData({ ...formData, email: e.target.value })} 
                         className="w-full pl-9 pr-3.5 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-black" 
@@ -960,7 +997,7 @@ export default function UsersAdmin() {
                   <div>
                     <div className="flex justify-between items-center mb-1">
                       <label className="text-xs font-bold uppercase tracking-wider text-gray-700">
-                        7. Usuario (Para login) *
+                        7. Usuario (Identificador login)
                       </label>
                       <button
                         type="button"
@@ -975,8 +1012,7 @@ export default function UsersAdmin() {
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">@</span>
                       <input 
                         type="text" 
-                        required 
-                        placeholder="admin.republica"
+                        placeholder="nombre.usuario"
                         value={formData.username} 
                         onChange={e => setFormData({ ...formData, username: e.target.value })} 
                         className="w-full pl-8 pr-3.5 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-black" 
@@ -1018,7 +1054,7 @@ export default function UsersAdmin() {
                     </div>
                     {editingId && (
                       <p className="text-[10px] text-gray-400 mt-1">
-                        Solo escribe aquí si deseas cambiar la contraseña del usuario.
+                        Dejar en blanco si deseas mantener la contraseña existente.
                       </p>
                     )}
                   </div>
@@ -1067,14 +1103,14 @@ export default function UsersAdmin() {
                   {/* Sede Asignada */}
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                      10. Sede Asignada (República, Villa Colombia, Ciudad Modelo, Mariano Ramos) *
+                      10. Sede Asignada *
                     </label>
                     
                     {formData.roleName === 'GLOBAL_ADMIN' ? (
                       <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center space-x-2 text-purple-900">
                         <Shield className="w-4 h-4 text-purple-600 shrink-0" />
                         <span className="text-xs font-bold">
-                          Como Administrador Global, este usuario tiene acceso irrestricto a todas las sedes del sistema.
+                          Como Administrador Global, este usuario tiene acceso a todas las sedes del sistema.
                         </span>
                       </div>
                     ) : (
@@ -1096,13 +1132,13 @@ export default function UsersAdmin() {
                                   <MapPin className={`w-4 h-4 ${isSelected ? 'text-emerald-700' : 'text-gray-400'}`} />
                                   <div>
                                     <div className="text-xs font-bold text-gray-900">{formatStoreName(store)}</div>
-                                    <div className="text-[10px] text-gray-500">{store.address || 'Sede física en Cali'}</div>
+                                    <div className="text-[10px] text-gray-500">{store.address || 'Sede física'}</div>
                                   </div>
                                 </div>
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
-                                  onChange={() => {}} // Manejado por onClick del contenedor
+                                  onChange={() => {}}
                                   className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                                 />
                               </div>
@@ -1110,7 +1146,7 @@ export default function UsersAdmin() {
                           })}
                         </div>
                         {stores.length === 0 && (
-                          <p className="text-xs text-gray-500 italic">Cargando sedes de Juan'D Store...</p>
+                          <p className="text-xs text-gray-500 italic">No hay sedes registradas en la base de datos.</p>
                         )}
                       </div>
                     )}
@@ -1218,7 +1254,7 @@ export default function UsersAdmin() {
                 <div>
                   <div className="flex items-center space-x-2">
                     <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-white/10 text-emerald-300">
-                      {selectedUserDetail.id}
+                      #{selectedUserDetail.id}
                     </span>
                     <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${
                       selectedUserDetail.role?.name === 'GLOBAL_ADMIN' ? 'bg-purple-500 text-white' : 'bg-blue-600 text-white'
@@ -1227,7 +1263,7 @@ export default function UsersAdmin() {
                     </span>
                   </div>
                   <h2 className="text-xl font-black mt-1 text-white">{selectedUserDetail.name}</h2>
-                  <p className="text-xs text-gray-300">@{selectedUserDetail.username || selectedUserDetail.email?.split('@')[0]}</p>
+                  <p className="text-xs text-gray-300">@{selectedUserDetail.username || (selectedUserDetail.email ? selectedUserDetail.email.split('@')[0] : '')}</p>
                 </div>
               </div>
             </div>
@@ -1243,8 +1279,8 @@ export default function UsersAdmin() {
                 <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
                   <span className="block text-gray-500 text-[10px] font-bold uppercase">1. ID de Usuario</span>
                   <div className="flex items-center justify-between mt-0.5">
-                    <span className="font-mono font-bold text-gray-900">{selectedUserDetail.id}</span>
-                    <button onClick={() => copyToClipboard(selectedUserDetail.id, 'ID')} className="text-gray-400 hover:text-black">
+                    <span className="font-mono font-bold text-gray-900">#{selectedUserDetail.id}</span>
+                    <button onClick={() => copyToClipboard(String(selectedUserDetail.id), 'ID')} className="text-gray-400 hover:text-black">
                       <Copy className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -1286,10 +1322,12 @@ export default function UsersAdmin() {
                 <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 sm:col-span-2">
                   <span className="block text-gray-500 text-[10px] font-bold uppercase">6. Correo Electrónico</span>
                   <div className="flex items-center justify-between mt-0.5">
-                    <span className="font-medium text-gray-900">{selectedUserDetail.email}</span>
-                    <button onClick={() => copyToClipboard(selectedUserDetail.email || '', 'Correo')} className="text-gray-400 hover:text-black">
-                      <Copy className="w-3.5 h-3.5" />
-                    </button>
+                    <span className="font-medium text-gray-900">{selectedUserDetail.email || 'Sin correo'}</span>
+                    {selectedUserDetail.email && (
+                      <button onClick={() => copyToClipboard(selectedUserDetail.email || '', 'Correo')} className="text-gray-400 hover:text-black">
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1297,14 +1335,14 @@ export default function UsersAdmin() {
                 <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
                   <span className="block text-gray-500 text-[10px] font-bold uppercase">7. Usuario (Login)</span>
                   <span className="font-mono font-bold text-gray-900 mt-0.5 block">
-                    @{selectedUserDetail.username || selectedUserDetail.email?.split('@')[0]}
+                    @{selectedUserDetail.username || (selectedUserDetail.email ? selectedUserDetail.email.split('@')[0] : '')}
                   </span>
                 </div>
 
                 {/* 8. Contraseña */}
                 <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
                   <span className="block text-gray-500 text-[10px] font-bold uppercase">8. Contraseña</span>
-                  <span className="font-mono text-gray-500 mt-0.5 block">•••••••• (Protegida)</span>
+                  <span className="font-mono text-gray-500 mt-0.5 block">•••••••• (Encriptada en BD)</span>
                 </div>
 
                 {/* 9. Rol */}

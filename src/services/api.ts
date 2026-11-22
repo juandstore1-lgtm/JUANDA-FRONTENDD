@@ -118,33 +118,18 @@ export const ProductService = {
   }
 };
 
-const DEFAULT_FALLBACK_STORES: Store[] = [
-  { id: '1', name: "JUAN'D STORE - República de Israel", address: 'Carrera 46 # 38a-59', barrio: 'República de Israel', phone: '3157891234', schedule: '10:00 a.m. - 8:00 p.m.', image: '', description: 'Sede Principal' },
-  { id: '2', name: "JUAN'D STORE - Ciudad Modelo", address: 'Calle 29 # 40a-19', barrio: 'Ciudad Modelo', phone: '3161234567', schedule: '10:00 a.m. - 8:00 p.m.', image: '', description: 'Sede Ciudad Modelo' },
-  { id: '3', name: 'QUALITY STORE - Villa Colombia', address: 'Calle 52 # 13a-6', barrio: 'Villa Colombia', phone: '3174567890', schedule: '10:00 a.m. - 8:00 p.m.', image: '', description: 'Sede Villa Colombia' },
-  { id: '4', name: 'QUALITY STORE - Mariano Ramos', address: 'Cra. 46 con Cl. 40', barrio: 'Mariano Ramos', phone: '3187654321', schedule: '10:00 a.m. - 8:00 p.m.', image: '', description: 'Sede Mariano Ramos' },
-];
-
 let storesCache: Store[] | null = null;
 
 export const StoreService = {
   getStores: async (): Promise<Store[]> => {
-    if (storesCache && storesCache.length > 0) return storesCache;
-    try {
-      const res = await fetch(`${API_URL}/sedes`, { headers: getHeaders() });
-      const data = await handleResponse(res);
-      if (Array.isArray(data) && data.length > 0) {
-        storesCache = data.map((s: any) => ({
-          ...s,
-          id: String(s.id)
-        }));
-        return storesCache;
-      }
-    } catch {
-      // Fallback a sedes por defecto
-    }
-    storesCache = DEFAULT_FALLBACK_STORES;
-    return storesCache;
+    if (storesCache) return storesCache;
+    const res = await fetch(`${API_URL}/sedes`, { headers: getHeaders() });
+    const data = await handleResponse(res);
+    storesCache = data.map((s: any) => ({
+      ...s,
+      id: String(s.id)
+    }));
+    return storesCache!;
   },
   
   createStore: async (store: Omit<Store, 'id'>): Promise<Store> => {
@@ -185,240 +170,71 @@ export const StoreService = {
   }
 };
 
-const USERS_STORAGE_KEY = 'juand_system_users_catalog_v2';
-
-const DEFAULT_INITIAL_USERS: User[] = [
-  {
-    id: 'ADM-1001',
-    name: 'Yeferson Alexis Muñoz',
-    documentType: 'CC',
-    documentNumber: '1144098234',
-    phone: '3157891234',
-    email: 'admin.republica@juandstore.com',
-    username: 'admin.republica',
-    role: { id: 'r2', name: 'STORE_ADMIN' },
-    storeIds: ['1'],
-    assignedStoreNames: ["JUAN'D STORE - República de Israel"],
-    status: 'ACTIVO',
-    isActive: true,
-    createdAt: '2026-01-15T10:30:00Z',
-    lastLogin: '2026-11-21T18:45:00Z'
-  },
-  {
-    id: 'ADM-1002',
-    name: 'Daniela Andrea Castillo',
-    documentType: 'CC',
-    documentNumber: '1116234567',
-    phone: '3174567890',
-    email: 'admin.villacolombia@juandstore.com',
-    username: 'admin.villacolombia',
-    role: { id: 'r2', name: 'STORE_ADMIN' },
-    storeIds: ['3'],
-    assignedStoreNames: ['QUALITY STORE - Villa Colombia'],
-    status: 'ACTIVO',
-    isActive: true,
-    createdAt: '2026-02-10T14:20:00Z',
-    lastLogin: '2026-11-21T19:10:00Z'
-  },
-  {
-    id: 'ADM-1003',
-    name: 'Juliana Marcela Morales',
-    documentType: 'CC',
-    documentNumber: '1143876543',
-    phone: '3161234567',
-    email: 'admin.ciudadmodelo@juandstore.com',
-    username: 'admin.ciudadmodelo',
-    role: { id: 'r2', name: 'STORE_ADMIN' },
-    storeIds: ['2'],
-    assignedStoreNames: ["JUAN'D STORE - Ciudad Modelo"],
-    status: 'ACTIVO',
-    isActive: true,
-    createdAt: '2026-03-05T09:15:00Z',
-    lastLogin: '2026-11-20T21:05:00Z'
-  },
-  {
-    id: 'ADM-1004',
-    name: 'Paola Andrea Rentería',
-    documentType: 'CC',
-    documentNumber: '1130456123',
-    phone: '3187654321',
-    email: 'admin.marianoramos@juandstore.com',
-    username: 'admin.marianoramos',
-    role: { id: 'r2', name: 'STORE_ADMIN' },
-    storeIds: ['4'],
-    assignedStoreNames: ['QUALITY STORE - Mariano Ramos'],
-    status: 'ACTIVO',
-    isActive: true,
-    createdAt: '2026-04-12T11:00:00Z',
-    lastLogin: '2026-11-21T16:30:00Z'
-  },
-  {
-    id: 'ADM-1000',
-    name: 'Juan David (Superadmin)',
-    documentType: 'CC',
-    documentNumber: '1144001122',
-    phone: '3109988776',
-    email: 'admin@juandstore.com',
-    username: 'superadmin',
-    role: { id: 'r1', name: 'GLOBAL_ADMIN' },
-    storeIds: [],
-    assignedStoreNames: ['Todas las sedes (Global)'],
-    status: 'ACTIVO',
-    isActive: true,
-    createdAt: '2025-11-01T08:00:00Z',
-    lastLogin: '2026-11-21T21:15:00Z'
-  }
-];
-
-const loadLocalUsers = (): User[] => {
-  try {
-    const raw = localStorage.getItem(USERS_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch {}
-  saveLocalUsers(DEFAULT_INITIAL_USERS);
-  return DEFAULT_INITIAL_USERS;
-};
-
-const saveLocalUsers = (users: User[]) => {
-  try {
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
-  } catch {}
-};
-
 export const UserService = {
   getUsers: async (): Promise<User[]> => {
-    const localUsers = loadLocalUsers();
-    try {
-      const res = await fetch(`${API_URL}/users`, { headers: getHeaders() });
-      const data = await handleResponse(res).catch(() => []);
-      if (Array.isArray(data) && data.length > 0) {
-        const merged: User[] = data.map((u: any) => {
-          const match = localUsers.find(l => String(l.id) === String(u.id) || l.email === u.email);
-          return {
-            id: String(u.id),
-            name: u.name,
-            documentType: match?.documentType || 'CC',
-            documentNumber: match?.documentNumber || '',
-            phone: match?.phone || '',
-            email: u.email,
-            username: match?.username || u.email?.split('@')[0] || `user_${u.id}`,
-            role: { id: u.roleName === 'GLOBAL_ADMIN' ? 'r1' : 'r2', name: u.roleName },
-            storeIds: u.storeIds ? u.storeIds.map(String) : [],
-            assignedStoreNames: match?.assignedStoreNames,
-            status: match?.status || (u.isActive ? 'ACTIVO' : 'INACTIVO'),
-            isActive: !!u.isActive,
-            createdAt: match?.createdAt || new Date().toISOString(),
-            lastLogin: match?.lastLogin || 'Sin accesos registrados'
-          };
-        });
-        
-        const localOnly = localUsers.filter(l => !merged.some(m => String(m.id) === String(l.id) || m.email === l.email));
-        const fullList = [...merged, ...localOnly];
-        saveLocalUsers(fullList);
-        return fullList;
-      }
-    } catch {}
-    return localUsers;
+    const res = await fetch(`${API_URL}/users`, { headers: getHeaders() });
+    const data = await handleResponse(res).catch(() => []);
+    return data.map((u: any) => ({
+      id: String(u.id),
+      name: u.name,
+      email: u.email,
+      role: { id: u.roleName === 'GLOBAL_ADMIN' ? 'r1' : 'r2', name: u.roleName },
+      storeIds: u.storeIds ? u.storeIds.map(String) : [],
+      isActive: !!u.isActive,
+      documentType: u.documentType,
+      documentNumber: u.documentNumber,
+      phone: u.phone,
+      username: u.username,
+      status: u.status,
+      createdAt: u.createdAt,
+      lastLogin: u.lastLogin
+    }));
   },
   
-  createUser: async (user: Omit<User, 'id'> & { id?: string }): Promise<User> => {
-    const localUsers = loadLocalUsers();
-    const newId = user.id || `ADM-${1000 + localUsers.length + 1}`;
-    const status = user.status || (user.isActive ? 'ACTIVO' : 'INACTIVO');
-    const newUser: User = {
-      ...user,
-      id: newId,
-      status,
-      isActive: status === 'ACTIVO',
-      createdAt: user.createdAt || new Date().toISOString(),
-      lastLogin: user.lastLogin || 'Sin accesos registrados'
-    };
-    
-    try {
-      await fetch(`${API_URL}/users`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify({
-          name: newUser.name,
-          email: newUser.email,
-          password: newUser.password,
-          roleName: newUser.role?.name,
-          storeIds: newUser.storeIds?.map(Number),
-          isActive: newUser.isActive
-        })
-      });
-    } catch {}
-
-    const updated = [newUser, ...localUsers.filter(u => u.id !== newId)];
-    saveLocalUsers(updated);
-    return newUser;
+  createUser: async (user: any): Promise<User> => {
+    const res = await fetch(`${API_URL}/users`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(user)
+    });
+    return handleResponse(res);
   },
   
-  updateUser: async (id: string, updates: Partial<User>): Promise<User> => {
-    const localUsers = loadLocalUsers();
-    const existingIndex = localUsers.findIndex(u => String(u.id) === String(id));
-    const current = existingIndex >= 0 ? localUsers[existingIndex] : null;
-    
-    const status = updates.status || (updates.isActive !== undefined ? (updates.isActive ? 'ACTIVO' : 'INACTIVO') : current?.status || 'ACTIVO');
-    const updatedUser: User = {
-      ...(current || ({} as User)),
-      ...updates,
-      id: String(id),
-      status,
-      isActive: status === 'ACTIVO'
-    };
-
-    try {
-      await fetch(`${API_URL}/users/${id}`, {
-        method: 'PUT',
-        headers: getHeaders(),
-        body: JSON.stringify({
-          name: updatedUser.name,
-          email: updatedUser.email,
-          password: updatedUser.password || undefined,
-          roleName: updatedUser.role?.name,
-          storeIds: updatedUser.storeIds?.map(Number),
-          isActive: updatedUser.isActive
-        })
-      });
-    } catch {}
-
-    const updatedList = localUsers.map(u => String(u.id) === String(id) ? updatedUser : u);
-    saveLocalUsers(updatedList);
-    return updatedUser;
+  updateUser: async (id: string, updates: any): Promise<User> => {
+    const res = await fetch(`${API_URL}/users/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(updates)
+    });
+    return handleResponse(res);
   },
   
   deleteUser: async (id: string): Promise<void> => {
-    try {
-      await fetch(`${API_URL}/users/${id}`, {
-        method: 'DELETE',
-        headers: getHeaders()
-      });
-    } catch {}
-    const localUsers = loadLocalUsers();
-    saveLocalUsers(localUsers.filter(u => String(u.id) !== String(id)));
+    const res = await fetch(`${API_URL}/users/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    await handleResponse(res);
   },
   
   getMe: async (): Promise<User> => {
-    try {
-      const res = await fetch(`${API_URL}/users/me`, { headers: getHeaders() });
-      const u = await handleResponse(res);
-      return {
-        id: String(u.id),
-        name: u.name,
-        email: u.email,
-        role: { id: u.roleName === 'GLOBAL_ADMIN' ? 'r1' : 'r2', name: u.roleName },
-        storeIds: u.storeIds ? u.storeIds.map(String) : [],
-        isActive: !!u.isActive,
-        status: u.isActive ? 'ACTIVO' : 'INACTIVO'
-      };
-    } catch {
-      const localUsers = loadLocalUsers();
-      return localUsers[0];
-    }
+    const res = await fetch(`${API_URL}/users/me`, { headers: getHeaders() });
+    const u = await handleResponse(res);
+    return {
+      id: String(u.id),
+      name: u.name,
+      email: u.email,
+      role: { id: u.roleName === 'GLOBAL_ADMIN' ? 'r1' : 'r2', name: u.roleName },
+      storeIds: u.storeIds ? u.storeIds.map(String) : [],
+      isActive: !!u.isActive,
+      documentType: u.documentType,
+      documentNumber: u.documentNumber,
+      phone: u.phone,
+      username: u.username,
+      status: u.status,
+      createdAt: u.createdAt,
+      lastLogin: u.lastLogin
+    };
   }
 };
 
