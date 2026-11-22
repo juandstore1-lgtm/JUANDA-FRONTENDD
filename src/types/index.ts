@@ -1,15 +1,29 @@
+export type UserRoleName = 'GLOBAL_ADMIN' | 'STORE_ADMIN' | 'VENDEDOR' | string;
+
 export interface Role {
   id: string;
-  name: 'GLOBAL_ADMIN' | 'STORE_ADMIN';
+  name: UserRoleName;
 }
 
+export type UserStatus = 'ACTIVO' | 'INACTIVO' | 'SUSPENDIDO';
+export type DocumentType = 'CC' | 'CE' | 'PASAPORTE' | 'PPT' | 'TI' | string;
+
 export interface User {
-  id: string;
-  name: string;
-  email?: string;
-  role: Role;
-  storeIds: string[]; // empty if GLOBAL_ADMIN
-  isActive: boolean;
+  id: string; // 1. ID de usuario (generado automáticamente)
+  name: string; // 2. Nombre completo (Nombres y apellidos)
+  documentType?: DocumentType; // 3. Tipo de documento (CC, CE, Pasaporte, etc.)
+  documentNumber?: string; // 4. Número de documento de identificación
+  phone?: string; // 5. Celular de contacto
+  email?: string; // 6. Correo electrónico (personal o corporativo)
+  username?: string; // 7. Usuario (identificador para inicio de sesión)
+  password?: string; // 8. Contraseña de acceso
+  role: Role; // 9. Rol (Administrador de sede, Global Admin, etc.)
+  storeIds: string[]; // 10. Sede asignada (IDs)
+  assignedStoreNames?: string[]; // Nombres legibles de las sedes
+  status?: UserStatus; // 11. Estado: Activo, inactivo o suspendido
+  isActive: boolean; // Retrocompatibilidad con la API
+  createdAt?: string; // 12. Fecha de creación automática
+  lastLogin?: string; // 13. Último acceso (fecha y hora de último inicio de sesión)
 }
 
 export interface Store {
