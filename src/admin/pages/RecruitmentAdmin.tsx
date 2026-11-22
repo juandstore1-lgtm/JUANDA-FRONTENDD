@@ -198,6 +198,13 @@ export default function RecruitmentAdmin() {
       .replace('febrero', 'feb.');
   };
 
+  const isSeasonVacancy = useMemo(() => {
+    return scheduleMode === 'ESPECIFICO' || 
+      shiftDates.length > 0 ||
+      (vacancyForm.employmentType || '').toLowerCase().includes('temporada') ||
+      (vacancyForm.contractType || '').toLowerCase().includes('pago por día');
+  }, [scheduleMode, shiftDates.length, vacancyForm.employmentType, vacancyForm.contractType]);
+
   const estimatedTotalPay = useMemo(() => {
     return shiftDates.reduce((acc, curr) => {
       const num = parseInt((curr.dailyPay || '40000').replace(/\D/g, ''), 10) || 40000;
@@ -205,25 +212,58 @@ export default function RecruitmentAdmin() {
     }, 0);
   }, [shiftDates]);
 
+  const areAllDailyPaysEqual = useMemo(() => {
+    if (shiftDates.length <= 1) return true;
+    const first = (shiftDates[0].dailyPay || '').replace(/\D/g, '');
+    return shiftDates.every(d => (d.dailyPay || '').replace(/\D/g, '') === first);
+  }, [shiftDates]);
+
   const sampleDailyPay = useMemo(() => {
-    if (shiftDates.length > 0 && shiftDates[0].dailyPay) {
-      return shiftDates[0].dailyPay;
+    if (shiftDates.length === 0) return '$40.000';
+    const cleanPays = shiftDates.map(d => (d.dailyPay || '$40.000').trim());
+    const unique = Array.from(new Set(cleanPays));
+    if (unique.length === 1) {
+      return `${unique[0]} / día`;
     }
-    return '$40.000';
+    return `Variable (${cleanPays[0]} a ${cleanPays[cleanPays.length - 1]})`;
   }, [shiftDates]);
 
   const updateShiftDatesAndForm = (newDates: ShiftDateItem[]) => {
     setShiftDates(newDates);
     const serialized = serializeShiftDates(newDates);
+
+    // Formatear una cadena de días corta (<= 220 caracteres) para respetar la restricción VARCHAR(255) de la BD
+    const shortDaysList = newDates.map(d => {
+      if (d.shortDate) return d.shortDate;
+      if (d.rawDate) {
+        const p = d.rawDate.split('-');
+        if (p.length === 3) return `${parseInt(p[2], 10)} ${p[1] === '12' ? 'Dic' : p[1] === '01' ? 'Ene' : 'Mes'}`;
+      }
+      return d.date.split(' de ')[0] || d.date;
+    }).join(', ');
+
+    const safeWorkDays = shortDaysList.length <= 220 
+      ? shortDaysList 
+      : `${newDates.length} fechas clave (${newDates[0]?.shortDate || 'Dic'} a ${newDates[newDates.length - 1]?.shortDate || 'Ene'})`;
+
+    const total = newDates.reduce((acc, curr) => {
+      const num = parseInt((curr.dailyPay || '40000').replace(/\D/g, ''), 10) || 40000;
+      return acc + num;
+    }, 0);
+    const cleanPays = newDates.map(d => (d.dailyPay || '$40.000').trim());
+    const uniquePays = Array.from(new Set(cleanPays));
+    const autoBaseSalary = newDates.length > 0
+      ? (uniquePays.length === 1 ? `${uniquePays[0]} / día trabajado` : `Tarifa variable por jornada (Total: $${total.toLocaleString('es-CO')})`)
+      : '$ 40.000 / día trabajado';
+
     setVacancyForm(prev => ({
       ...prev,
       scheduleObservations: serialized,
       workScheduleHours: newDates.length > 0 
         ? `Horario variable según fecha (${newDates.length} fechas programadas)`
         : prev.workScheduleHours,
-      workDays: newDates.length > 0
-        ? newDates.map(d => d.date).join(', ')
-        : prev.workDays
+      workDays: newDates.length > 0 ? safeWorkDays : prev.workDays,
+      baseSalary: autoBaseSalary
     }));
   };
 
@@ -609,28 +649,67 @@ export default function RecruitmentAdmin() {
 
     try {
       setSavingVacancy(true);
+      const isSeasonVacancy = scheduleMode === 'ESPECIFICO' ||
+        (vacancyForm.employmentType || '').toLowerCase().includes('temporada') ||
+        (vacancyForm.contractType || '').toLowerCase().includes('pago por día');
+
       let scheduleObs = vacancyForm.scheduleObservations || '';
       let workSchedHours = vacancyForm.workScheduleHours;
       let workDaysVal = vacancyForm.workDays;
+      let finalBaseSalary = vacancyForm.baseSalary;
 
       if (scheduleMode === 'ESPECIFICO' && shiftDates.length > 0) {
         scheduleObs = serializeShiftDates(shiftDates);
         workSchedHours = `Horario variable según fecha (${shiftDates.length} fechas programadas)`;
-        workDaysVal = shiftDates.map(d => d.date).join(', ');
+        
+        // Garantizar que workDays nunca sobrepase los 220 caracteres (para no romper el límite VARCHAR(255) de la BD)
+        const shortDaysList = shiftDates.map(d => {
+          if (d.shortDate) return d.shortDate;
+          if (d.rawDate) {
+            const p = d.rawDate.split('-');
+            if (p.length === 3) return `${parseInt(p[2], 10)} ${p[1] === '12' ? 'Dic' : p[1] === '01' ? 'Ene' : 'Mes'}`;
+          }
+          return d.date.split(' de ')[0] || d.date;
+        }).join(', ');
+
+        workDaysVal = shortDaysList.length <= 220 
+          ? shortDaysList 
+          : `${shiftDates.length} fechas clave (${shiftDates[0]?.shortDate || 'Dic'} a ${shiftDates[shiftDates.length - 1]?.shortDate || 'Ene'})`;
+
+        const cleanPays = shiftDates.map(d => (d.dailyPay || '$40.000').trim());
+        const uniquePays = Array.from(new Set(cleanPays));
+        finalBaseSalary = uniquePays.length === 1 
+          ? `${uniquePays[0]} / día trabajado` 
+          : `Tarifa variable por día (Total: $${estimatedTotalPay.toLocaleString('es-CO')})`;
       } else if (scheduleMode === 'FIJO') {
-        // Clean out any seasonal shift data for a fixed job (like Administrador)
+        // Limpiar datos decembrinos para cargos fijos (ej. Administrador fijo)
         scheduleObs = vacancyForm.scheduleObservations ? vacancyForm.scheduleObservations.replace(/\[DATOS_TURNOS_JSON:.*?\]/s, '').replace(/📅 FECHAS Y HORARIOS ASIGNADOS:[\s\S]*/s, '').trim() : '';
+        if (!finalBaseSalary) finalBaseSalary = "$ 1.750.000";
       }
 
-      const toSave = {
+      const toSave: any = {
         ...vacancyForm,
         scheduleObservations: scheduleObs,
         workScheduleHours: workSchedHours,
         workDays: workDaysVal,
-        title: vacancyForm.title.trim() || `${vacancyForm.position} - ${vacancyForm.company}`,
-        requirements: selectedReqs.join(', '),
+        baseSalary: finalBaseSalary || (isSeasonVacancy ? "$ 40.000 / día trabajado" : "$ 1.750.000"),
+        transportAid: isSeasonVacancy ? "No aplica (se cancela directamente el valor de cada día trabajado)" : (vacancyForm.transportAid || 'Por definir'),
+        sundayHolidaySurcharge: isSeasonVacancy ? "No aplica (tarifa integral por día)" : (vacancyForm.sundayHolidaySurcharge || 'Aplica recargo legal'),
+        benefits: isSeasonVacancy ? (vacancyForm.benefits || "Pago directo por cada día laborado") : (vacancyForm.benefits || 'Todas las prestaciones de ley'),
+        salaryObservations: isSeasonVacancy 
+          ? `Se cancela directamente el valor de cada día trabajado. Total estimado: $${estimatedTotalPay.toLocaleString('es-CO')} para las ${shiftDates.length} jornadas programadas.`
+          : vacancyForm.salaryObservations,
+        title: vacancyForm.title?.trim() || `${vacancyForm.position} - ${vacancyForm.company}`,
+        requirements: selectedReqs.length > 0 
+          ? selectedReqs.join(', ') 
+          : (vacancyForm.requirements || 'Mayor de 18 años, Actitud comercial, Disponibilidad para presentarse en las fechas asignadas.'),
         status: status
       };
+
+      // Si es creación, eliminar id para que Hibernate genere el ID autoincremental
+      if (!toSave.id) {
+        delete toSave.id;
+      }
 
       if (vacancyForm.id) {
         await RecruitmentService.updateVacancy(vacancyForm.id, toSave);
@@ -4372,75 +4451,169 @@ export default function RecruitmentAdmin() {
                     <div className="flex items-center gap-2 mb-2">
                       <DollarSign className="w-4 h-4 text-emerald-600" />
                       <h3 className="text-sm font-extrabold text-gray-900">
-                        {vacancyForm.employmentType === 'Temporada Decembrina' ? '3. Pago por día trabajado' : '3. Salario y beneficios'}
+                        {isSeasonVacancy ? '3. Pago y remuneración por jornada' : '3. Salario y beneficios'}
                       </h3>
                     </div>
 
-                    {vacancyForm.employmentType === 'Temporada Decembrina' && (
-                      <div className="p-3.5 bg-amber-50/90 border border-amber-300 rounded-xl text-xs text-amber-950 space-y-1">
-                        <div className="flex items-center gap-2 font-bold text-amber-900">
-                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                          <span>Modalidad: Pago por día trabajado (Sin salario mensual)</span>
+                    {isSeasonVacancy ? (
+                      /* Modo Temporada Decembrina / Fechas Específicas: El pago ya se definió en el Paso 2 */
+                      <div className="space-y-4">
+                        {/* Tarjeta de Resumen Automático: No pide el valor de nuevo */}
+                        <div className="p-4 bg-emerald-50/90 border border-emerald-300 rounded-2xl shadow-xs space-y-3">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-base shadow-xs shrink-0">
+                                💰
+                              </div>
+                              <div>
+                                <h4 className="text-xs font-black text-emerald-950 uppercase tracking-wide">
+                                  Pago Definido Automáticamente por Jornada
+                                </h4>
+                                <p className="text-[11px] text-emerald-800 font-medium">
+                                  El valor de pago ya fue asignado en cada fecha del Paso 2. No necesitas volver a escribirlo aquí.
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setWizardStep(2)}
+                              className="text-xs font-bold text-emerald-800 hover:text-emerald-950 hover:underline flex items-center gap-1 shrink-0"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                              <span>Editar fechas o tarifas</span>
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-emerald-200/80">
+                            <div className="bg-white p-3 rounded-xl border border-emerald-100 shadow-2xs">
+                              <span className="text-[10px] font-bold text-gray-500 uppercase block">Jornadas programadas</span>
+                              <span className="text-base font-black text-gray-900">{shiftDates.length} fechas</span>
+                            </div>
+                            <div className="bg-white p-3 rounded-xl border border-emerald-100 shadow-2xs">
+                              <span className="text-[10px] font-bold text-gray-500 uppercase block">Tarifa por día</span>
+                              <span className="text-base font-black text-emerald-700">
+                                {sampleDailyPay}
+                              </span>
+                            </div>
+                            <div className="bg-white p-3 rounded-xl border border-emerald-100 shadow-2xs">
+                              <span className="text-[10px] font-bold text-gray-500 uppercase block">Pago total estimado</span>
+                              <span className="text-base font-black text-emerald-800">${estimatedTotalPay.toLocaleString('es-CO')}</span>
+                            </div>
+                          </div>
                         </div>
-                        <p className="text-[11px] text-amber-900 leading-relaxed">
-                          Para esta labor temporal <strong>no hay salario mensual fijo, auxilio de transporte ni recargos</strong>. Se cancela directamente el valor acordado por cada día laborado según las fechas que asignes (ej. 6, 7, 20 al 24 de diciembre).
-                        </p>
+
+                        {/* Opciones adicionales de pago sin duplicar campos */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">
+                              Frecuencia o momento de pago *
+                            </label>
+                            <select
+                              value={vacancyForm.paymentFrequency || 'Diario / Por día trabajado'}
+                              onChange={e => setVacancyForm({ ...vacancyForm, paymentFrequency: e.target.value })}
+                              className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg bg-white font-medium"
+                            >
+                              <option value="Diario / Por día trabajado">Pago diario al terminar cada turno</option>
+                              <option value="Semanal">Pago semanal acumulado de días laborados</option>
+                              <option value="Quincenal">Pago quincenal acumulado</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">
+                              Observaciones de pago y condiciones
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Ej. Se cancela directamente el valor de cada día trabajado"
+                              value={vacancyForm.benefits || 'Pago directo por día laborado en sede asignada'}
+                              onChange={e => setVacancyForm({ ...vacancyForm, benefits: e.target.value })}
+                              className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Resumen interactivo de fechas y valores para verificar */}
+                        {shiftDates.length > 0 && (
+                          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-[11px] font-bold uppercase text-gray-700">
+                                Fechas y valores configurados ({shiftDates.length} jornadas)
+                              </span>
+                              <span className="text-[11px] font-black text-emerald-800">
+                                Total a pagar: ${estimatedTotalPay.toLocaleString('es-CO')}
+                              </span>
+                            </div>
+                            <div className="max-h-36 overflow-y-auto divide-y divide-gray-200 text-xs">
+                              {shiftDates.map((item, idx) => (
+                                <div key={item.id || idx} className="py-1.5 flex items-center justify-between text-[11px]">
+                                  <span className="font-semibold text-gray-800">{item.date}</span>
+                                  <span className="text-gray-500 font-medium">{item.hours}</span>
+                                  <span className="font-black text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded">
+                                    {item.dailyPay}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* Modo Horarios fijos semanales (Administrador, etc.) */
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">
+                            Salario base mensual *
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ej. $ 1.750.000"
+                            value={vacancyForm.baseSalary}
+                            onChange={e => setVacancyForm({ ...vacancyForm, baseSalary: e.target.value })}
+                            className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg font-bold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">
+                            Auxilio de transporte *
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ej. $ 162.000"
+                            value={vacancyForm.transportAid}
+                            onChange={e => setVacancyForm({ ...vacancyForm, transportAid: e.target.value })}
+                            className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">
+                            Recargo por domingos y festivos *
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ej. Aplica recargo legal"
+                            value={vacancyForm.sundayHolidaySurcharge}
+                            onChange={e => setVacancyForm({ ...vacancyForm, sundayHolidaySurcharge: e.target.value })}
+                            className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">
+                            Beneficios y prestaciones *
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ej. Todas las prestaciones de ley, Descuentos en tienda"
+                            value={vacancyForm.benefits}
+                            onChange={e => setVacancyForm({ ...vacancyForm, benefits: e.target.value })}
+                            className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg"
+                          />
+                        </div>
                       </div>
                     )}
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">
-                          {vacancyForm.employmentType === 'Temporada Decembrina' ? 'Valor por día trabajado *' : 'Salario base mensual *'}
-                        </label>
-                        <input
-                          type="text"
-                          placeholder={vacancyForm.employmentType === 'Temporada Decembrina' ? 'Ej. $ 60.000 / día trabajado' : 'Ej. $ 1.750.000'}
-                          value={vacancyForm.baseSalary}
-                          onChange={e => setVacancyForm({ ...vacancyForm, baseSalary: e.target.value })}
-                          className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg font-bold"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">
-                          {vacancyForm.employmentType === 'Temporada Decembrina' ? 'Auxilio de transporte (Opcional)' : 'Auxilio de transporte *'}
-                        </label>
-                        <input
-                          type="text"
-                          placeholder={vacancyForm.employmentType === 'Temporada Decembrina' ? 'No aplica (se paga el día trabajado)' : 'Ej. $ 70.000'}
-                          value={vacancyForm.transportAid}
-                          onChange={e => setVacancyForm({ ...vacancyForm, transportAid: e.target.value })}
-                          className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">
-                          {vacancyForm.employmentType === 'Temporada Decembrina' ? 'Recargo festivos (Opcional)' : 'Recargo por domingos y festivos *'}
-                        </label>
-                        <input
-                          type="text"
-                          placeholder={vacancyForm.employmentType === 'Temporada Decembrina' ? 'No aplica (tarifa por día)' : 'Ej. $ 43.666'}
-                          value={vacancyForm.sundayHolidaySurcharge}
-                          onChange={e => setVacancyForm({ ...vacancyForm, sundayHolidaySurcharge: e.target.value })}
-                          className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">
-                          {vacancyForm.employmentType === 'Temporada Decembrina' ? 'Condiciones de pago *' : 'Beneficios *'}
-                        </label>
-                        <input
-                          type="text"
-                          placeholder={vacancyForm.employmentType === 'Temporada Decembrina' ? 'Ej. Pago diario al terminar el turno' : 'Ej. Descuento en tienda, Incentivos por metas'}
-                          value={vacancyForm.benefits}
-                          onChange={e => setVacancyForm({ ...vacancyForm, benefits: e.target.value })}
-                          className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg"
-                        />
-                      </div>
-                    </div>
                   </div>
                 )}
 
@@ -4631,9 +4804,21 @@ export default function RecruitmentAdmin() {
                         <button type="button" onClick={() => setWizardStep(3)} className="absolute top-2 right-2 text-gray-400 hover:text-emerald-700">
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
-                        <strong className="block text-gray-900 mb-1">Salario y beneficios</strong>
-                        <p>Base: {vacancyForm.baseSalary || 'Por definir'}</p>
-                        <p>Auxilio: {vacancyForm.transportAid || 'Por definir'}</p>
+                        <strong className="block text-gray-900 mb-1">
+                          {isSeasonVacancy ? 'Pago y remuneración' : 'Salario y beneficios'}
+                        </strong>
+                        {isSeasonVacancy ? (
+                          <>
+                            <p className="text-emerald-900 font-bold">Total estimado: ${estimatedTotalPay.toLocaleString('es-CO')}</p>
+                            <p className="text-gray-600">Tarifa: {areAllDailyPaysEqual ? sampleDailyPay : 'Variable por jornada'}</p>
+                            <p className="text-gray-500">Pago: {vacancyForm.paymentFrequency || 'Diario al terminar turno'}</p>
+                          </>
+                        ) : (
+                          <>
+                            <p>Base: {vacancyForm.baseSalary || 'Por definir'}</p>
+                            <p>Auxilio: {vacancyForm.transportAid || 'Por definir'}</p>
+                          </>
+                        )}
                       </div>
 
                       <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 relative">
@@ -4728,7 +4913,9 @@ export default function RecruitmentAdmin() {
                                 Pago total estimado: ${estimatedTotalPay.toLocaleString('es-CO')}
                               </p>
                               <p className="text-[10px] text-emerald-700 font-medium">
-                                ({shiftDates.length} {shiftDates.length === 1 ? 'jornada' : 'jornadas'} × {sampleDailyPay})
+                                {areAllDailyPaysEqual
+                                  ? `(${shiftDates.length} ${shiftDates.length === 1 ? 'jornada' : 'jornadas'} × ${sampleDailyPay})`
+                                  : `(${shiftDates.length} jornadas programadas con tarifas diferenciadas)`}
                               </p>
                             </div>
                           </div>
