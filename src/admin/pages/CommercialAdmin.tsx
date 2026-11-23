@@ -67,7 +67,6 @@ export default function CommercialAdmin() {
 
   const setActiveTab = (tab: string) => {
     if (tab === 'cargar-ia') {
-      setIsAiInlineOpen(true);
       setSearchParams({ tab: 'registro-manual' });
       return;
     }
@@ -76,7 +75,6 @@ export default function CommercialAdmin() {
 
   useEffect(() => {
     if (searchParams.get('tab') === 'cargar-ia') {
-      setIsAiInlineOpen(true);
       setSearchParams({ tab: 'registro-manual' });
     }
   }, [searchParams]);

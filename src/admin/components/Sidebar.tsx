@@ -19,7 +19,6 @@ import {
   TrendingUp,
   ChevronDown,
   ChevronRight,
-  Sparkles,
   Edit3,
   History,
   BarChart3,
@@ -90,7 +89,6 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
   const commercialSubItems = [
     { name: 'Resumen general', tab: 'resumen', icon: LayoutDashboard },
-    { name: 'Cargar ventas (IA)', tab: 'cargar-ia', icon: Sparkles },
     { name: 'Registro manual', tab: 'registro-manual', icon: Edit3 },
     { name: 'Historial de ventas', tab: 'historial', icon: History },
     { name: 'Ventas mensuales', tab: 'ventas-mensuales', icon: BarChart3 },
